@@ -1,0 +1,21 @@
+[package]
+name = "n_transpiler"
+version = "0.1.0"
+authors = ["NotIntMan"]
+
+[lib]
+name = "n_transpiler"
+path = "src/lib.rs"
+
+[[bin]]
+name = "n_transpiler"
+path = "src/main.rs"
+
+[dependencies]
+nom = "3.2.1"
+itertools = "0.7.6"
+log = "0.4.1"
+env_logger = "0.5.3"
+
+[dev-dependencies]
+stainless = "0.1.12"
