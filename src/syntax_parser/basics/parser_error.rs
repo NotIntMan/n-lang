@@ -10,6 +10,8 @@ use std::cmp::{
     PartialOrd,
 };
 
+use std::mem::replace;
+
 use lexeme_scanner::{
     TokenKind,
     SymbolPosition,
@@ -87,6 +89,31 @@ impl ParserError {
             &ParserError::Many(ref v) => v.clone(),
         }
     }
+    pub fn append(&mut self, err: ParserError) {
+        let result = match self {
+            &mut ParserError::One(ref e) => {
+                let e = e.clone();
+                let v = match err {
+                    ParserError::One(f) => {
+                        vec![e, f]
+                    },
+                    ParserError::Many(mut w) => {
+                        w.push(e);
+                        w
+                    },
+                };
+                ParserError::Many(v)
+            },
+            &mut ParserError::Many(ref mut v) => {
+                match err {
+                    ParserError::One(e) => v.push(e),
+                    ParserError::Many(mut w) => v.append(&mut w),
+                }
+                return;
+            },
+        };
+        replace(self, result);
+    }
 }
 
 impl Display for ParserError {
@@ -100,4 +127,3 @@ impl Display for ParserError {
         writeln!(f, "Solution of one of them may solve the problem.")
     }
 }
-
