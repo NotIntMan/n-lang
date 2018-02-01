@@ -1,11 +1,13 @@
 //! Сканер. Получает строку на ввод и реализует итерируемый механизм сканирования лексем в полученонй строке.
 
 use std::str::Chars;
+use std::iter::FromIterator;
 
 use super::*;
 use super::eaters::scan;
 use super::super::helpers::iter_buffer::{
     IterBuffer,
+    PerfectBuffer,
     IterBufferCursor,
 };
 
@@ -54,6 +56,7 @@ impl<'a> Iterator for Scanner<'a>
 
 impl<'a> Scanner<'a> {
     /// Создаёт новый сканер
+    #[inline]
     pub fn new(source: &'a str) -> Self {
         let buffer = IterBuffer::new(source.chars());
         Self {
@@ -62,5 +65,21 @@ impl<'a> Scanner<'a> {
             position: SymbolPosition::default(),
             finished: false,
         }
+    }
+    /// Пробует собрать все лексемы (токены) в единый буфер.
+    /// Если встречает ошибку, возвращает её.
+    #[inline]
+    pub fn into_buffer(self) -> Result<PerfectBuffer<Token<'a>>, ScannerError> {
+        Result::from_iter(self)
+    }
+    /**
+        Сканирование
+
+        Производит сканирование и складывает все лексемы в PerfectBuffer.
+        Является композицией методов `new` и `into_buffer`.
+    */
+    #[inline]
+    pub fn scan(source: &'a str) -> Result<PerfectBuffer<Token<'a>>, ScannerError> {
+        Scanner::new(source).into_buffer()
     }
 }

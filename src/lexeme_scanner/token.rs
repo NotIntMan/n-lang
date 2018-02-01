@@ -63,6 +63,14 @@ impl TokenKind {
     pub fn is_end(&self) -> bool {
         self == &TokenKind::EndOfInput
     }
+    /// Проверяет является ли тип токены числовым литералом
+    #[inline]
+    pub fn is_number(&self) -> bool {
+        match self {
+            &TokenKind::NumberLiteral { negative: _, fractional: _, radix: _ } => true,
+            _ => false,
+        }
+    }
 }
 
 impl<'a> Token<'a> {
