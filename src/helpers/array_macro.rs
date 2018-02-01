@@ -53,21 +53,21 @@ macro_rules! array {
         const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };
     (pub const $name: ident : $element_type: ty = $( $element: expr ),*) => {
-        const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
+        pub const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };
     (pub const $name: ident : $element_type: ty = $( $element: expr ),* ,) => {
-        const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
+        pub const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };
     (let $name: ident : $element_type: ty = $( $element: expr ),*) => {
-        const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
+        let $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };
     (let $name: ident : $element_type: ty = $( $element: expr ),* ,) => {
-        const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
+        let $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };
     (let mut $name: ident : $element_type: ty = $( $element: expr ),*) => {
-        const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
+        let mut $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };
     (let mut $name: ident : $element_type: ty = $( $element: expr ),* ,) => {
-        const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
+        let mut $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };
 }

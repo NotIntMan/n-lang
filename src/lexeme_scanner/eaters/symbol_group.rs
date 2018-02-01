@@ -4,7 +4,8 @@ use super::*;
 
 use self::basics::*;
 
-array!(const SYMBOLS_1: char =
+/// Массив одиночных спец. символов
+array!(pub const SYMBOLS_1: char =
     '|',
     '&',
     '^',
@@ -28,7 +29,8 @@ array!(const SYMBOLS_1: char =
     '*',
 );
 
-array!(const SYMBOLS_2: [char; 2] =
+/// Массив групп спецсимволов
+array!(pub const SYMBOLS_2: [char; 2] =
     ['|', '|'],
     ['&', '&'],
     ['<', '<'],
