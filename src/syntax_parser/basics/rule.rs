@@ -1,3 +1,5 @@
+//! Примитивы синтаксического анализа, определённые над правилами распознавания лексем
+
 use helpers::num_range::NumRange;
 
 use super::{
@@ -6,6 +8,11 @@ use super::{
     LexemeParserResult,
 };
 
+/**
+    Примитив "Возможно".
+    Выполняет разбор хранимого правила и, в случае успеха, возвращает его результат, обёрнутый в `Some(_)`.
+    В случае неудачи откатывает положение курсора и возвращает `None`.
+*/
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuleOption<R>(pub R);
 
@@ -24,6 +31,12 @@ impl<'a, 'b, R: LexemeParser<'a, 'b>> LexemeParser<'a, 'b> for RuleOption<R> {
     }
 }
 
+/**
+    Примитив "Ветвление".
+    Выполняет разбор сначала первого правила и, в случае неудачи,
+    откатывает положение курсора и выполняет разбор второго правила,
+    результат которого и возвращает, вне зависимости от успешности.
+*/
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuleBranch<A, B>(pub A, pub B);
 
@@ -49,6 +62,19 @@ impl<'a, 'b, A, B, R> LexemeParser<'a, 'b> for RuleBranch<A, B>
     }
 }
 
+/**
+    Примитив "Повторение".
+    Выполняет повторный разбор правила до тех пор,
+    пока не достигнет верхней границы хранимого диапазона,
+    которой, кстати, может и не быть,
+    или пока не встретит ошибку.
+
+    При обнаружении ошибки, выполняет проверку количества успешно разобранных итераций.
+    Если количество входит в хранимый диапазон, возвращает вектор полученных результатов,
+    предватирельно откатив положение курсора на начало последней итерации.
+    Если количество успешно разобранных итераций не входит в хранимый диапазон,
+    возвращает обнаруженную ошибку.
+*/
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuleRepeat<A, B>(pub A, pub B);
 
@@ -61,7 +87,6 @@ impl<'a, 'b, A, B> LexemeParser<'a, 'b> for RuleRepeat<A, B>
 {
     type Result = Vec<A::Result>;
     fn parse(&self, cursor: &mut LexemeCursor<'a, 'b>) -> LexemeParserResult<Self::Result> {
-//        #[cfg(test)] trace!("Starting parsing repeating of {:?}", self.0);
         let mut result = match self.1.get_max() {
             Some(end) => Vec::with_capacity(end),
             None => Vec::new(),
@@ -72,28 +97,21 @@ impl<'a, 'b, A, B> LexemeParser<'a, 'b> for RuleRepeat<A, B>
                 Some(m) => i >= m,
                 None => false,
             } { break 'parsing_cycle; }
-//            #[cfg(test)] trace!("  Iteration #{}", _i);
             let begin = cursor.index;
             match self.0.parse(cursor) {
                 Ok(v) => {
-//                    #[cfg(test)] trace!("    Success! Got: {:?}", v);
                     result.push(v)
                 }
                 Err(e) => {
-//                    #[cfg(test)] trace!("    Error! Checking count of success results");
                     if self.1.is_contains(&result.len()) {
-//                        #[cfg(test)] trace!("      {} contains in {:?}", result.len(), self.1);
                         cursor.index = begin;
                         break 'parsing_cycle;
                     } else {
-//                        #[cfg(test)] trace!("      {} not contains in {:?}", result.len(), self.1);
-//                        #[cfg(test)] trace!("  Returning error {:?}", e);
                         return Err(e);
                     }
                 }
             }
         }
-//        #[cfg(test)] trace!("  Returning result {:?}", result);
         Ok(result)
     }
 }

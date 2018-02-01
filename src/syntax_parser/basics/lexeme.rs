@@ -1,3 +1,5 @@
+//! Примитивы распознавания лексем
+
 use lexeme_scanner::{
     Token,
     TokenKind,
@@ -10,6 +12,14 @@ use super::{
     ParserErrorKind,
 };
 
+/**
+    Примитив "Лексема".
+    Сравнивает тип первой полученной лексемы с ожидаемым.
+
+    Ничего не возвращает в случае успеха.
+    В случае не совпадения типов возвращет ошибку типа `ExpectedGotKind`.
+    В случае неудачи получения лексемы возвращает ошибку типа `UnexpectedEnd`.
+*/
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lexeme(pub TokenKind);
 
@@ -29,6 +39,14 @@ impl<'a, 'b> LexemeParser<'a, 'b> for Lexeme {
     }
 }
 
+/**
+    Примитив "Такая же лексема" или "Именно такая лексема".
+    Отличается от `Lexeme` тем, что проверяет не только тип, но и текст полученной лексемы.
+
+    Как и `Lexeme`, ничего не возвращает в случае успеха.
+    В случае не совпадения типов возвращет ошибку типа `ExpectedGotKindText`.
+    В случае неудачи получения лексемы возвращает ошибку типа `UnexpectedEnd`.
+*/
 #[derive(Debug, Clone, PartialEq)]
 pub struct LexemeExact<'a>(pub TokenKind, pub &'a str);
 
@@ -48,6 +66,13 @@ impl<'a, 'b, 'c> LexemeParser<'a, 'b> for LexemeExact<'c> {
     }
 }
 
+/**
+    Примитив "Извлечение лексемы".
+    Отличается от `Lexeme` тем, что клонирует и возвращает лексему (`Token`) в случае успеха.
+
+    В случае не совпадения типов возвращет ошибку типа `ExpectedGotKind`.
+    В случае неудачи получения лексемы возвращает ошибку типа `UnexpectedEnd`.
+*/
 #[derive(Debug, Clone, PartialEq)]
 pub struct LexemeExtract(pub TokenKind);
 
@@ -70,66 +95,4 @@ impl<'a, 'b> LexemeParser<'a, 'b> for LexemeExtract {
             Err(kind) => cursor.parse_error_on(0, ParserErrorKind::ExpectedGotKind(self.0.clone(), kind)),
         }
     }
-}
-
-#[test]
-fn lexeme_detects_correctly() {
-    use helpers::iter_buffer::IterBuffer;
-    use lexeme_scanner::{
-        SymbolPosition,
-        Token,
-    };
-    use env_logger::try_init;
-    let _ = try_init();
-    let mut buffer = IterBuffer::from_vec(vec![
-        Token::new(
-            TokenKind::Word,
-            "first",
-            SymbolPosition {
-                offset: 0,
-                line: 1,
-                column: 1,
-            },
-        ),
-        Token::new(
-            TokenKind::EndOfInput,
-            "",
-            SymbolPosition {
-                offset: 5,
-                line: 1,
-                column: 6,
-            },
-        ),
-    ]);
-    let mut cursor = buffer.cursor(0);
-    Lexeme(TokenKind::Word).parse(&mut cursor).expect("a word");
-    Lexeme(TokenKind::EndOfInput).parse(&mut cursor).expect("end of the input");
-    assert_eq!(cursor.next(), None);
-}
-
-#[test]
-fn lexeme_text_extracts_correctly() {
-    use helpers::iter_buffer::IterBuffer;
-    use lexeme_scanner::{
-        SymbolPosition,
-        Token,
-    };
-    use env_logger::try_init;
-    let _ = try_init();
-    let mut buffer = IterBuffer::from_vec(vec![
-        Token::new(
-            TokenKind::Word,
-            "first",
-            SymbolPosition {
-                offset: 0,
-                line: 1,
-                column: 1,
-            },
-        ),
-    ]);
-    let mut cursor = buffer.cursor(0);
-    const RULE: LexemeExtract = LexemeExtract(TokenKind::Word);
-    let t = RULE.parse(&mut cursor).expect("a word");
-    assert_eq!(t.text, "first");
-    assert_eq!(cursor.next(), None);
 }

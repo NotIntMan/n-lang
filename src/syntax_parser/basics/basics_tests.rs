@@ -1,12 +1,18 @@
 use std::ops::Range;
 
+use helpers::iter_buffer::IterBuffer;
+
 use lexeme_scanner::{
     Scanner,
+    SymbolPosition,
+    Token,
     TokenKind,
 };
 
 use super::{
+    Lexeme,
     LexemeExact,
+    LexemeExtract,
     LexemeCursor,
     LexemeParser,
     LexemeParserResult,
@@ -26,7 +32,7 @@ impl<'a, 'b> LexemeParser<'a, 'b> for Number {
             if t.kind.is_number() {
                 Ok(t.text)
             } else {
-                Err(ParserErrorKind::ExpectedGotMessage("number".to_string(), t.kind.clone()))
+                Err(ParserErrorKind::ExpectedGotMessage("number".to_string(), (t.kind.clone(), t.text.to_string())))
             }
         };
         match r {
@@ -82,6 +88,58 @@ const SUM_OR_SUB: SumOrSub = RuleBranch(Sum, Sub);
 type Pluses<'a> = RuleRepeat<Plus<'a>, Range<usize>>;
 
 const PLUSES: Pluses = RuleRepeat(PLUS, 2..6);
+
+#[test]
+fn lexeme_detects_correctly() {
+    use env_logger::try_init;
+    let _ = try_init();
+    let mut buffer = IterBuffer::from_vec(vec![
+        Token::new(
+            TokenKind::Word,
+            "first",
+            SymbolPosition {
+                offset: 0,
+                line: 1,
+                column: 1,
+            },
+        ),
+        Token::new(
+            TokenKind::EndOfInput,
+            "",
+            SymbolPosition {
+                offset: 5,
+                line: 1,
+                column: 6,
+            },
+        ),
+    ]);
+    let mut cursor = buffer.cursor(0);
+    Lexeme(TokenKind::Word).parse(&mut cursor).expect("a word");
+    Lexeme(TokenKind::EndOfInput).parse(&mut cursor).expect("end of the input");
+    assert_eq!(cursor.next(), None);
+}
+
+#[test]
+fn lexeme_text_extracts_correctly() {
+    use env_logger::try_init;
+    let _ = try_init();
+    let mut buffer = IterBuffer::from_vec(vec![
+        Token::new(
+            TokenKind::Word,
+            "first",
+            SymbolPosition {
+                offset: 0,
+                line: 1,
+                column: 1,
+            },
+        ),
+    ]);
+    let mut cursor = buffer.cursor(0);
+    const RULE: LexemeExtract = LexemeExtract(TokenKind::Word);
+    let t = RULE.parse(&mut cursor).expect("a word");
+    assert_eq!(t.text, "first");
+    assert_eq!(cursor.next(), None);
+}
 
 #[test]
 fn sum_correctly_parses_input() {
