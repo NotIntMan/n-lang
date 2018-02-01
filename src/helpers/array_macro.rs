@@ -14,10 +14,10 @@
     # #[macro_use]
     # extern crate n_transpiler;
     # fn main() {
-    arr!(pub const U8_PUBLIC_CONST_ARRAY: usize = 9);
-    arr!(const USIZE_CONST_ARRAY: usize = 1, 2, 3);
-    arr!(let char_let_array: char = 'a', 'b', 'c', 'd');
-    arr!(let mut option_bool_mut_array: Option<bool> =
+    array!(pub const U8_PUBLIC_CONST_ARRAY: usize = 9);
+    array!(const USIZE_CONST_ARRAY: usize = 1, 2, 3);
+    array!(let char_let_array: char = 'a', 'b', 'c', 'd');
+    array!(let mut option_bool_mut_array: Option<bool> =
         Some(true),
         Some(false),
         Some(false),
@@ -45,7 +45,7 @@
     ```
 */
 #[macro_export]
-macro_rules! arr {
+macro_rules! array {
     (const $name: ident : $element_type: ty = $( $element: expr ),*) => {
         const $name: [$element_type; count_expressions!( $($element),* )] = [$($element),*];
     };

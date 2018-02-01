@@ -4,7 +4,7 @@ use super::*;
 
 use self::basics::*;
 
-arr!(const SYMBOLS_1: char =
+array!(const SYMBOLS_1: char =
     '|',
     '&',
     '^',
@@ -28,7 +28,7 @@ arr!(const SYMBOLS_1: char =
     '*',
 );
 
-arr!(const SYMBOLS_2: [char; 2] =
+array!(const SYMBOLS_2: [char; 2] =
     ['|', '|'],
     ['&', '&'],
     ['<', '<'],
