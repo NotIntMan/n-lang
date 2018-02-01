@@ -63,18 +63,13 @@ pub struct IterBuffer<T: Iterator> {
 pub type PerfectBuffer<T> = IterBuffer<Empty<T>>;
 
 /// Тип, дающий возможность устанавливать в качестве источника курсора как буфер, так и курсор
-pub enum IterBufferCursorSource<'a, T: Iterator>
-    where IterBuffer<T>: 'a,
-          IterBufferCursor<'a, T>: 'a,
-{
+pub enum IterBufferCursorSource<'a, T: Iterator + 'a> {
     Buffer(&'a mut IterBuffer<T>),
     Cursor(&'a mut IterBufferCursor<'a, T>),
 }
 
 /// Итератор-курсор
-pub struct IterBufferCursor<'a, T: Iterator>
-    where IterBuffer<T>: 'a,
-{
+pub struct IterBufferCursor<'a, T: Iterator + 'a> {
     pub source: IterBufferCursorSource<'a, T>,
     pub index: usize,
 }

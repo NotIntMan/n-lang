@@ -1,16 +1,15 @@
 use lexeme_scanner::{
+    Scanner,
     TokenKind,
 };
 
-use super::lexeme::LexemeExact;
-
-use super::parser::{
+use super::{
+    LexemeExact,
     LexemeCursor,
     LexemeParser,
     LexemeParserResult,
+    ParserErrorKind,
 };
-
-use super::parser_error::ParserErrorKind;
 
 pub struct Number;
 
@@ -19,9 +18,10 @@ impl<'a, 'b> LexemeParser<'a, 'b> for Number {
     fn parse(&self, cursor: &mut LexemeCursor<'a, 'b>) -> LexemeParserResult<Self::Result> {
         let r = {
             let t = cursor.get_or(0, ParserErrorKind::UnexpectedEnd)?;
-            match t.kind {
-                TokenKind::NumberLiteral { negative: _, fractional: _, radix: _ } => Ok(t.text),
-                _ => Err(ParserErrorKind::ExpectedGotMessage("number".to_string(), t.kind.clone())),
+            if t.kind.is_number() {
+                Ok(t.text)
+            } else {
+                Err(ParserErrorKind::ExpectedGotMessage("number".to_string(), t.kind.clone()))
             }
         };
         match r {
@@ -34,9 +34,9 @@ impl<'a, 'b> LexemeParser<'a, 'b> for Number {
     }
 }
 
-pub struct Sum;
-
 const PLUS: LexemeExact = LexemeExact(TokenKind::SymbolGroup, "+");
+
+pub struct Sum;
 
 impl<'a, 'b> LexemeParser<'a, 'b> for Sum {
     type Result = (&'b str, &'b str);
@@ -49,4 +49,20 @@ impl<'a, 'b> LexemeParser<'a, 'b> for Sum {
 }
 
 #[test]
-fn x() {}
+fn sum_correctly_parses_input() {
+    let mut buf = Scanner::scan("7 + 9")
+        .expect("Scanning result with no error");
+    let mut cursor = buf.cursor(0);
+    assert_eq!(
+        Sum.parse(&mut cursor)
+            .expect("Parsing result with no error"),
+        ("7", "9")
+    );
+    assert_eq!(
+        cursor.next()
+            .expect("Some(Token)")
+            .kind,
+        TokenKind::EndOfInput
+    );
+    assert_eq!(cursor.next(), None);
+}
