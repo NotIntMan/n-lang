@@ -21,5 +21,11 @@ pub use self::parser_error::{
     ParserErrorKind,
 };
 
+pub use self::rule::{
+    RuleBranch,
+    RuleOption,
+    RuleRepeat,
+};
+
 #[cfg(test)]
 pub mod basics_tests;
