@@ -1,10 +1,11 @@
 use helpers::iter_buffer::PerfectBufferCursor;
 
 use lexeme_scanner::Token;
-pub use super::parser_error::ParserError as LexemeParserError;
+
+use super::ParserError;
 
 pub type LexemeCursor<'a, 'b> = PerfectBufferCursor<'a, Token<'b>>;
-pub type LexemeParserResult<T> = Result<T, LexemeParserError>;
+pub type LexemeParserResult<T> = Result<T, ParserError>;
 
 pub trait LexemeParser<'a, 'b> {
     type Result;

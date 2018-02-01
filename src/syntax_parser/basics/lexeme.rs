@@ -3,13 +3,12 @@ use lexeme_scanner::{
     TokenKind,
 };
 
-use syntax_parser::basics::parser::{
+use super::{
     LexemeCursor,
     LexemeParser,
     LexemeParserResult,
+    ParserErrorKind,
 };
-
-use super::parser_error::ParserErrorKind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lexeme(pub TokenKind);
