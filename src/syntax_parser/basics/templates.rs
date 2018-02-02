@@ -1,9 +1,12 @@
 //! Набор примитивных шаблонов образования языка
 
-use super::super::basics::{
+use syntax_parser::basics::{
     LexemeCursor,
     LexemeParser,
     LexemeParserResult,
+};
+
+use syntax_parser::basics::constants::{
     ConstSymbol,
     COMMA,
     SEMICOLON,

@@ -30,18 +30,8 @@ pub mod macros_tests;
 pub use self::basic_rules::{
     BasicIdentifier,
     BasicKeyword,
-};
-
-pub use self::constants::{
-    CLOSING_BRACES_BRACKET,
-    CLOSING_ROUND_BRACKET,
-    CLOSING_TRIANGULAR_BRACKET,
-    OPENING_BRACES_BRACKET,
-    OPENING_ROUND_BRACKET,
-    OPENING_TRIANGULAR_BRACKET,
-    COMMA,
-    ConstSymbol,
-    SEMICOLON,
+    BasicNumber,
+    BasicUSizeLiteral,
 };
 
 pub use self::lexeme::{

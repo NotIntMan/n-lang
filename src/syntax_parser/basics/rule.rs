@@ -160,7 +160,7 @@ macro_rules! parse_branch {
     ) => {{
         let __begin = $cursor.index;
         match $first_rule {
-            Err(__error) => {
+            Err(mut __error) => {
                 parse_branch!(
                     begin: __begin,
                     cursor: $cursor,
