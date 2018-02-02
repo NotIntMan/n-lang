@@ -62,6 +62,68 @@ impl<'a, 'b, A, B, R> LexemeParser<'a, 'b> for RuleBranch<A, B>
     }
 }
 
+#[allow(unused_macros)]
+#[macro_export]
+macro_rules! parse_branch {
+    (
+        begin: $begin: expr,
+        cursor: $cursor: expr,
+        error: $error: expr,
+        $first_rule: expr,
+        $( $rule: expr ),+
+    ) => {
+        match $first_rule {
+            Err(e) => {
+                $error.append(e);
+                $cursor.index = $begin;
+                parse_branch!(
+                    begin: $begin,
+                    cursor: $cursor,
+                    error: $error,
+                    $( $rule ),+
+                )
+            },
+            ok => ok,
+        }
+    };
+    (
+        begin: $begin: expr,
+        cursor: $cursor: expr,
+        error: $error: expr,
+        $rule: expr
+    ) => {
+        $rule
+    };
+    (
+        cursor: $cursor: expr,
+        $first_rule: expr,
+        $( $rule: expr ),+
+    ) => {{
+        let __begin = $cursor.index;
+        match $first_rule {
+            Err(__error) => {
+                parse_branch!(
+                    begin: __begin,
+                    cursor: $cursor,
+                    error: __error,
+                    $( $rule ),+
+                )
+            },
+            ok => ok,
+        }
+    }};
+    (
+        cursor: $cursor: expr,
+        $( $rule: expr ),+
+        ,
+    ) => {
+        parse_branch!(
+            cursor: $cursor,
+            $( $rule ),+
+        )
+    };
+}
+
 /**
     Примитив "Повторение".
     Выполняет повторный разбор правила до тех пор,

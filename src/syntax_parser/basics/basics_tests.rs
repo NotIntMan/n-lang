@@ -277,3 +277,20 @@ fn pluses_correctly_parses_input1() {
     );
     assert_eq!(cursor.next(), None);
 }
+
+#[test]
+fn parse_branch_do_it_right() {
+    use env_logger::try_init;
+    let _ = try_init();
+    let mut buf = Scanner::scan("2+ 3")
+        .expect("Scanning result with no error");
+    let mut cursor = buf.cursor(0);
+    assert_eq!(
+        parse_branch!(
+            cursor: cursor,
+            Sum.parse(&mut cursor),
+            Sub.parse(&mut cursor),
+        ).expect("Parsing result with no error"),
+        ("2", "+", "3")
+    );
+}

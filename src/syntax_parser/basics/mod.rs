@@ -19,6 +19,7 @@ pub mod constants;
 pub mod lexeme;
 pub mod parser;
 pub mod parser_error;
+#[macro_use]
 pub mod rule;
 pub mod templates;
 
