@@ -282,7 +282,7 @@ fn pluses_correctly_parses_input1() {
 fn parse_branch_do_it_right() {
     use env_logger::try_init;
     let _ = try_init();
-    let mut buf = Scanner::scan("2+ 3")
+    let mut buf = Scanner::scan("2 + 3")
         .expect("Scanning result with no error");
     let mut cursor = buf.cursor(0);
     assert_eq!(
