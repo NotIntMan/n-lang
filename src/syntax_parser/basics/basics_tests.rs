@@ -277,4 +277,3 @@ fn pluses_correctly_parses_input1() {
     );
     assert_eq!(cursor.next(), None);
 }
-
