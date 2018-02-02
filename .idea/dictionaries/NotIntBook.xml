@@ -2,6 +2,7 @@
   <dictionary name="NotIntBook">
     <words>
       <w>batcher</w>
+      <w>brainfuck</w>
       <w>iter</w>
       <w>itertools</w>
       <w>norun</w>

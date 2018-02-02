@@ -12,7 +12,7 @@ use super::{
 };
 
 #[test]
-fn x() {
+fn brainfuck_counter_test() {
     use env_logger::try_init;
     let _ = try_init();
     let mut buf = Scanner::scan("++-+++----")
@@ -40,6 +40,49 @@ fn x() {
     );
     let fold = |c: &mut LexemeCursor| parse_sequence!(
         let m = many(c),
+        return {
+            let mut sum = 0;
+            for i in m {
+                sum += i;
+            }
+            Ok(sum)
+        }
+    );
+    let double_fold = |c: &mut LexemeCursor| parse_sequence!(
+        let a = fold(c),
+        let b = fold(c),
+        return { Ok(a + b) }
+    );
+    assert_eq!(
+        double_fold(&mut cursor)
+            .expect("Parsing result with no error"),
+        4
+    );
+}
+
+#[test]
+fn brainfuck_counter_composition_test() {
+    use env_logger::try_init;
+    let _ = try_init();
+    let mut buf = Scanner::scan("++-+++----")
+        .expect("Scanning result with no error");
+    let mut cursor = buf.cursor(0);
+    let fold = |c: &mut LexemeCursor| parse_sequence!(
+        let m = parse_repeat!(
+            cursor: c,
+            range: ..4,
+            parse_branch!(
+                cursor: c,
+                parse_sequence!(
+                    LexemeExact(TokenKind::SymbolGroup, "+").parse(c),
+                    return Ok(1)
+                ),
+                parse_sequence!(
+                    LexemeExact(TokenKind::SymbolGroup, "-").parse(c),
+                    return Ok(-1)
+                ),
+            )
+        ),
         return {
             let mut sum = 0;
             for i in m {
