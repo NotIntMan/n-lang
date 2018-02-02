@@ -50,6 +50,14 @@ impl<'a, 'b> LexemeParser<'a, 'b> for Lexeme {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LexemeExact<'a>(pub TokenKind, pub &'a str);
 
+impl<'a> LexemeExact<'a> {
+    /// Создаёт новое правило разбора группы символов
+    #[inline]
+    pub const fn group(text: &'a str) -> Self {
+        LexemeExact(TokenKind::SymbolGroup, text)
+    }
+}
+
 impl<'a, 'b, 'c> LexemeParser<'a, 'b> for LexemeExact<'c> {
     type Result = ();
     fn parse(&self, cursor: &mut LexemeCursor<'a, 'b>) -> LexemeParserResult<Self::Result> {
