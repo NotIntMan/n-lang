@@ -4,6 +4,7 @@
 #![feature(plugin)]
 #![cfg_attr(test, plugin(stainless))]
 #![feature(const_fn)]
+#![feature(try_trait)]
 
 #[allow(unused_imports)]
 #[macro_use]

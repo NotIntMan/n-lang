@@ -14,6 +14,10 @@
     такие как "идентификатор", "ключевое слово", "список" и "обёртка".
 */
 
+use nom::IResult;
+use lexeme_scanner::Token;
+
+pub mod cursor;
 //pub mod basic_rules;
 //pub mod constants;
 pub mod lexeme;
@@ -27,6 +31,10 @@ pub mod parser_error;
 //#[cfg(test)]
 //pub mod macros_tests;
 
+pub use self::cursor::{
+    Cursor,
+};
+
 //pub use self::basic_rules::{
 //    BasicIdentifier,
 //    BasicKeyword,
@@ -34,12 +42,15 @@ pub mod parser_error;
 //    BasicUSizeLiteral,
 //};
 
-pub use self::lexeme::{
-    Lexeme,
-    LexemeExact,
-    LexemeExtract,
-};
+pub type TokenCursor<'a, 'b> = Cursor<'a, Token<'b>>;
+pub type NewLexemeParserResult<'a, 'b, O> = IResult<TokenCursor<'a, 'b>, O, ParserError>;
 
+//pub use self::lexeme::{
+//    Lexeme,
+//    LexemeExact,
+//    LexemeExtract,
+//};
+//
 pub use self::parser::{
     LexemeCursor,
     LexemeParser,

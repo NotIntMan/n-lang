@@ -1,6 +1,7 @@
 //! Ошибка синтаксического разбора
 
 use std::fmt::{
+    Debug,
     Display,
     Result as FResult,
     Formatter,
@@ -27,7 +28,7 @@ use lexeme_scanner::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParserErrorKind {
     /// Неожиданный конец. Сообщает о том, что лексемы закончились, но правила этого не допускают.
-    UnexpectedEnd,
+    UnexpectedEnd(Option<String>),
     /// Неожиданный ввод. Сообщает о том, что ожидалась лексема одного вида, а была получена - другого.
     ExpectedGotKind(TokenKind, TokenKind),
     /// Другая разновидность ошибки "Неожиданный ввод".
@@ -52,11 +53,35 @@ pub enum ParserError {
     Many(Vec<ParserErrorItem>),
 }
 
+impl ParserErrorKind {
+    /// Конструирует новый `ParserErrorKind::UnexpectedEnd` с сообщением о том, что ожидался символ
+    #[inline]
+    pub fn unexpected_end_expected_debug<D: Debug>(c: D) -> Self {
+        ParserErrorKind::UnexpectedEnd(Some(format!("{:?}", c)))
+    }
+    /// Конструирует новый `ParserErrorKind::UnexpectedEnd` с данным сообщением об ожидании
+    #[inline]
+    pub fn unexpected_end_expected<S: ToString>(msg: S) -> Self {
+        ParserErrorKind::UnexpectedEnd(Some(msg.to_string()))
+    }
+    /// Конструирует новый `ParserErrorKind::UnexpectedEnd` без сообщения
+    #[inline]
+    pub fn unexpected_end() -> Self {
+        ParserErrorKind::UnexpectedEnd(None)
+    }
+}
+
 /// Типаж Display у `ParserErrorKind` служит для отображения типа ошибки в человекочитаемом виде
 impl Display for ParserErrorKind {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
-            &ParserErrorKind::UnexpectedEnd => write!(f, "unexpected end"),
+            &ParserErrorKind::UnexpectedEnd(ref s) => {
+                write!(f, "unexpected end")?;
+                if let &Some(ref m) = s {
+                    write!(f, ", expected: {}", m)?;
+                }
+                Ok(())
+            },
             &ParserErrorKind::ExpectedGotKind(ref exp, ref got) => write!(f, "expected: {:?}, got: {:?}", exp, got),
             &ParserErrorKind::ExpectedGotKindText(
                 (ref exp_kind, ref exp_text), (ref got_kind, ref got_text)

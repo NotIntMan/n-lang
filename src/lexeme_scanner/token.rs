@@ -1,5 +1,7 @@
 //! Набор структур для отображения элемента лексического разбора
 
+use std::fmt;
+
 use super::*;
 
 /// Тип токена
@@ -58,6 +60,21 @@ pub enum TokenKindLess {
     BracedExpressionLiteral,
     Word,
     SymbolGroup,
+}
+
+impl fmt::Display for TokenKindLess {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let text = match self {
+            &TokenKindLess::EndOfInput => "end of input",
+            &TokenKindLess::Whitespace => "whitespace",
+            &TokenKindLess::NumberLiteral => "number literal",
+            &TokenKindLess::StringLiteral => "string literal",
+            &TokenKindLess::BracedExpressionLiteral => "braced expression literal",
+            &TokenKindLess::Word => "word",
+            &TokenKindLess::SymbolGroup => "symbol group",
+        };
+        write!(f, "{}", text)
+    }
 }
 
 /// Токен. Содержит информацию о своём типе, местоположении и тексте элемента, который отображает.
