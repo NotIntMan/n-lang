@@ -1,7 +1,3 @@
-use std::iter::FromIterator;
-
-use helpers::iter_buffer::PerfectBuffer;
-
 use super::{
     Scanner,
     ScannerError,
@@ -22,7 +18,7 @@ fn scans_alone_string_correctly() {
     assert_eq!(
         scanner.next(),
         Token::new_wrapped(
-            TokenKind::StringLiteral,
+            TokenKind::StringLiteral { length: 7 },
             text,
             SymbolPosition {
                 offset: 0,
@@ -105,7 +101,7 @@ fn scans_alone_octal_number_correctly() {
 #[test]
 fn scans_alone_decimal_number_correctly() {
     let _ = try_init();
-    let text = "1129";
+    let text = "1";
     let mut scanner = Scanner::new(text);
     assert_eq!(
         scanner.next(),
@@ -121,9 +117,9 @@ fn scans_alone_decimal_number_correctly() {
             TokenKind::EndOfInput,
             "",
             SymbolPosition {
-                offset: 4,
+                offset: 1,
                 line: 1,
-                column: 5,
+                column: 2,
             },
         )
     );
@@ -276,7 +272,7 @@ fn scans_complex_text_correctly() {
     pos.step_str(", ");
     assert_eq!(
         scanner.next(),
-        Token::new_wrapped(TokenKind::StringLiteral, "\"Azaz-kanzas\"", pos.clone())
+        Token::new_wrapped(TokenKind::StringLiteral { length: 11 }, "\"Azaz-kanzas\"", pos.clone())
     );
     pos.step_str("\"Azaz-kanzas\" ");
     assert_eq!(
@@ -348,7 +344,7 @@ fn throw_and_format_error_correctly() {
     assert_eq!(
         err,
         ScannerError {
-            kind: ScannerErrorKind::UnexpectedEnd,
+            kind: ScannerErrorKind::unexpected_end_expected("string body's symbol"),
             pos: SymbolPosition {
                 offset: 6,
                 line: 1,
@@ -358,7 +354,7 @@ fn throw_and_format_error_correctly() {
     );
     assert_eq!(
         err.to_string(),
-        "Error: unexpected end of input on line 1, column 7"
+        "Error: unexpected end of input, expected: string body's symbol on line 1, column 7"
     );
     assert_eq!(
         scanner.next(),
@@ -370,12 +366,10 @@ fn throw_and_format_error_correctly() {
 fn coverts_into_token_iterator_correctly() {
     let _ = try_init();
     let text = "!2";
-    let scanner = Scanner::new(text);
-    let mut token_iter: PerfectBuffer<Token> = Result::from_iter(scanner).expect("Token iterator");
-    let mut cursor = token_iter.cursor(0);
+    let mut scanner = Scanner::new(text);
     assert_eq!(
-        cursor.next(),
-        Some(Token::new(
+        scanner.next(),
+        Token::new_wrapped(
             TokenKind::SymbolGroup,
             "!",
             SymbolPosition {
@@ -383,11 +377,11 @@ fn coverts_into_token_iterator_correctly() {
                 line: 1,
                 column: 1,
             },
-        ))
+        )
     );
     assert_eq!(
-        cursor.next(),
-        Some(Token::new(
+        scanner.next(),
+        Token::new_wrapped(
             TokenKind::NumberLiteral {
                 negative: false,
                 radix: 10,
@@ -399,11 +393,11 @@ fn coverts_into_token_iterator_correctly() {
                 line: 1,
                 column: 2,
             },
-        ))
+        )
     );
     assert_eq!(
-        cursor.next(),
-        Some(Token::new(
+        scanner.next(),
+        Token::new_wrapped(
             TokenKind::EndOfInput,
             "",
             SymbolPosition {
@@ -411,7 +405,7 @@ fn coverts_into_token_iterator_correctly() {
                 line: 1,
                 column: 3,
             },
-        ))
+        )
     );
-    assert_eq!(cursor.next(), None);
+    assert_eq!(scanner.next(), None);
 }
