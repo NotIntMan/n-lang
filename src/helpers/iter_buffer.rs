@@ -158,10 +158,14 @@ impl<T> IterBuffer<Empty<T>> {
 impl<'a> IterBuffer<Empty<Token<'a>>> {
     pub fn get_position_of(&mut self, index: usize) -> SymbolPosition {
         if let Some(t) = self.get(index) {
-            return t.pos.begin.clone();
+            return t.pos.clone();
         }
         match self.buffer.last() {
-            Some(t) => t.pos.end.clone(),
+            Some(t) => {
+                let mut res = t.pos.clone();
+                res.step_str(t.text);
+                res
+            },
             None => SymbolPosition::default(),
         }
     }

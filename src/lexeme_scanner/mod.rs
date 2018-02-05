@@ -52,17 +52,17 @@
 pub mod eaters;
 pub mod position;
 pub mod scanner;
-pub mod scan_error;
+pub mod scanner_error;
 pub mod token;
 
 pub use self::token::{
     Token,
     TokenKind,
+    TokenKindLess,
 };
 
 pub use self::scanner::{
     Scanner,
-    ScannerCursor,
 };
 
 pub use self::position::{
@@ -70,13 +70,13 @@ pub use self::position::{
     ItemPosition,
 };
 
-pub use self::scan_error::{
+pub use self::scanner_error::{
     ScannerError,
     ScannerErrorKind,
 };
 
 pub type ScannerItem<'a> = Result<Token<'a>, ScannerError>;
-pub type BatcherResult = Result<TokenKind, ScannerErrorKind>;
+pub type BatcherResult = Result<(TokenKind, usize), (ScannerErrorKind, usize)>;
 
 #[cfg(test)]
 mod scanner_tests;

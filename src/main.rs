@@ -10,6 +10,9 @@
 extern crate log;
 extern crate env_logger;
 extern crate generic_array;
+#[allow(unused_imports)]
+#[macro_use]
+extern crate nom;
 
 #[macro_use]
 pub mod helpers;

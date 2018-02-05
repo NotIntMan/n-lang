@@ -14,25 +14,25 @@
     такие как "идентификатор", "ключевое слово", "список" и "обёртка".
 */
 
-pub mod basic_rules;
-pub mod constants;
+//pub mod basic_rules;
+//pub mod constants;
 pub mod lexeme;
 pub mod parser;
 pub mod parser_error;
-#[macro_use]
-pub mod rule;
-pub mod templates;
-#[cfg(test)]
-pub mod basics_tests;
-#[cfg(test)]
-pub mod macros_tests;
+//#[macro_use]
+//pub mod rule;
+//pub mod templates;
+//#[cfg(test)]
+//pub mod basics_tests;
+//#[cfg(test)]
+//pub mod macros_tests;
 
-pub use self::basic_rules::{
-    BasicIdentifier,
-    BasicKeyword,
-    BasicNumber,
-    BasicUSizeLiteral,
-};
+//pub use self::basic_rules::{
+//    BasicIdentifier,
+//    BasicKeyword,
+//    BasicNumber,
+//    BasicUSizeLiteral,
+//};
 
 pub use self::lexeme::{
     Lexeme,
@@ -52,13 +52,13 @@ pub use self::parser_error::{
     ParserErrorKind,
 };
 
-pub use self::rule::{
-    RuleBranch,
-    RuleOption,
-    RuleRepeat,
-};
-
-pub use self::templates::{
-    TemplateList,
-    TemplateWrap
-};
+//pub use self::rule::{
+//    RuleBranch,
+//    RuleOption,
+//    RuleRepeat,
+//};
+//
+//pub use self::templates::{
+//    TemplateList,
+//    TemplateWrap
+//};
