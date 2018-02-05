@@ -52,23 +52,41 @@ pub fn is_begin_of_group(c: char) -> bool {
     false
 }
 
-/**
-    Поедатель символов
+///**
+//    Поедатель символов
+//
+//    При встрече со специальным символом или их группой, поглощает их и возвращает `TokenKind::SymbolGroup`
+//*/
+//pub fn eat_symbol_group(it: &mut ScannerCursor) -> BatcherResult {
+//    assert_peek_pred(it, is_begin_of_group, "a specific symbol")?;
+//    let a = match it.next() {
+//        Some(c) => c,
+//        None => unreachable!(),
+//    };
+//    let b = match it.peek() {
+//        Some(c) => c,
+//        None => return Ok(TokenKind::SymbolGroup),
+//    };
+//    if SYMBOLS_2.contains(&[a, b]) {
+//        it.next();
+//    }
+//    Ok(TokenKind::SymbolGroup)
+//}
 
-    При встрече со специальным символом или их группой, поглощает их и возвращает `TokenKind::SymbolGroup`
+/**
+    Правило "Группа символов".
+
+    При встрече со специальным символом или их группой, обрабатывает их и возвращает `TokenKind::SymbolGroup`
+    Возвращает ошибку `MustBeGot` в случае, если начало ввода не входит в набор специальных символов.
 */
-pub fn eat_symbol_group(it: &mut ScannerCursor) -> BatcherResult {
-    assert_peek_pred(it, is_begin_of_group, "a specific symbol")?;
-    let a = match it.next() {
-        Some(c) => c,
-        None => unreachable!(),
-    };
-    let b = match it.peek() {
-        Some(c) => c,
-        None => return Ok(TokenKind::SymbolGroup),
-    };
-    if SYMBOLS_2.contains(&[a, b]) {
-        it.next();
+pub fn symbol_group(input: &[u8]) -> BatcherResult {
+    assert_pred(input, 0, is_begin_of_group, "a special symbol")?;
+    let a = input[0] as char;
+    if input.len() > 1 {
+        let b = input[1] as char;
+        if SYMBOLS_2.contains(&[a, b]) {
+            return Ok((TokenKind::SymbolGroup, 2))
+        }
     }
-    Ok(TokenKind::SymbolGroup)
+    Ok((TokenKind::SymbolGroup, 1))
 }

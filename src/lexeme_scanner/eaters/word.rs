@@ -19,23 +19,39 @@ fn is_identifier_symbol(c: char) -> bool {
     }
 }
 
-/**
-    Поедатель слов
+///**
+//    Поедатель слов
+//
+//    Поглощает слово, состоящее из букв, цифр и символа `_`. Первым символом обязательно должна быть буква.
+//*/
+//pub fn eat_word(it: &mut ScannerCursor) -> BatcherResult {
+//    assert_peek_pred(it, is_letter, "a letter")?;
+//    it.next();
+//    loop {
+//        let c = match it.peek() {
+//            Some(c) => c,
+//            None => return Ok(TokenKind::Word),
+//        };
+//        if is_letter(c) || is_identifier_symbol(c) {
+//            it.next();
+//        } else {
+//            return Ok(TokenKind::Word);
+//        }
+//    }
+//}
 
-    Поглощает слово, состоящее из букв, цифр и символа `_`. Первым символом обязательно должна быть буква.
+/**
+    Правило "Слово".
+
+    Обрабатывает слово, состоящее из букв, цифр и символа `_`. Первым символом обязательно должна быть буква.
+    Возвращает ошибку `MustBeGot` в случае, если в начале ввода не буква.
 */
-pub fn eat_word(it: &mut ScannerCursor) -> BatcherResult {
-    assert_peek_pred(it, is_letter, "a letter")?;
-    it.next();
-    loop {
-        let c = match it.peek() {
-            Some(c) => c,
-            None => return Ok(TokenKind::Word),
-        };
-        if is_letter(c) || is_identifier_symbol(c) {
-            it.next();
-        } else {
-            return Ok(TokenKind::Word);
-        }
+pub fn word(input: &[u8]) -> BatcherResult {
+    assert_pred(input, 0, is_letter, "a letter")?;
+    let mut result = 1;
+    let len = input.len();
+    while (result < len) && (is_letter(input[result] as char) || is_identifier_symbol(input[result] as char)) {
+        result += 1;
     }
+    Ok((TokenKind::Word, result))
 }
