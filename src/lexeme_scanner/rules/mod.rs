@@ -1,4 +1,4 @@
-//! Модуль, содержащий функции-поедатели ввода
+//! Модуль, содержащий функции-правила для обработки ввода
 
 use super::*;
 
@@ -9,7 +9,7 @@ pub mod symbol_group;
 pub mod whitespace;
 pub mod word;
 
-/// Композитор всех прочих "поедателей", расположенных в этом модуле
+/// Композитор всех прочих "правил", расположенных в этом модуле
 pub fn scan(input: &[u8]) -> BatcherResult {
     if input.len() == 0 {
         #[cfg(test)] trace!("Scanner found end of the input");

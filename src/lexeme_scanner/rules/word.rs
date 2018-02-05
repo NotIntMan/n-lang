@@ -1,4 +1,4 @@
-//! Поедатель слов
+//! Правило "Слово"
 
 use super::*;
 
@@ -18,27 +18,6 @@ fn is_identifier_symbol(c: char) -> bool {
         _ => false,
     }
 }
-
-///**
-//    Поедатель слов
-//
-//    Поглощает слово, состоящее из букв, цифр и символа `_`. Первым символом обязательно должна быть буква.
-//*/
-//pub fn eat_word(it: &mut ScannerCursor) -> BatcherResult {
-//    assert_peek_pred(it, is_letter, "a letter")?;
-//    it.next();
-//    loop {
-//        let c = match it.peek() {
-//            Some(c) => c,
-//            None => return Ok(TokenKind::Word),
-//        };
-//        if is_letter(c) || is_identifier_symbol(c) {
-//            it.next();
-//        } else {
-//            return Ok(TokenKind::Word);
-//        }
-//    }
-//}
 
 /**
     Правило "Слово".

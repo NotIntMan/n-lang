@@ -1,4 +1,4 @@
-//! Поедатель символов
+//! Правило "Группа символов"
 
 use super::*;
 
@@ -51,27 +51,6 @@ pub fn is_begin_of_group(c: char) -> bool {
     }
     false
 }
-
-///**
-//    Поедатель символов
-//
-//    При встрече со специальным символом или их группой, поглощает их и возвращает `TokenKind::SymbolGroup`
-//*/
-//pub fn eat_symbol_group(it: &mut ScannerCursor) -> BatcherResult {
-//    assert_peek_pred(it, is_begin_of_group, "a specific symbol")?;
-//    let a = match it.next() {
-//        Some(c) => c,
-//        None => unreachable!(),
-//    };
-//    let b = match it.peek() {
-//        Some(c) => c,
-//        None => return Ok(TokenKind::SymbolGroup),
-//    };
-//    if SYMBOLS_2.contains(&[a, b]) {
-//        it.next();
-//    }
-//    Ok(TokenKind::SymbolGroup)
-//}
 
 /**
     Правило "Группа символов".
