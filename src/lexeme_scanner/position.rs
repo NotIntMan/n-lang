@@ -63,6 +63,22 @@ impl SymbolPosition {
             self.step(c);
         }
     }
+    /**
+        Создаёт новый `ItemPosition` с началом в данном объекте.
+        Конец `ItemPosition` вычисляется на основе данного текста.
+    */
+    #[inline]
+    pub fn into_item_pos(self, item_text: &str) -> ItemPosition {
+        let begin = self.clone();
+        let mut end = self.clone();
+        end.step_str(item_text);
+        ItemPosition { begin, end }
+    }
+    /// Выполняет клонирование данного объекта и применяет к нему метод `into_item_pos`.
+    #[inline]
+    pub fn make_item_pos(&self, item_text: &str) -> ItemPosition {
+        self.clone().into_item_pos(item_text)
+    }
 }
 
 impl Default for SymbolPosition {
