@@ -3,7 +3,7 @@
 use std::iter::FromIterator;
 
 use super::*;
-use super::eaters::scan;
+use super::rules::scan;
 
 /// Сканер. Получает строку на ввод и реализует итерируемый механизм сканирования лексем в полученонй строке.
 pub struct Scanner<'a> {
