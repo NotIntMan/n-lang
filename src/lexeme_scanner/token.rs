@@ -5,7 +5,7 @@ use std::fmt;
 use super::*;
 
 /// Тип токена
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     /// Конец ввода. Этот тип токена генерируется сканером после окончания чтения ввода.
     EndOfInput,
@@ -51,7 +51,7 @@ pub enum TokenKind {
 }
 
 /// Урезанное отображение типа токена в его тип без прочей информации
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKindLess {
     EndOfInput,
     Whitespace,
@@ -78,7 +78,7 @@ impl fmt::Display for TokenKindLess {
 }
 
 /// Токен. Содержит информацию о своём типе, местоположении и тексте элемента, который отображает.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub text: &'a str,
@@ -95,14 +95,6 @@ impl TokenKind {
     #[inline]
     pub fn is_end(&self) -> bool {
         self == &TokenKind::EndOfInput
-    }
-    /// Проверяет является ли тип токены числовым литералом
-    #[inline]
-    pub fn is_number(&self) -> bool {
-        match self {
-            &TokenKind::NumberLiteral { negative: _, fractional: _, radix: _ } => true,
-            _ => false,
-        }
     }
     /// Отображает тип токена в тип без прочей информации
     #[inline]
