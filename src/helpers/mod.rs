@@ -4,5 +4,4 @@
 pub mod array_macro;
 #[macro_use]
 pub mod count_expression_macro;
-pub mod iter_buffer;
 pub mod num_range;

@@ -15,46 +15,38 @@
 */
 
 use nom::IResult;
+
 use lexeme_scanner::Token;
 
-pub mod cursor;
-//pub mod basic_rules;
-//pub mod constants;
-pub mod lexeme;
-pub mod parser;
+pub mod basic_rules;
+pub mod input;
 pub mod parser_error;
-//#[macro_use]
-//pub mod rule;
-//pub mod templates;
-//#[cfg(test)]
-//pub mod basics_tests;
-//#[cfg(test)]
-//pub mod macros_tests;
+#[macro_use]
+pub mod rule_macro;
+pub mod token;
+#[macro_use]
+pub mod templates;
 
-pub use self::cursor::{
-    Cursor,
+pub use self::basic_rules::{
+    braced_expression_literal,
+    identifier,
+    keyword,
+    number_literal,
+    NumberLiteralSpec,
+    special_number_literal,
+    string_literal,
+    symbols,
 };
 
-//pub use self::basic_rules::{
-//    BasicIdentifier,
-//    BasicKeyword,
-//    BasicNumber,
-//    BasicUSizeLiteral,
-//};
+pub use self::input::ParserInput;
 
-pub type TokenCursor<'a, 'b> = Cursor<'a, Token<'b>>;
-pub type NewLexemeParserResult<'a, 'b, O> = IResult<TokenCursor<'a, 'b>, O, ParserError>;
+pub type Parser<'a, 'b, O> = Fn(&'a [Token<'b>]) -> ParserResult<'a, 'b, O>;
+pub type ParserResult<'a, 'b, O> = IResult<&'a [Token<'b>], O, ParserError>;
 
-//pub use self::lexeme::{
-//    Lexeme,
-//    LexemeExact,
-//    LexemeExtract,
-//};
-//
-pub use self::parser::{
-    LexemeCursor,
-    LexemeParser,
-    LexemeParserResult,
+pub use self::token::{
+    exact_token,
+    some_token,
+    token,
 };
 
 pub use self::parser_error::{
@@ -62,14 +54,3 @@ pub use self::parser_error::{
     ParserErrorItem,
     ParserErrorKind,
 };
-
-//pub use self::rule::{
-//    RuleBranch,
-//    RuleOption,
-//    RuleRepeat,
-//};
-//
-//pub use self::templates::{
-//    TemplateList,
-//    TemplateWrap
-//};

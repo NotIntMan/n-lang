@@ -4,7 +4,6 @@
 #![feature(plugin)]
 #![cfg_attr(test, plugin(stainless))]
 #![feature(const_fn)]
-#![feature(try_trait)]
 
 #[allow(unused_imports)]
 #[macro_use]
@@ -18,4 +17,4 @@ extern crate nom;
 #[macro_use]
 pub mod helpers;
 pub mod lexeme_scanner;
-pub mod syntax_parser;
+pub mod parser_basics;
