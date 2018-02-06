@@ -20,6 +20,12 @@ use lexeme_scanner::{
     SymbolPosition,
 };
 
+/**
+    Тип, отображающий некоторый объект текста.
+
+    Существует только для того, чтобы помочь варианту `ParserErrorKind::ExpectedGot` не размножиться
+    на 8 штук только из-за необходимости вариативности отображения объектов.
+*/
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParserErrorTokenInfo {
     Kind(TokenKindLess),
@@ -80,18 +86,21 @@ impl ParserErrorKind {
     pub fn unexpected_end() -> Self {
         ParserErrorKind::UnexpectedEnd(None)
     }
+    /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе ожидаемого и полученного токенов
     #[inline]
     pub fn expected_got_kind(expected: TokenKindLess, got: TokenKindLess) -> Self {
         let a = ParserErrorTokenInfo::Kind(expected);
         let b = ParserErrorTokenInfo::Kind(got);
         ParserErrorKind::ExpectedGot(a, b)
     }
+    /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе и тексте ожидаемого и полученного токенов
     #[inline]
     pub fn expected_got_kind_text<A: ToString, B: ToString>(expected_kind: TokenKindLess, expected_text: A, got_kind: TokenKindLess, got_text: B) -> Self {
         let a = ParserErrorTokenInfo::Object(expected_kind, expected_text.to_string());
         let b = ParserErrorTokenInfo::Object(got_kind, got_text.to_string());
         ParserErrorKind::ExpectedGot(a, b)
     }
+    /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий описание ожидаемого токена и инофрмацию о типе и тексте полученного токена
     #[inline]
     pub fn expected_got_description<A: ToString, B: ToString>(expected: A, got_kind: TokenKindLess, got_text: B) -> Self {
         let a = ParserErrorTokenInfo::Description(expected.to_string());
