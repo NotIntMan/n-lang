@@ -2,7 +2,7 @@
     Макрос `parser_rule!` является синонимом `named!` из пакета `nom`.
     Только он для текущего проекта.
 
-    ```
+    ```md
     parser_rule!(
         [pub] $name ($input [, ...$args]) -> $result_type { ...$body }
     )

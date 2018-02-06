@@ -15,32 +15,32 @@ use super::{
 
     Для этого у типала есть два метода: `ok` и `err`, а так же два ассоциированных типа.
 
-    В качестве примера приведем реализацию этого типажа для `&[Token]`.
+    В качестве примера приведем реализацию этого типажа для синонима `&[u8]`.
 
     ```rust,no_run
-    impl<'a, 'b> ParserInput for &'a [Token<'b>] {
+
+    # extern crate nom;
+    # use nom::{IResult, ErrorKind};
+    # extern crate n_transpiler;
+    # use n_transpiler::lexeme_scanner::Token;
+    # use n_transpiler::parser_basics::{ParserInput, ParserError, ParserErrorKind};
+
+    struct Input<'a>(&'a [u8]);
+
+    # fn main() {
+
+    impl<'a> ParserInput for Input<'a> {
         type Error = ParserError;
         type ErrorKind = ParserErrorKind;
         fn ok<T>(self, processed: usize, value: T) -> IResult<Self, T, Self::Error> {
-            IResult::Done(&self[processed..], value)
+            IResult::Done(Input(&self.0[processed..]), value)
         }
         fn err<T>(self, position: usize, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> {
-            let len = self.len();
-            let error = if position < len {
-                ParserError::new(kind, self[position].pos)
-            } else {
-                if len > 0 {
-                    let t = &self[len - 1];
-                    let mut pos = t.pos;
-                    pos.step_str(t.text);
-                    ParserError::new(kind, pos)
-                } else {
-                    ParserError::new_without_pos(kind)
-                }
-            };
-            IResult::Error(ErrorKind::Custom(error))
+            IResult::Error(ErrorKind::Custom(ParserError::new_without_pos(kind)))
         }
     }
+
+    # }
     ```
 
     Как видно в примере, в методах `ok` и `err` мы сгенерировали значения,
