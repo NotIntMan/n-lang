@@ -58,8 +58,10 @@ pub use self::parser_error::{
 };
 
 pub use self::templates::{
+    comma_list,
     list,
     round_wrap,
+    rounded_comma_list,
     symbol_wrap,
     wrap,
 };

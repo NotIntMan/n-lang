@@ -100,6 +100,27 @@ pub fn list<
     input.ok(result)
 }
 
+/**
+    Шаблон "Список через запяную".
+    Используется для разбора списка `element`, разделённых `,`.
+
+    Является частным случаем шаблона "Список".
+*/
+#[inline]
+pub fn comma_list<
+    'token,
+    'source,
+    ElementOutput,
+    Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
+>(
+    input: &'token [Token<'source>], element: Element
+)
+    -> ParserResult<'token, 'source, Vec<ElementOutput>>
+    where Token<'source>: 'token
+{
+    list(input, element, prepare!(symbols(",")))
+}
+
 #[test]
 fn f() {
     use lexeme_scanner::Scanner;
@@ -189,6 +210,23 @@ pub fn round_wrap<
     where Token<'source>: 'token
 {
     symbol_wrap(input, "(", element, ")")
+}
+
+/// Шаблон "Список через запятую, обёрнутый круглыми скобками".
+#[inline]
+pub fn rounded_comma_list<
+    'token,
+    'source,
+    ElementOutput,
+    Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
+>(
+    input: &'token [Token<'source>],
+    element: Element,
+)
+    -> ParserResult<'token, 'source, ElementOutput>
+    where Token<'source>: 'token
+{
+    symbol_wrap(input, "(", prepare!(comma_list(element)), ")")
 }
 
 #[test]
