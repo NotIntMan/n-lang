@@ -44,6 +44,8 @@ pub enum ParserErrorKind {
     UnexpectedEnd(Option<String>),
     /// Неожиданный ввод. Сообщает о том, что ожидалась лексема одного вида, а была получена - другого.
     ExpectedGot(ParserErrorTokenInfo, ParserErrorTokenInfo),
+    /// Прочая ошибка. Сообщает о том, что произошло что-то где-то за пределами парсера.
+    CustomError(String),
 }
 
 /// Одиночная ошибка разбора. Применяется как элемент `ParserError`.
@@ -107,6 +109,11 @@ impl ParserErrorKind {
         let b = ParserErrorTokenInfo::Object(got_kind, got_text.to_string());
         ParserErrorKind::ExpectedGot(a, b)
     }
+    /// Конструирует новый `ParserErrorKind::NomError`, содержащий сообщение об ошибке комбинатора парсеров
+    #[inline]
+    pub fn custom_error<A: ToString>(msg: A) -> Self {
+        ParserErrorKind::CustomError(msg.to_string())
+    }
 }
 
 /// Типаж Display у `ParserErrorKind` служит для отображения типа ошибки в человекочитаемом виде
@@ -121,6 +128,7 @@ impl Display for ParserErrorKind {
                 Ok(())
             },
             &ParserErrorKind::ExpectedGot(ref exp, ref got) => write!(f, "expected: {}, got: {}", exp, got),
+            &ParserErrorKind::CustomError(ref msg) => write!(f, "{}", msg),
         }
     }
 }

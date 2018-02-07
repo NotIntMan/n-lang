@@ -18,6 +18,15 @@ use super::{
 };
 
 /**
+    Правило "Ничего".
+    Ничего не ожидает, ничего не возвращает.
+    Ошибкам взяться неоткуда.
+*/
+pub fn none<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, ()> {
+    input.ok(())
+}
+
+/**
     Правило "Идентификатор".
     Ищет токен типа `Word` и возвращает его текст в случае успеха.
 */
@@ -167,5 +176,71 @@ pub fn special_number_literal<'a, 'b>(input: &'a [Token<'b>], spec: NumberLitera
             }
         },
         other => other,
+    }
+}
+
+pub const UNSIGNED_INTEGER_SPEC: NumberLiteralSpec = NumberLiteralSpec {
+    negative: Some(false),
+    fractional: Some(false),
+    radix: None,
+};
+
+fn make_parse_error(input: &str) -> ParserErrorKind {
+    ParserErrorKind::expected_got_description("integer literal", TokenKindLess::NumberLiteral,input)
+}
+
+pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
+    let mut chars = input.chars()
+        .skip_while(|c| c.is_whitespace());
+    let first = match chars.next() {
+        Some(v) => v,
+        None => return Err(make_parse_error(input)),
+    };
+    let (
+        mut result,
+        radix,
+    ) = match first {
+        '0' => {
+            let second = match chars.next() {
+                Some(v) => v,
+                None => return Err(make_parse_error(input)),
+            };
+            match second {
+                'b' => (0, 2),
+                'o' => (0, 8),
+                'x' => (0, 16),
+                c => match c.to_digit(8) {
+                    Some(v) => (v, 8),
+                    None => return Err(make_parse_error(input)),
+                },
+            }
+        },
+        c => match c.to_digit(10) {
+            Some(v) => (v, 10),
+            None => return Err(make_parse_error(input)),
+        },
+    };
+    for c in chars {
+        match c.to_digit(radix) {
+            Some(v) => {
+                result *= 10;
+                result += v;
+            },
+            None => return Err(make_parse_error(input)),
+        }
+    }
+    Ok(result)
+}
+
+pub fn u32_literal<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, u32> {
+    match special_number_literal(input, UNSIGNED_INTEGER_SPEC.clone()) {
+        IResult::Done(input, result) => {
+            match parse_integer_literal(result.text) {
+                Ok(v) => input.ok(v),
+                Err(e) => input.err(e),
+            }
+        }
+        IResult::Incomplete(n) => IResult::Incomplete(n),
+        IResult::Error(e) => IResult::Error(e),
     }
 }
