@@ -54,6 +54,9 @@ macro_rules! prepare {
     ($name:ident ( $( $arg: expr ),+ , ) ) => { |input|
         $name(input, $( $arg ),+)
     };
+    ($name:ident! ( $( $arg: tt )+) ) => { |input|
+        $name!(input, $( $arg )+)
+    };
 }
 
 /**
@@ -202,4 +205,25 @@ fn g() {
             .expect("Parser result must be ok"),
         vec![(), ()]
     );
+}
+
+/**
+    Шаблон "Опционально".
+    Пытается провести разбор данного парсера, но, в случае неудачи, не возвращает ошибку.
+
+    Является перекрытием макроса opt! из пакета nom с нормальным наследованием типа результата.
+*/
+#[macro_export]
+macro_rules! opt {
+    ($i:expr, $mac:ident!( $($args:tt)* )) => {{
+        let i_ = $i.clone();
+        match $mac!(i_, $($args)*) {
+            $crate::nom::IResult::Done(i,o)     => $crate::nom::IResult::Done(i, ::std::option::Option::Some(o)),
+            $crate::nom::IResult::Incomplete(i) => $crate::nom::IResult::Incomplete(i),
+            _ => $crate::nom::IResult::Done($i, ::std::option::Option::None),
+        }
+    }};
+    ($i:expr, $f:expr) => {
+        opt!($i, call!($f));
+    };
 }
