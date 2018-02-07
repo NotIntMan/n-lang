@@ -11,7 +11,7 @@ extern crate log;
 extern crate env_logger;
 #[allow(unused_imports)]
 #[macro_use]
-extern crate nom;
+pub extern crate nom;
 
 #[macro_use]
 pub mod helpers;

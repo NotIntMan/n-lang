@@ -67,8 +67,6 @@ pub fn exact_token<'a, 'b>(input: &'a [Token<'b>], expected_kind: TokenKindLess,
 
 #[test]
 fn x() {
-    use nom;
-    use parser_basics;
     use self::TokenKindLess::*;
     parser_rule!(extract_text(i, kind: TokenKindLess) -> &'source str {
         do_parse!(i,
@@ -98,7 +96,6 @@ fn x() {
 #[test]
 fn y() {
     use nom;
-    use parser_basics;
     use self::TokenKindLess::*;
     parser_rule!(extract_text(i, kind: TokenKindLess) -> &'source str {
         do_parse!(i,
