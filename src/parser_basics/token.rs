@@ -19,9 +19,9 @@ use super::{
 */
 pub fn some_token<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'a Token<'b>> {
     if input.is_empty() {
-        return input.err(0, ParserErrorKind::unexpected_end());
+        return input.err(ParserErrorKind::unexpected_end());
     }
-    input.ok(1, &input[0])
+    input.ok_at(1, &input[0])
 }
 
 /**
@@ -34,13 +34,13 @@ pub fn some_token<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'a To
 */
 pub fn token<'a, 'b>(input: &'a [Token<'b>], expected: TokenKindLess) -> ParserResult<'a, 'b, &'a Token<'b>> {
     if input.is_empty() {
-        return input.err(0, ParserErrorKind::unexpected_end_expected(expected));
+        return input.err(ParserErrorKind::unexpected_end_expected(expected));
     }
     let got = input[0].kind.less();
     if expected == got {
-        input.ok(1, &input[0])
+        input.ok_at(1, &input[0])
     } else {
-        input.err(0, ParserErrorKind::expected_got_kind(expected, got))
+        input.err(ParserErrorKind::expected_got_kind(expected, got))
     }
 }
 
@@ -54,14 +54,14 @@ pub fn token<'a, 'b>(input: &'a [Token<'b>], expected: TokenKindLess) -> ParserR
 */
 pub fn exact_token<'a, 'b>(input: &'a [Token<'b>], expected_kind: TokenKindLess, expected_text: &str) -> ParserResult<'a, 'b, &'a Token<'b>> {
     if input.is_empty() {
-        return input.err(0, ParserErrorKind::unexpected_end_expected(expected_kind));
+        return input.err(ParserErrorKind::unexpected_end_expected(expected_kind));
     }
     let got_kind = input[0].kind.less();
     let got_text = input[0].text;
     if (expected_kind == got_kind) && (expected_text == got_text) {
-        input.ok(1, &input[0])
+        input.ok_at(1, &input[0])
     } else {
-        input.err(0, ParserErrorKind::expected_got_kind_text(expected_kind, expected_text, got_kind, got_text))
+        input.err(ParserErrorKind::expected_got_kind_text(expected_kind, expected_text, got_kind, got_text))
     }
 }
 

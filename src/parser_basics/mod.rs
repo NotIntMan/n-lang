@@ -35,7 +35,7 @@ pub use self::basic_rules::{
 
 pub use self::input::ParserInput;
 
-pub type Parser<'a, 'b, O> = Fn(&'a [Token<'b>]) -> ParserResult<'a, 'b, O>;
+pub type Parser<'a, 'b, O> = fn(&'a [Token<'b>]) -> ParserResult<'a, 'b, O>;
 pub type ParserResult<'a, 'b, O> = IResult<&'a [Token<'b>], O, ParserError>;
 
 pub use self::token::{

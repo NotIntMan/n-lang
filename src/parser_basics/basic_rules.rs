@@ -43,9 +43,9 @@ pub fn keyword<'a, 'b>(input: &'a [Token<'b>], expected_text: &str) -> ParserRes
     match token(input, TokenKindLess::Word) {
         IResult::Done(i, output) => {
             if !compare_words(output.text, expected_text) {
-                return input.err(0, ParserErrorKind::expected_got_kind_text(TokenKindLess::Word, expected_text, TokenKindLess::Word, output.text))
+                return input.err(ParserErrorKind::expected_got_kind_text(TokenKindLess::Word, expected_text, TokenKindLess::Word, output.text))
             }
-            i.ok(0, ())
+            i.ok(())
         },
         IResult::Incomplete(n) => IResult::Incomplete(n),
         IResult::Error(e) => IResult::Error(e),
@@ -141,7 +141,7 @@ pub fn special_number_literal<'a, 'b>(input: &'a [Token<'b>], spec: NumberLitera
                         } else {
                             "positive number literal"
                         };
-                        return input.err(0, ParserErrorKind::expected_got_description(
+                        return input.err(ParserErrorKind::expected_got_description(
                             desc, TokenKindLess::NumberLiteral, output.text
                         ));
                     } }
@@ -151,19 +151,19 @@ pub fn special_number_literal<'a, 'b>(input: &'a [Token<'b>], spec: NumberLitera
                         } else {
                             "integer number literal"
                         };
-                        return input.err(0, ParserErrorKind::expected_got_description(
+                        return input.err(ParserErrorKind::expected_got_description(
                             desc, TokenKindLess::NumberLiteral, output.text
                         ));
                     } }
                     if let Some(v) = spec.radix { if !v.contains(radix) {
                         let desc = format!("number literal with radix between {}..{}", v.start, v.end);
-                        return input.err(0, ParserErrorKind::expected_got_description(
+                        return input.err(ParserErrorKind::expected_got_description(
                             desc, TokenKindLess::NumberLiteral, output.text
                         ));
                     } }
-                    i.ok(0, output)
+                    i.ok(output)
                 },
-                other => input.err(0, ParserErrorKind::expected_got_kind(TokenKindLess::NumberLiteral, other.less())),
+                other => input.err(ParserErrorKind::expected_got_kind(TokenKindLess::NumberLiteral, other.less())),
             }
         },
         other => other,
