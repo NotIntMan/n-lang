@@ -18,161 +18,188 @@
 //    OPENING_TRIANGULAR_BRACKET,
 //};
 
-/*
-    Это дело не скопилируется потому, что, похоже, шаблонам придётся учитывать подмакросы.
-    Надо подумать над этим т.к. я не хочу реализовывать экспоненциальное количество вариантов макроса.
-    TODO Решить задачку с макросами-шаблонами
+use nom::IResult;
+
+use lexeme_scanner::Token;
+
+use super::{
+    ParserInput,
+    ParserResult,
+    symbols,
+};
+
+/**
+    Шаблон "Подготовка".
+    Реализует частичное обратное каррирование парсеров.
+
+    Имеет синтаксис `prepare!( $fn [(...$args)] )`
+
+    Возвращает замыкание единственного аргумента, которое вызовет функцию `$fn`,
+    передав ей значение аргумента замыкания, а затем все дополнительные аргументы `...$args`.
+    Пустые, ничего не содержащие скобки агрументов могут быть опущены.
+
+    <b>Пример: </b> `prepare!(symbols("+")) <==> |input| symbols(input, "+")`.
+
+    <b>Пример: </b> `prepare!(list(prepare!(symbols("+")), prepare!(symbols(","))))`
+
+    эквивалентно `|input| list(input, |input| symbols(input, "+"), |input| symbols(input, ","))`.
 */
-
 #[macro_export]
-macro_rules! call_template {
-    ($i: expr, $name: ident) => { $name($i) };
-    ($i: expr, $name: ident! ( ( $arg: expr ),* )) => { $name!($i, ( $arg: expr ),*) };
+macro_rules! prepare {
+    ($name:ident) => { |input| $name(input) };
+    ($name:ident ()) => { |input| $name(input) };
+    ($name:ident ( $( $arg: expr ),+) ) => { |input|
+        $name(input, $( $arg ),+)
+    };
+    ($name:ident ( $( $arg: expr ),+ , ) ) => { |input|
+        $name(input, $( $arg ),+)
+    };
 }
 
-//#[test]
-//fn a() {
-//    fn inc(i: u8) -> u8 { i + 1 }
-//    assert_eq!(call_template!(5, inc), 6);
-//    assert_eq!(call_template!(5, call_template!(inc)), 6);
-//}
+/**
+    Шаблон "Список".
+    Используется для разбора списка `element`, разделённых `delimiter`.
 
-#[macro_export]
-macro_rules! list {
-    ($i: expr, $($element:tt)* , $($delimiter:tt)*) => {{
-        use nom::IResult;
-        use parser_basics::ParserInput;
-        let mut result = Vec::new();
-        let mut input = $i.clone();
-        'parse_cycle: loop {
-            match call_template!(input, $($element)*) {
-                IResult::Done(I, O) => {
-                    input = I;
-                    result.push(O);
-                },
-                _ => { break 'parse_cycle },
-            }
-            match call_template!(input, $($delimiter)*) {
-                IResult::Done(I, _) => {
-                    input = I;
-                },
-                _ => { break 'parse_cycle },
-            }
+    В конце списка `delimiter` является опциональным.
+    Возвращает вектор успешно разобранных значений (`Vec<ElementOutput>`).
+    Никогда не возвращает ошибку.
+*/
+#[inline]
+pub fn list<
+    'token,
+    'source,
+    ElementOutput,
+    Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
+    DelimiterOutput,
+    Delimiter: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, DelimiterOutput>,
+>(
+    mut input: &'token [Token<'source>], element: Element, delimiter: Delimiter
+)
+    -> ParserResult<'token, 'source, Vec<ElementOutput>>
+    where Token<'source>: 'token
+{
+    let mut result = Vec::new();
+    'parse_cycle: loop {
+        match element(input) {
+            IResult::Done(new_input, element_result) => {
+                input = new_input;
+                result.push(element_result);
+            },
+            _ => { break 'parse_cycle },
         }
-        input.ok(0, result)
-    }};
+        match delimiter(input) {
+            IResult::Done(new_input, _) => {
+                input = new_input;
+            },
+            _ => { break 'parse_cycle },
+        }
+    }
+    input.ok(result)
 }
 
-//#[test]
-//fn x() {
-//    use nom;
-//    use parser_basics;
-//    use parser_basics::symbols;
-//    parser_rule!(pluses(i, kind: TokenKindLess) -> &'source str {
-//        do_parse!(i,
-//            x: list!(
-//                apply!(symbols, "+"),
-//                apply!(symbols, ",")
-//            ) >>
-//            (x)
-//        )
-//    });
-//    use lexeme_scanner::Scanner;
-//    let buf = Scanner::scan("+, + , +")
-//        .expect("Scanner result must be ok");
-//    let input = buf.as_slice();
-//    assert_eq!(
-//        pluses(input)
-//            .to_result()
-//            .expect("Parser result must be ok"),
-//        vec![]
-//    );
-//}
+#[test]
+fn f() {
+    use lexeme_scanner::Scanner;
+    let buf = Scanner::scan("+, + , +")
+        .expect("Scanner result must be ok");
+    let pluses = prepare!(list(prepare!(symbols("+")), prepare!(symbols(","))));
+    let input = buf.as_slice();
+    assert_eq!(
+        pluses(input)
+            .to_result()
+            .expect("Parser result must be ok"),
+        vec![(), (), ()]
+    );
+}
 
-// /**
-//    Шаблон "Список".
-//    Используется для разбора списка `Element`, разделённых `Delimiter`.
-//    В конце списка `Delimiter` является опциональным.
-//    Возвращает вектор успешно разобранных значений (`Vec<Element::Result>`).
-//    Никогда не возвращает ошибку.
-//*/
-//#[derive(Debug, Clone, PartialEq, Eq)]
-//pub struct TemplateList<Element, Delimiter>(pub Element, pub Delimiter);
-//
-//impl<Element> TemplateList<Element, ConstSymbol> {
-//    /// Создаёт правило, разбирающее список `Element`, разделённых символом `,`.
-//    #[inline]
-//    pub const fn comma(e: Element) -> Self {
-//        TemplateList(e, COMMA)
-//    }
-//    /// Создаёт правило, разбирающее список `Element`, разделённых символом `;`.
-//    #[inline]
-//    pub const fn semicolon(e: Element) -> Self {
-//        TemplateList(e, SEMICOLON)
-//    }
-//}
-//
-//impl<'a, 'b, Element, Delimiter> LexemeParser<'a, 'b> for TemplateList<Element, Delimiter>
-//    where Element: LexemeParser<'a, 'b>,
-//          Delimiter: LexemeParser<'a, 'b>,
-//{
-//    type Result = Vec<Element::Result>;
-//    fn parse(&self, cursor: &mut LexemeCursor<'a, 'b>) -> LexemeParserResult<Self::Result> {
-//        let mut result = Vec::new();
-//        let mut begin;
-//        'parse_loop: loop {
-//            begin = cursor.index;
-//            match self.0.parse(cursor) {
-//                Ok(r) => result.push(r),
-//                Err(_) => break 'parse_loop,
-//            }
-//            if let Err(_) = self.1.parse(cursor) {
-//                break 'parse_loop;
-//            }
-//        }
-//        cursor.index = begin;
-//        Ok(result)
-//    }
-//}
+/**
+    Шаблон "Обёртка".
+    Используется для разбора `element`, который следует после `opening_paren` и до `closing_paren`.
+    Частным случаем "обёртки" являются скобки.
+*/
+#[inline]
+pub fn wrap<
+    'token,
+    'source,
+    OpeningParenOutput,
+    OpeningParen: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, OpeningParenOutput>,
+    ElementOutput,
+    Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
+    ClosingParenOutput,
+    ClosingParen: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ClosingParenOutput>,
+>(
+    input: &'token [Token<'source>],
+    opening_paren: OpeningParen,
+    element: Element,
+    closing_paren: ClosingParen,
+)
+    -> ParserResult<'token, 'source, ElementOutput>
+    where Token<'source>: 'token
+{
+    do_parse!(input,
+        opening_paren >>
+        e: element >>
+        closing_paren >>
+        (e)
+    )
+}
 
-// /**
-//    Шаблон "Обёртка".
-//    Используется, в основном, для скобок.
-//    Представляет собой последовательность открывающейся скобки, элемента и закрывающейся скобки.
-//    Возвращает `Element::Result` в случае успеха.
-//    В случае обнаружения ошибки разбора возвращает её.
-//*/
-//#[derive(Debug, Clone, PartialEq, Eq)]
-//pub struct TemplateWrap<OpenBracket, Element, CloseBracket>(pub OpenBracket, pub Element, pub CloseBracket);
-//
-//impl<Element> TemplateWrap<ConstSymbol, Element, ConstSymbol> {
-//    /// Создаёт правило, разбирающее список `Element`, обёрнутый символами `(` и `)`.
-//    #[inline]
-//    pub const fn round(e: Element) -> Self {
-//        TemplateWrap(OPENING_ROUND_BRACKET, e, CLOSING_ROUND_BRACKET)
-//    }
-//    /// Создаёт правило, разбирающее список `Element`, обёрнутый символами `<` и `>`.
-//    #[inline]
-//    pub const fn triangular(e: Element) -> Self {
-//        TemplateWrap(OPENING_TRIANGULAR_BRACKET, e, CLOSING_TRIANGULAR_BRACKET)
-//    }
-//    /// Создаёт правило, разбирающее список `Element`, обёрнутый символами `{` и `}`.
-//    #[inline]
-//    pub const fn braces(e: Element) -> Self {
-//        TemplateWrap(OPENING_BRACES_BRACKET, e, CLOSING_BRACES_BRACKET)
-//    }
-//}
-//
-//impl<'a, 'b, OpenBracket, Element, CloseBracket> LexemeParser<'a, 'b> for TemplateWrap<OpenBracket, Element, CloseBracket>
-//    where Element: LexemeParser<'a, 'b>,
-//          OpenBracket: LexemeParser<'a, 'b>,
-//          CloseBracket: LexemeParser<'a, 'b>,
-//{
-//    type Result = Element::Result;
-//    fn parse(&self, cursor: &mut LexemeCursor<'a, 'b>) -> LexemeParserResult<Self::Result> {
-//        self.0.parse(cursor)?;
-//        let result = self.1.parse(cursor)?;
-//        self.2.parse(cursor)?;
-//        Ok(result)
-//    }
-//}
+/**
+    Шаблон "Обёртка символами".
+    Используется для разбора `element`, который следует после `opening_paren` и до `closing_paren`.
+    Является частным случаем шаблона "Обёртка" и служит для упрощения работы с ней.
+*/
+#[inline]
+pub fn symbol_wrap<
+    'token,
+    'source,
+    ElementOutput,
+    Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
+>(
+    input: &'token [Token<'source>],
+    opening_paren: &str,
+    element: Element,
+    closing_paren: &str,
+)
+    -> ParserResult<'token, 'source, ElementOutput>
+    where Token<'source>: 'token
+{
+    wrap(input, prepare!(symbols(opening_paren)), element, prepare!(symbols(closing_paren)))
+}
+
+/**
+    Шаблон "Обёртка круглыми скобками".
+    Используется для разбора `element`, который следует после `(` и до `)`.
+    Является частным случаем шаблона "Обёртка символами".
+*/
+#[inline]
+pub fn round_wrap<
+    'token,
+    'source,
+    ElementOutput,
+    Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
+>(
+    input: &'token [Token<'source>],
+    element: Element,
+)
+    -> ParserResult<'token, 'source, ElementOutput>
+    where Token<'source>: 'token
+{
+    symbol_wrap(input, "(", element, ")")
+}
+
+#[test]
+fn g() {
+    use lexeme_scanner::Scanner;
+    let buf = Scanner::scan("(+, +) , +")
+        .expect("Scanner result must be ok");
+    let pluses = prepare!(list(prepare!(symbols("+")), prepare!(symbols(","))));
+    let rounded_pluses = prepare!(round_wrap(pluses));
+    let input = buf.as_slice();
+    assert_eq!(
+        rounded_pluses(input)
+            .to_result()
+            .expect("Parser result must be ok"),
+        vec![(), ()]
+    );
+}
