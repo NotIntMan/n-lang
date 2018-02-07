@@ -1,3 +1,5 @@
+//! Набор структур для образования грамматики примитивных типов данных
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum IntegerType {
     Tiny,
@@ -10,7 +12,7 @@ pub enum IntegerType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NumberType {
     Bit {
-        size: Option<usize>,
+        size: Option<u32>,
     },
     Boolean,
     Integer {
@@ -19,15 +21,13 @@ pub enum NumberType {
         zerofill: bool,
     },
     Decimal {
-        size: Option<(usize, Option<usize>)>,
+        size: Option<(u32, Option<u32>)>,
         unsigned: bool,
         zerofill: bool,
     },
     Float {
-        size: Option<(usize, usize)>,
+        size: Option<(u32, u32)>,
         double: bool,
-        unsigned: bool,
-        zerofill: bool,
     },
 }
 
@@ -60,8 +60,6 @@ impl NumberType {
             &NumberType::Float {
                 size: _,
                 double: _,
-                unsigned: _,
-                zerofill: _,
             } => NumberTypeLess::Float,
         }
     }
@@ -72,13 +70,13 @@ impl NumberType {
 pub enum DateTimeType {
     Date,
     Time {
-        precision: Option<usize>,
+        precision: Option<u32>,
     },
     Datetime {
-        precision: Option<usize>,
+        precision: Option<u32>,
     },
     Timestamp {
-        precision: Option<usize>,
+        precision: Option<u32>,
     },
 }
 
@@ -122,7 +120,7 @@ pub enum CharacterSet {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StringType {
     Varchar {
-        size: Option<usize>,
+        size: Option<u32>,
         character_set: Option<CharacterSet>,
     },
     Text {
