@@ -1,7 +1,6 @@
 //! Набор примитивных шаблонов образования языка
 
 // TODO Попробовать запилить шаблоны, которые сочетаются с nom
-// TODO Запилить человеческий комбинатор ветвления с нормальными ошибками, а не вот этим вот многозначным и не понятным `Alternative`
 
 use nom::IResult;
 
@@ -269,4 +268,63 @@ fn a() {
             .expect("Parser result must be ok"),
         vec![(), ()]
     );
+}
+
+/**
+    Шаблон "Альтернатива".
+    Пытается провести разбор правила. В слчае неудачи, идёт к следующему.
+    В случае полной неудачи, возвращает группу ошибок.
+
+    Является перекрытием макроса alt! из пакета nom с нормальным группированием ошибок.
+*/
+#[macro_export]
+macro_rules! alt {
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) => { $gen:expr }) => {
+        match $rule!($i, $($args)*) {
+            $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, $gen(o)),
+            $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
+            $crate::nom::IResult::Error(e) => $crate::nom::IResult::Error(e),
+        }
+    };
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* )) => {
+        $rule!($i, $($args)*)
+    };
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) => { $gen:expr } | $($rest: tt)+) => {
+        match $rule!($i, $($args)*) {
+            $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, $gen(o)),
+            $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
+            $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(mut e)) => {
+                match alt!(__impl $i, $($rest)+) {
+                    $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
+                    $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
+                    $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(f)) => {
+                        e.append(f);
+                        $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(e))
+                    },
+                    $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
+                }
+            },
+            $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
+        }
+    };
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) | $($rest: tt)+) => {
+        match $rule!($i, $($args)*) {
+            $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
+            $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
+            $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(mut e)) => {
+                match alt!(__impl $i, $($rest)+) {
+                    $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
+                    $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
+                    $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(f)) => {
+                        e.append(f);
+                        $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(e))
+                    },
+                    $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
+                }
+            },
+            $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
+        }
+    };
+    (__impl $i: expr, $rule: ident $($rest: tt)*) => { alt!(__impl $i, call!($rule) $($rest)*) };
+    ($i: expr, $($rest :tt)+) => { alt!(__impl $i, $($rest)+) };
 }
