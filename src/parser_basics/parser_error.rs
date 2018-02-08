@@ -1,5 +1,7 @@
 //! Ошибка синтаксического разбора
 
+// TODO Применить группировку к некоторым ошибкам одинакового типа
+
 use std::fmt::{
     Debug,
     Display,
@@ -33,6 +35,16 @@ pub enum ParserErrorTokenInfo {
     Description(String),
 }
 
+impl Display for ParserErrorTokenInfo {
+    fn fmt(&self, f: &mut Formatter) -> FResult {
+        match self {
+            &ParserErrorTokenInfo::Kind(ref kind) => write!(f, "{}", kind),
+            &ParserErrorTokenInfo::Object(ref kind, ref msg) => write!(f, "{}({})", kind, msg),
+            &ParserErrorTokenInfo::Description(ref msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
 /**
     Тип синтаксической ошибки.
     Самая интересная часть для того, кто собрался написать ещё пару правил.
@@ -48,30 +60,6 @@ pub enum ParserErrorKind {
     KeyIsNotUnique(String),
     /// Прочая ошибка. Сообщает о том, что произошло что-то где-то за пределами парсера.
     CustomError(String),
-}
-
-/// Одиночная ошибка разбора. Применяется как элемент `ParserError`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParserErrorItem {
-    pub kind: ParserErrorKind,
-    pub pos: Option<SymbolPosition>,
-}
-
-/// Ошибка разбора. Может содержать несколько `ParserErrorItem`.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ParserError {
-    One(ParserErrorItem),
-    Many(Vec<ParserErrorItem>),
-}
-
-impl Display for ParserErrorTokenInfo {
-    fn fmt(&self, f: &mut Formatter) -> FResult {
-        match self {
-            &ParserErrorTokenInfo::Kind(ref kind) => write!(f, "{}", kind),
-            &ParserErrorTokenInfo::Object(ref kind, ref msg) => write!(f, "{}({})", kind, msg),
-            &ParserErrorTokenInfo::Description(ref msg) => write!(f, "{}", msg),
-        }
-    }
 }
 
 impl ParserErrorKind {
@@ -141,6 +129,13 @@ impl Display for ParserErrorKind {
     }
 }
 
+/// Одиночная ошибка разбора. Применяется как элемент `ParserError`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParserErrorItem {
+    pub kind: ParserErrorKind,
+    pub pos: Option<SymbolPosition>,
+}
+
 impl ParserErrorItem {
     /// Конструирует новую единицу ошибки из типа и позиции
     #[inline]
@@ -183,6 +178,13 @@ impl Ord for ParserErrorItem {
     }
 }
 
+/// Ошибка разбора. Может содержать несколько `ParserErrorItem`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParserError {
+    One(ParserErrorItem),
+    Many(Vec<ParserErrorItem>),
+}
+
 impl ParserError {
     /// Конструирует единичную ошибку из типа и позиции
     #[inline]
@@ -208,30 +210,46 @@ impl ParserError {
     }
     /// Выполняет поглощение другой ошибки.
     /// После выполнения текущий объект будет содержать как свои элементы, так и элементы из переданного объекта.
-    pub fn append(&mut self, err: ParserError) {
+    pub fn append(&mut self, other_error: ParserError) {
+        println!("Попытка объединить две группы ошибок:\n  {:?} и\n  {:?}", self, other_error);
         let result = match self {
-            &mut ParserError::One(ref e) => {
-                let e = e.clone();
-                let v = match err {
-                    ParserError::One(f) => {
-                        vec![e, f]
+            &mut ParserError::One(ref self_item) => {
+                let self_item = self_item.clone();
+                let new_vec = match other_error {
+                    ParserError::One(other_item) => {
+                        if self_item == other_item { return; }
+                        vec![self_item, other_item]
                     },
-                    ParserError::Many(mut w) => {
-                        w.push(e);
-                        w
+                    ParserError::Many(mut other_vec) => {
+                        if !other_vec.contains(&self_item) {
+                            other_vec.push(self_item);
+                        }
+                        other_vec
                     },
                 };
-                ParserError::Many(v)
+                ParserError::Many(new_vec)
             },
-            &mut ParserError::Many(ref mut v) => {
-                match err {
-                    ParserError::One(e) => v.push(e),
-                    ParserError::Many(mut w) => v.append(&mut w),
+            &mut ParserError::Many(ref mut self_vec) => {
+                match other_error {
+                    ParserError::One(other_item) => {
+                        if !self_vec.contains(&other_item) {
+                            self_vec.push(other_item);
+                        }
+                    },
+                    ParserError::Many(mut other_vec) => {
+                        for other_item in other_vec {
+                            if !self_vec.contains(&other_item) {
+                                self_vec.push(other_item);
+                            }
+                        }
+                    },
                 }
+                println!("Результат: Many({:?})", self_vec);
                 return;
             },
         };
         replace(self, result);
+        println!("Результат: {:?}", self);
     }
 }
 
