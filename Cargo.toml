@@ -8,8 +8,8 @@ name = "n_transpiler"
 path = "src/lib.rs"
 
 [[bin]]
-name = "n_transpiler"
-path = "src/main.rs"
+name = "first_presentation"
+path = "presentations/first-presentation.rs"
 
 [dependencies]
 nom = "3.2.1"
