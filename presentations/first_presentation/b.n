@@ -1,0 +1,9 @@
+{
+    a: boolean,
+    b: bit(2),
+    c: unsigned small integer,
+    d: (
+        zerofill decimal,
+        double,
+    ),
+}

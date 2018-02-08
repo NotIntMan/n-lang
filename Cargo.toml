@@ -9,7 +9,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "first_presentation"
-path = "presentations/first-presentation.rs"
+path = "presentations/first_presentation/main.rs"
 
 [dependencies]
 nom = "3.2.1"
