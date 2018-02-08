@@ -65,7 +65,6 @@ impl NumberType {
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DateTimeType {
     Date,
