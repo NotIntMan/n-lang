@@ -211,7 +211,6 @@ impl ParserError {
     /// Выполняет поглощение другой ошибки.
     /// После выполнения текущий объект будет содержать как свои элементы, так и элементы из переданного объекта.
     pub fn append(&mut self, other_error: ParserError) {
-        println!("Попытка объединить две группы ошибок:\n  {:?} и\n  {:?}", self, other_error);
         let result = match self {
             &mut ParserError::One(ref self_item) => {
                 let self_item = self_item.clone();
@@ -244,12 +243,10 @@ impl ParserError {
                         }
                     },
                 }
-                println!("Результат: Many({:?})", self_vec);
                 return;
             },
         };
         replace(self, result);
-        println!("Результат: {:?}", self);
     }
 }
 
