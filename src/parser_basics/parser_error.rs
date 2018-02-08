@@ -15,7 +15,11 @@ use std::cmp::{
     PartialOrd,
 };
 
-use std::mem::replace;
+use helpers::group::{
+    Appendable,
+    Group,
+};
+use helpers::display_list::display_list;
 
 use lexeme_scanner::{
     TokenKindLess,
@@ -45,6 +49,8 @@ impl Display for ParserErrorTokenInfo {
     }
 }
 
+impl Appendable for ParserErrorTokenInfo {}
+
 /**
     Тип синтаксической ошибки.
     Самая интересная часть для того, кто собрался написать ещё пару правил.
@@ -53,61 +59,106 @@ impl Display for ParserErrorTokenInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParserErrorKind {
     /// Неожиданный конец. Сообщает о том, что лексемы закончились, но правила этого не допускают.
-    UnexpectedEnd(Option<String>),
+    UnexpectedEnd(Group<String>),
     /// Неожиданный ввод. Сообщает о том, что ожидалась лексема одного вида, а была получена - другого.
-    ExpectedGot(ParserErrorTokenInfo, ParserErrorTokenInfo),
+    ExpectedGot(Group<ParserErrorTokenInfo>, ParserErrorTokenInfo),
     /// Ключ не уникален. Сообщает о том, что в определении структуры находится два поля с одинаковым именем.
-    KeyIsNotUnique(String),
+    KeyIsNotUnique(Group<String>),
     /// Прочая ошибка. Сообщает о том, что произошло что-то где-то за пределами парсера.
-    CustomError(String),
+    CustomError(Group<String>),
 }
 
 impl ParserErrorKind {
     /// Конструирует новый `ParserErrorKind::UnexpectedEnd` с сообщением о том, что ожидался символ
     #[inline]
     pub fn unexpected_end_expected_debug<D: Debug>(c: D) -> Self {
-        ParserErrorKind::UnexpectedEnd(Some(format!("{:?}", c)))
+        ParserErrorKind::UnexpectedEnd(Group::One(format!("{:?}", c)))
     }
     /// Конструирует новый `ParserErrorKind::UnexpectedEnd` с данным сообщением об ожидании
     #[inline]
     pub fn unexpected_end_expected<S: ToString>(msg: S) -> Self {
-        ParserErrorKind::UnexpectedEnd(Some(msg.to_string()))
+        ParserErrorKind::UnexpectedEnd(Group::One(msg.to_string()))
     }
     /// Конструирует новый `ParserErrorKind::UnexpectedEnd` без сообщения
     #[inline]
     pub fn unexpected_end() -> Self {
-        ParserErrorKind::UnexpectedEnd(None)
+        ParserErrorKind::UnexpectedEnd(Group::None)
     }
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе ожидаемого и полученного токенов
     #[inline]
     pub fn expected_got_kind(expected: TokenKindLess, got: TokenKindLess) -> Self {
-        let a = ParserErrorTokenInfo::Kind(expected);
+        let a = Group::One(ParserErrorTokenInfo::Kind(expected));
         let b = ParserErrorTokenInfo::Kind(got);
         ParserErrorKind::ExpectedGot(a, b)
     }
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе и тексте ожидаемого и полученного токенов
     #[inline]
     pub fn expected_got_kind_text<A: ToString, B: ToString>(expected_kind: TokenKindLess, expected_text: A, got_kind: TokenKindLess, got_text: B) -> Self {
-        let a = ParserErrorTokenInfo::Object(expected_kind, expected_text.to_string());
+        let a = Group::One(ParserErrorTokenInfo::Object(expected_kind, expected_text.to_string()));
         let b = ParserErrorTokenInfo::Object(got_kind, got_text.to_string());
         ParserErrorKind::ExpectedGot(a, b)
     }
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий описание ожидаемого токена и инофрмацию о типе и тексте полученного токена
     #[inline]
     pub fn expected_got_description<A: ToString, B: ToString>(expected: A, got_kind: TokenKindLess, got_text: B) -> Self {
-        let a = ParserErrorTokenInfo::Description(expected.to_string());
+        let a = Group::One(ParserErrorTokenInfo::Description(expected.to_string()));
         let b = ParserErrorTokenInfo::Object(got_kind, got_text.to_string());
         ParserErrorKind::ExpectedGot(a, b)
     }
     /// Конструирует новый `ParserErrorKind::NomError`, содержащий сообщение об ошибке комбинатора парсеров
     #[inline]
     pub fn custom_error<A: ToString>(msg: A) -> Self {
-        ParserErrorKind::CustomError(msg.to_string())
+        ParserErrorKind::CustomError(Group::One(msg.to_string()))
     }
     /// Конструирует новый `ParserErrorKind::KeyIsNotUnique`, содержащий сообщение имя повторяющегося ключа
     #[inline]
     pub fn key_is_not_unique<A: ToString>(msg: A) -> Self {
-        ParserErrorKind::KeyIsNotUnique(msg.to_string())
+        ParserErrorKind::KeyIsNotUnique(Group::One(msg.to_string()))
+    }
+}
+
+impl Appendable for ParserErrorKind {
+    fn append(&mut self, other: Self) -> Option<Self> {
+        match self {
+            &mut ParserErrorKind::UnexpectedEnd(ref mut self_group) => {
+                match other {
+                    ParserErrorKind::UnexpectedEnd(other_group) => {
+                        self_group.append_group(other_group);
+                        None
+                    },
+                    other_else => Some(other_else),
+                }
+            },
+            &mut ParserErrorKind::ExpectedGot(ref mut self_group, ref self_info) => {
+                match other {
+                    ParserErrorKind::ExpectedGot(other_group, other_info) => {
+                        if *self_info == other_info {
+                            self_group.append_group(other_group);
+                            None
+                        } else { Some(ParserErrorKind::ExpectedGot(other_group, other_info)) }
+                    },
+                    other_else => Some(other_else),
+                }
+            },
+            &mut ParserErrorKind::KeyIsNotUnique(ref mut self_group) => {
+                match other {
+                    ParserErrorKind::KeyIsNotUnique(other_group) => {
+                        self_group.append_group(other_group);
+                        None
+                    },
+                    other_else => Some(other_else),
+                }
+            },
+            &mut ParserErrorKind::CustomError(ref mut self_group) => {
+                match other {
+                    ParserErrorKind::CustomError(other_group) => {
+                        self_group.append_group(other_group);
+                        None
+                    },
+                    other_else => Some(other_else),
+                }
+            },
+        }
     }
 }
 
@@ -117,14 +168,26 @@ impl Display for ParserErrorKind {
         match self {
             &ParserErrorKind::UnexpectedEnd(ref s) => {
                 write!(f, "unexpected end")?;
-                if let &Some(ref m) = s {
-                    write!(f, ", expected: {}", m)?;
+                let expectations = s.extract_into_vec();
+                if expectations.len() > 0 {
+                    write!(f, ", expected: ")?;
+                    display_list(f, &expectations)?;
                 }
                 Ok(())
             },
-            &ParserErrorKind::ExpectedGot(ref exp, ref got) => write!(f, "expected: {}, got: {}", exp, got),
-            &ParserErrorKind::KeyIsNotUnique(ref key) => write!(f, "key {:?} is not unique", key),
-            &ParserErrorKind::CustomError(ref msg) => write!(f, "{}", msg),
+            &ParserErrorKind::ExpectedGot(ref exp, ref got) => {
+                write!(f, "expected: ")?;
+                display_list(f, &exp.extract_into_vec())?;
+                write!(f, ", got: {}", got)?;
+                Ok(())
+            },
+            &ParserErrorKind::KeyIsNotUnique(ref key) => {
+                write!(f, "key")?;
+                display_list(f, &key.extract_into_vec())?;
+                write!(f, "is not unique")?;
+                Ok(())
+            },
+            &ParserErrorKind::CustomError(ref messages) => display_list(f, &messages.extract_into_vec()),
         }
     }
 }
@@ -155,6 +218,25 @@ impl ParserErrorItem {
     }
 }
 
+impl Appendable for ParserErrorItem {
+    fn append(&mut self, other: Self) -> Option<Self> {
+        if self.pos != other.pos {
+            return Some(other);
+        }
+        let ParserErrorItem {
+            kind: other_kind,
+            pos: other_pos,
+        } = other;
+        match self.kind.append(other_kind) {
+            Some(other_kind) => Some(ParserErrorItem {
+                kind: other_kind,
+                pos: other_pos,
+            }),
+            None => None,
+        }
+    }
+}
+
 /// Типаж Display у `ParserErrorItem` служит для отображения ошибки в человекочитаемом виде
 impl Display for ParserErrorItem {
     fn fmt(&self, f: &mut Formatter) -> FResult {
@@ -179,79 +261,27 @@ impl Ord for ParserErrorItem {
 }
 
 /// Ошибка разбора. Может содержать несколько `ParserErrorItem`.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ParserError {
-    One(ParserErrorItem),
-    Many(Vec<ParserErrorItem>),
-}
+pub type ParserError = Group<ParserErrorItem>;
 
-impl ParserError {
+impl Group<ParserErrorItem> {
     /// Конструирует единичную ошибку из типа и позиции
     #[inline]
     pub const fn new(kind: ParserErrorKind, pos: SymbolPosition) -> ParserError {
-        ParserError::One(
+        Group::One(
             ParserErrorItem::new(kind, pos)
         )
     }
     /// Конструирует единичную ошибку из типа, но без позиции
     #[inline]
     pub const fn new_without_pos(kind: ParserErrorKind) -> ParserError {
-        ParserError::One(
+        Group::One(
             ParserErrorItem::new_without_pos(kind)
         )
-    }
-    /// Выполняет копирование всех хранимых ошибок в вектор и возвращает его
-    #[inline]
-    pub fn extract_into_vec(&self) -> Vec<ParserErrorItem> {
-        match self {
-            &ParserError::One(ref e) => vec![e.clone()],
-            &ParserError::Many(ref v) => v.clone(),
-        }
-    }
-    /// Выполняет поглощение другой ошибки.
-    /// После выполнения текущий объект будет содержать как свои элементы, так и элементы из переданного объекта.
-    pub fn append(&mut self, other_error: ParserError) {
-        let result = match self {
-            &mut ParserError::One(ref self_item) => {
-                let self_item = self_item.clone();
-                let new_vec = match other_error {
-                    ParserError::One(other_item) => {
-                        if self_item == other_item { return; }
-                        vec![self_item, other_item]
-                    },
-                    ParserError::Many(mut other_vec) => {
-                        if !other_vec.contains(&self_item) {
-                            other_vec.push(self_item);
-                        }
-                        other_vec
-                    },
-                };
-                ParserError::Many(new_vec)
-            },
-            &mut ParserError::Many(ref mut self_vec) => {
-                match other_error {
-                    ParserError::One(other_item) => {
-                        if !self_vec.contains(&other_item) {
-                            self_vec.push(other_item);
-                        }
-                    },
-                    ParserError::Many(mut other_vec) => {
-                        for other_item in other_vec {
-                            if !self_vec.contains(&other_item) {
-                                self_vec.push(other_item);
-                            }
-                        }
-                    },
-                }
-                return;
-            },
-        };
-        replace(self, result);
     }
 }
 
 /// Типаж Display у `ParserError` служит для отображения группы ошибок в человекочитаемом виде
-impl Display for ParserError {
+impl Display for Group<ParserErrorItem> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         let mut errors = self.extract_into_vec();
         errors.sort();

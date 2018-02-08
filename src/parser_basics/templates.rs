@@ -298,7 +298,7 @@ macro_rules! alt {
                     $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
                     $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
                     $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(f)) => {
-                        e.append(f);
+                        e.append_group(f);
                         $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(e))
                     },
                     $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
@@ -316,7 +316,7 @@ macro_rules! alt {
                     $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
                     $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
                     $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(f)) => {
-                        e.append(f);
+                        e.append_group(f);
                         $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(e))
                     },
                     $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
