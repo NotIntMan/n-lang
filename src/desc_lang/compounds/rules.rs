@@ -1,9 +1,17 @@
 use std::collections::HashMap;
+use std::hash::Hash;
+
+use lexeme_scanner::Token;
+
+use parser_basics::{
+    ParserErrorKind,
+    ParserInput,
+    ParserResult,
+};
 
 use parser_basics::{
     comma_list,
     identifier,
-    rounded_comma_list,
     symbols,
 };
 
@@ -16,66 +24,84 @@ parser_rule!(attribute(i) -> Attribute<'source> {
     do_parse!(i,
         apply!(symbols, "#[") >>
         name: identifier >>
-        arguments: prepare!(rounded_comma_list(identifier)) >>
+        arguments: opt!(do_parse!(
+            apply!(symbols, "(") >>
+            x: apply!(comma_list, identifier) >>
+            apply!(symbols, ")") >>
+            (x)
+        )) >>
         apply!(symbols, "]") >>
         (Attribute { name, arguments })
     )
 });
 
-parser_rule!(attributes(i) -> Option<Vec<Attribute<'source>>> {
-    opt!(i, many1!(attribute))
+parser_rule!(attributes(i) -> Vec<Attribute<'source>> {
+    many0!(i, attribute)
 });
 
-// TODO Поправить field_type так, чтобы он ссылался на корневое правило разбора типа данных
 parser_rule!(struct_field(i) -> (&'source str, Field<'source>) {
     do_parse!(i,
         attributes: attributes >>
         name: identifier >>
         apply!(symbols, ":") >>
-        field_type: identifier >>
+        field_type: data_type >>
         ((name, Field { attributes, field_type }))
     )
 });
 
-// TODO Поправить field_type так, чтобы он ссылался на корневое правило разбора типа данных
 parser_rule!(tuple_field(i) -> Field<'source> {
     do_parse!(i,
-        attributes: opt!(many1!(attribute)) >>
-        field_type: identifier >>
+        attributes: attributes >>
+        field_type: data_type >>
         (Field { attributes, field_type })
     )
 });
+
+fn slice_to_map<K: Eq + Hash + Clone + ToString, V: Clone>(input: &[(K, V)]) -> Result<HashMap<K, V>, ParserErrorKind> {
+    let mut result = HashMap::new();
+    for &(ref key, ref value) in input {
+        if let Some(_) = result.insert(key.clone(), value.clone()) {
+            return Err(ParserErrorKind::key_is_not_unique(key.clone()));
+        }
+    }
+    Ok(result)
+}
 
 parser_rule!(struct_body(i) -> StructureDataType<'source> {
     do_parse!(i,
         attributes: attributes >>
         apply!(symbols, "{") >>
-        fields_vec: prepare!(comma_list(struct_field)) >>
+        fields_vec: apply!(comma_list, struct_field) >>
         apply!(symbols, "}") >>
         ({
-            let fields = HashMap::from_iter(fields_vec);
+            let fields = match slice_to_map(fields_vec.as_slice()) {
+                Ok(v) => v,
+                Err(kind) => {
+                    println!("Found error while parsing struct {:?}", kind);
+                    return i.err(kind);
+                },
+            };
             StructureDataType { attributes, fields }
         })
     )
 });
 
-parser_rule!(tuple_body(i) -> StructureDataType<'source> {
+parser_rule!(tuple_body(i) -> TupleDataType<'source> {
     do_parse!(i,
         attributes: attributes >>
         apply!(symbols, "(") >>
-        fields_vec: prepare!(comma_list(tuple_field)) >>
+        fields: apply!(comma_list, tuple_field) >>
         apply!(symbols, ")") >>
         (TupleDataType { attributes, fields })
     )
 });
 
-
-/// Парсер, реализующий разбор грамматики составных типов
-pub fn compound_data_type<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, PrimitiveDataType> {
+/// Парсер, реализующий разбор грамматики составных и простых типов
+pub fn data_type<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, DataType<'b>> {
     alt!(input,
+        struct_body => { |x| DataType::Compound(CompoundDataType::Structure(x)) } |
+        tuple_body => { |x| DataType::Compound(CompoundDataType::Tuple(x)) } |
         primitive_data_type => { |x| DataType::Primitive(x) } |
-        struct_body => { |x| DataType::Structure(x) } |
-        tuple_body => { |x| DataType::Tuple(x) } |
         identifier => { |x| DataType::Reference(x) }
     )
 }
@@ -86,7 +112,7 @@ fn x0() {
     use parser_basics::parse;
     let tokens = Scanner::scan("(boolean, {a: integer, b: double})")
         .expect("Scanner result must be ok");
-    let result = parse(tokens.as_slice(), compound_data_type)
+    let result = parse(tokens.as_slice(), data_type)
         .expect("Parser result must be ok");
-    println!("{:?}", result);
+    println!("{:#?}", result);
 }

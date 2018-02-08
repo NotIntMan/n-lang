@@ -44,6 +44,8 @@ pub enum ParserErrorKind {
     UnexpectedEnd(Option<String>),
     /// Неожиданный ввод. Сообщает о том, что ожидалась лексема одного вида, а была получена - другого.
     ExpectedGot(ParserErrorTokenInfo, ParserErrorTokenInfo),
+    /// Ключ не уникален. Сообщает о том, что в определении структуры находится два поля с одинаковым именем.
+    KeyIsNotUnique(String),
     /// Прочая ошибка. Сообщает о том, что произошло что-то где-то за пределами парсера.
     CustomError(String),
 }
@@ -114,6 +116,11 @@ impl ParserErrorKind {
     pub fn custom_error<A: ToString>(msg: A) -> Self {
         ParserErrorKind::CustomError(msg.to_string())
     }
+    /// Конструирует новый `ParserErrorKind::KeyIsNotUnique`, содержащий сообщение имя повторяющегося ключа
+    #[inline]
+    pub fn key_is_not_unique<A: ToString>(msg: A) -> Self {
+        ParserErrorKind::KeyIsNotUnique(msg.to_string())
+    }
 }
 
 /// Типаж Display у `ParserErrorKind` служит для отображения типа ошибки в человекочитаемом виде
@@ -128,6 +135,7 @@ impl Display for ParserErrorKind {
                 Ok(())
             },
             &ParserErrorKind::ExpectedGot(ref exp, ref got) => write!(f, "expected: {}, got: {}", exp, got),
+            &ParserErrorKind::KeyIsNotUnique(ref key) => write!(f, "key {:?} is not unique", key),
             &ParserErrorKind::CustomError(ref msg) => write!(f, "{}", msg),
         }
     }

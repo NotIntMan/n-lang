@@ -30,7 +30,7 @@ pub fn none<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, ()> {
     Правило "Идентификатор".
     Ищет токен типа `Word` и возвращает его текст в случае успеха.
 */
-pub fn identifier<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'a str> {
+pub fn identifier<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'b str> {
     token(input, TokenKindLess::Word)
         .map(|token| token.text)
 }

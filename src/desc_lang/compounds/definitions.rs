@@ -10,26 +10,31 @@ pub struct Attribute<'a> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field<'a> {
-    pub attributes: Option<Vec<Attribute<'a>>>,
+    pub attributes: Vec<Attribute<'a>>,
     pub field_type: DataType<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StructureDataType<'a> {
-    pub attributes: Option<Vec<Attribute<'a>>>,
+    pub attributes: Vec<Attribute<'a>>,
     pub fields: HashMap<&'a str, Field<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TupleDataType<'a> {
-    pub attributes: Option<Vec<Attribute<'a>>>,
+    pub attributes: Vec<Attribute<'a>>,
     pub fields: Vec<Field<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataType<'a> {
-    Primitive(PrimitiveDataType),
+pub enum CompoundDataType<'a> {
     Structure(StructureDataType<'a>),
     Tuple(TupleDataType<'a>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataType<'a> {
+    Compound(CompoundDataType<'a>),
+    Primitive(PrimitiveDataType),
     Reference(&'a str),
 }

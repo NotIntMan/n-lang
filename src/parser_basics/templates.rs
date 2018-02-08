@@ -223,10 +223,15 @@ pub fn rounded_comma_list<
     input: &'token [Token<'source>],
     element: Element,
 )
-    -> ParserResult<'token, 'source, ElementOutput>
+    -> ParserResult<'token, 'source, Vec<ElementOutput>>
     where Token<'source>: 'token
 {
-    symbol_wrap(input, "(", prepare!(comma_list(element)), ")")
+    do_parse!(input,
+        apply!(symbols, "(") >>
+        x: apply!(comma_list, element) >>
+        apply!(symbols, ")") >>
+        (x)
+    )
 }
 
 #[test]
@@ -264,4 +269,19 @@ macro_rules! opt {
     ($i:expr, $f:expr) => {
         opt!($i, call!($f));
     };
+}
+
+#[test]
+fn a() {
+    use lexeme_scanner::Scanner;
+    let buf = Scanner::scan("(+, +) , +")
+        .expect("Scanner result must be ok");
+    let pluses = prepare!(rounded_comma_list(prepare!(symbols("+"))));
+    let input = buf.as_slice();
+    assert_eq!(
+        pluses(input)
+            .to_result()
+            .expect("Parser result must be ok"),
+        vec![(), ()]
+    );
 }
