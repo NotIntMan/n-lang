@@ -1,22 +1,7 @@
 //! Набор примитивных шаблонов образования языка
 
-//use syntax_parser::basics::{
-//    LexemeCursor,
-//    LexemeParser,
-//    LexemeParserResult,
-//};
-//
-//use syntax_parser::basics::constants::{
-//    ConstSymbol,
-//    COMMA,
-//    SEMICOLON,
-//    CLOSING_BRACES_BRACKET,
-//    CLOSING_ROUND_BRACKET,
-//    CLOSING_TRIANGULAR_BRACKET,
-//    OPENING_BRACES_BRACKET,
-//    OPENING_ROUND_BRACKET,
-//    OPENING_TRIANGULAR_BRACKET,
-//};
+// TODO Попробовать запилить шаблоны, которые сочетаются с nom
+// TODO Запилить человеческий комбинатор ветвления с нормальными ошибками, а не вот этим вот многозначным и не понятным `Alternative`
 
 use nom::IResult;
 
