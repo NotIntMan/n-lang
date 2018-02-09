@@ -33,23 +33,78 @@ use lexeme_scanner::{
     на 8 штук только из-за необходимости вариативности отображения объектов.
 */
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParserErrorTokenInfo {
-    Kind(TokenKindLess),
-    Object(TokenKindLess, String),
-    Description(String),
+pub struct ParserErrorTokenInfo {
+    pub kind: Option<TokenKindLess>,
+    pub desc: Option<String>,
+}
+
+impl ParserErrorTokenInfo {
+    #[inline]
+    pub fn new(kind: Option<TokenKindLess>, desc: Option<String>) -> Self {
+        Self { kind, desc }
+    }
+    #[inline]
+    pub fn from_kind(kind: TokenKindLess) -> Self {
+        ParserErrorTokenInfo::new(Some(kind), None)
+    }
+    #[inline]
+    pub fn from_desc(desc: String) -> Self {
+        ParserErrorTokenInfo::new(None, Some(desc))
+    }
+    #[inline]
+    pub fn append_expectation(&mut self, other: Self) -> Option<Self> {
+        trace!("Запрос на уточняющее объединение {} и {}", self, other);
+        if self.kind != other.kind {
+            trace!("self.kind != other.kind. Отказано.");
+            return Some(other);
+        }
+        'out: loop {
+            self.desc = match &self.desc {
+                &Some(ref desc) => {
+                    if let &Some(ref other_desc) = &other.desc {
+                        if desc != other_desc {
+                            break 'out;
+                        }
+                    }
+                    trace!("Поглощено: {}", self);
+                    return None;
+                },
+                &None => other.desc,
+            };
+            trace!("Поглощено: {}", self);
+            return None;
+        }
+        trace!("self.desc.some != other.desc.some. Отказано.");
+        return Some(other);
+    }
 }
 
 impl Display for ParserErrorTokenInfo {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
-            &ParserErrorTokenInfo::Kind(ref kind) => write!(f, "{}", kind),
-            &ParserErrorTokenInfo::Object(ref kind, ref msg) => write!(f, "{}({})", kind, msg),
-            &ParserErrorTokenInfo::Description(ref msg) => write!(f, "{}", msg),
+            &ParserErrorTokenInfo { kind: Some(ref kind), desc: None } => write!(f, "{}", kind),
+            &ParserErrorTokenInfo { kind: Some(ref kind), desc: Some(ref msg) } => write!(f, "{} {:?}", kind, msg),
+            &ParserErrorTokenInfo { kind: None, desc: Some(ref msg) } => write!(f, "{}", msg),
+            _ => Ok(()),
         }
     }
 }
 
-impl Appendable for ParserErrorTokenInfo {}
+impl Appendable for ParserErrorTokenInfo {
+    fn append(&mut self, other: Self) -> Option<Self> {
+        trace!("Запрос на группировку {} и {}", self, other);
+        if self.kind != other.kind {
+            trace!("self.kind и other.kind не равны. Отказано.");
+            return Some(other);
+        }
+        if self.desc == other.desc {
+            trace!("self и other равны. Поглощено.");
+            return None;
+        }
+        trace!("self и other различны. Отказано.");
+        Some(other)
+    }
+}
 
 /**
     Тип синтаксической ошибки.
@@ -87,22 +142,22 @@ impl ParserErrorKind {
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе ожидаемого и полученного токенов
     #[inline]
     pub fn expected_got_kind(expected: TokenKindLess, got: TokenKindLess) -> Self {
-        let a = Group::One(ParserErrorTokenInfo::Kind(expected));
-        let b = ParserErrorTokenInfo::Kind(got);
+        let a = Group::One(ParserErrorTokenInfo::from_kind(expected));
+        let b = ParserErrorTokenInfo::from_kind(got);
         ParserErrorKind::ExpectedGot(a, b)
     }
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе и тексте ожидаемого и полученного токенов
     #[inline]
     pub fn expected_got_kind_text<A: ToString, B: ToString>(expected_kind: TokenKindLess, expected_text: A, got_kind: TokenKindLess, got_text: B) -> Self {
-        let a = Group::One(ParserErrorTokenInfo::Object(expected_kind, expected_text.to_string()));
-        let b = ParserErrorTokenInfo::Object(got_kind, got_text.to_string());
+        let a = Group::One(ParserErrorTokenInfo::new(Some(expected_kind), Some(expected_text.to_string())));
+        let b = ParserErrorTokenInfo::new(Some(got_kind), Some(got_text.to_string()));
         ParserErrorKind::ExpectedGot(a, b)
     }
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий описание ожидаемого токена и инофрмацию о типе и тексте полученного токена
     #[inline]
     pub fn expected_got_description<A: ToString, B: ToString>(expected: A, got_kind: TokenKindLess, got_text: B) -> Self {
-        let a = Group::One(ParserErrorTokenInfo::Description(expected.to_string()));
-        let b = ParserErrorTokenInfo::Object(got_kind, got_text.to_string());
+        let a = Group::One(ParserErrorTokenInfo::from_desc(expected.to_string()));
+        let b = ParserErrorTokenInfo::new(Some(got_kind), Some(got_text.to_string()));
         ParserErrorKind::ExpectedGot(a, b)
     }
     /// Конструирует новый `ParserErrorKind::NomError`, содержащий сообщение об ошибке комбинатора парсеров
@@ -119,45 +174,73 @@ impl ParserErrorKind {
 
 impl Appendable for ParserErrorKind {
     fn append(&mut self, other: Self) -> Option<Self> {
+        trace!("Запрос на объединение {} и {}", self, other);
+        if *self == other {
+            trace!("self и other равны. Поглощено.");
+            return None;
+        }
         match self {
             &mut ParserErrorKind::UnexpectedEnd(ref mut self_group) => {
+                trace!("self оказался UnexpectedEnd");
                 match other {
                     ParserErrorKind::UnexpectedEnd(other_group) => {
+                        trace!("Как и other. Запрос на поглощение группы передан ниже.");
                         self_group.append_group(other_group);
+                        trace!("Результат запроса: {:?}", self_group);
                         None
-                    },
-                    other_else => Some(other_else),
+                    }
+                    other_else => {
+                        trace!("а other - нет. отказано.");
+                        Some(other_else)
+                    }
                 }
-            },
-            &mut ParserErrorKind::ExpectedGot(ref mut self_group, ref self_info) => {
+            }
+            &mut ParserErrorKind::ExpectedGot(ref mut self_group, ref mut self_info) => {
+                trace!("self оказался ExpectedGot");
                 match other {
                     ParserErrorKind::ExpectedGot(other_group, other_info) => {
-                        if *self_info == other_info {
-                            self_group.append_group(other_group);
-                            None
-                        } else { Some(ParserErrorKind::ExpectedGot(other_group, other_info)) }
-                    },
-                    other_else => Some(other_else),
+                        trace!("Как и other. Запрос на поглощение \"ожидания\" передан ниже.");
+                        match self_info.append_expectation(other_info) {
+                            Some(other_info) => {
+                                trace!("\"ожидание\" не поглощено. отказано.");
+                                Some(ParserErrorKind::ExpectedGot(other_group, other_info))
+                            }
+                            None => {
+                                trace!("\"ожидание\" поглощено. Запрос на поглощение группы передан ниже.");
+                                self_group.append_group(other_group);
+                                trace!("Результат запроса: {:?}", self_group);
+                                None
+                            }
+                        }
+                    }
+                    other_else => {
+                        trace!("а other - нет. отказано.");
+                        Some(other_else)
+                    }
                 }
-            },
+            }
             &mut ParserErrorKind::KeyIsNotUnique(ref mut self_group) => {
                 match other {
                     ParserErrorKind::KeyIsNotUnique(other_group) => {
+                        //trace!("Запрос передан ниже.");
                         self_group.append_group(other_group);
+                        //trace!("Результат запроса: {:?}", self_group);
                         None
-                    },
+                    }
                     other_else => Some(other_else),
                 }
-            },
+            }
             &mut ParserErrorKind::CustomError(ref mut self_group) => {
                 match other {
                     ParserErrorKind::CustomError(other_group) => {
+                        //trace!("Запрос передан ниже.");
                         self_group.append_group(other_group);
+                        //trace!("Результат запроса: {:?}", self_group);
                         None
-                    },
+                    }
                     other_else => Some(other_else),
                 }
-            },
+            }
         }
     }
 }
@@ -174,19 +257,19 @@ impl Display for ParserErrorKind {
                     display_list(f, &expectations)?;
                 }
                 Ok(())
-            },
+            }
             &ParserErrorKind::ExpectedGot(ref exp, ref got) => {
                 write!(f, "expected: ")?;
                 display_list(f, &exp.extract_into_vec())?;
                 write!(f, ", got: {}", got)?;
                 Ok(())
-            },
+            }
             &ParserErrorKind::KeyIsNotUnique(ref key) => {
                 write!(f, "key")?;
                 display_list(f, &key.extract_into_vec())?;
                 write!(f, "is not unique")?;
                 Ok(())
-            },
+            }
             &ParserErrorKind::CustomError(ref messages) => display_list(f, &messages.extract_into_vec()),
         }
     }
@@ -220,19 +303,32 @@ impl ParserErrorItem {
 
 impl Appendable for ParserErrorItem {
     fn append(&mut self, other: Self) -> Option<Self> {
+        trace!("Запрос на объединение {} и {}", self, other);
+        if *self == other {
+            trace!("self и other равны. возвращаем self: {}", self);
+            return None;
+        }
         if self.pos != other.pos {
+            trace!("self и other имеют разные позиции. в запросе отказано.");
             return Some(other);
         }
+        trace!("Запрос передан ниже.");
         let ParserErrorItem {
             kind: other_kind,
             pos: other_pos,
         } = other;
         match self.kind.append(other_kind) {
-            Some(other_kind) => Some(ParserErrorItem {
-                kind: other_kind,
-                pos: other_pos,
-            }),
-            None => None,
+            Some(other_kind) => {
+                trace!("Kind не был поглощён. Отказано.");
+                Some(ParserErrorItem {
+                    kind: other_kind,
+                    pos: other_pos,
+                })
+            }
+            None => {
+                trace!("Kind был поглощён. Поглощено. {}", self);
+                None
+            }
         }
     }
 }
@@ -280,15 +376,15 @@ impl Group<ParserErrorItem> {
     }
 }
 
-/// Типаж Display у `ParserError` служит для отображения группы ошибок в человекочитаемом виде
-impl Display for Group<ParserErrorItem> {
-    fn fmt(&self, f: &mut Formatter) -> FResult {
-        let mut errors = self.extract_into_vec();
-        errors.sort();
-        writeln!(f, "There are some errors:")?;
-        for (i, error) in errors.into_iter().enumerate() {
-            writeln!(f, "  {}. {}", i + 1, error)?;
-        }
-        writeln!(f, "Solution of one of them may solve the problem.")
-    }
-}
+///// Типаж Display у `ParserError` служит для отображения группы ошибок в человекочитаемом виде
+//impl Display for Group<ParserErrorItem> {
+//    fn fmt(&self, f: &mut Formatter) -> FResult {
+//        let mut errors = self.extract_into_vec();
+//        errors.sort();
+//        writeln!(f, "There are some errors:")?;
+//        for (i, error) in errors.into_iter().enumerate() {
+//            writeln!(f, "  {}. {}", i + 1, error)?;
+//        }
+//        writeln!(f, "Solution of one of them may solve the problem.")
+//    }
+//}

@@ -14,3 +14,11 @@ pub fn display_list<T: Display>(formatter: &mut Formatter, source: &[T]) -> FRes
     }
     Ok(())
 }
+
+pub fn list_to_string<T: Display>(source: &[T]) -> String {
+    let mut result = String::new();
+    for item in source.iter() {
+        result.push_str(&format!("  {}\n", item));
+    }
+    result
+}

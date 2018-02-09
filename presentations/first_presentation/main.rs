@@ -1,5 +1,7 @@
+extern crate env_logger;
 extern crate n_transpiler;
 
+use env_logger::try_init;
 use std::process::exit;
 use std::io::{
     Read,
@@ -187,6 +189,7 @@ pub fn stringify_type(input: &DataType, margin_left: usize) -> String {
 }
 
 pub fn scan(input: &str) -> Result<Vec<Token>, String> {
+    let _ = try_init();
     println!("Начало сканирования. Ввод: {:?}", input);
     let mut result = Vec::new();
     for scanner_iteration_result in Scanner::new(input) {
@@ -205,7 +208,7 @@ pub fn parse_it(input: &[Token]) -> Result<String, String> {
     println!("Передаём токены парсеру.");
     match parse(input, data_type) {
         Ok(t) => Ok(stringify_type(&t, 2)),
-        Err(e) => return Err(format!("Парсер сгенерировал ошибку: {}", e)),
+        Err(e) => Err(format!("Парсер сгенерировал ошибку: {}", e)),
     }
 }
 
