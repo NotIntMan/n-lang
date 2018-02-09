@@ -63,12 +63,11 @@ impl<T> Group<T> {
                 trace!("self оказался пустым, возвращаем other: {}", other);
                 other
             },
-            &mut Group::One(ref self_item) => {
+            &mut Group::One(ref mut self_item) => {
                 trace!("self оказался единичным");
-                let mut self_item = self_item.clone();
                 let new_vec = match other {
                     Group::None => {
-                        trace!("а other - пустым. возвращаем self {}", self);
+                        trace!("а other - пустым. возвращаем self {}", self_item);
                         return
                     },
                     Group::One(other_item) => {
@@ -80,11 +79,11 @@ impl<T> Group<T> {
                                 return
                             },
                         };
-                        vec![self_item, other_item]
+                        vec![self_item.clone(), other_item]
                     }
                     Group::Many(mut other_vec) => {
                         trace!("а other - множеством. добавляем свой элемент в него");
-                        Group::append_or_push(&mut other_vec, self_item);
+                        Group::append_or_push(&mut other_vec, self_item.clone());
                         other_vec
                     }
                 };

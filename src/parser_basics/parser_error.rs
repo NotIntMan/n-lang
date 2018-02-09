@@ -91,19 +91,19 @@ impl Display for ParserErrorTokenInfo {
 }
 
 impl Appendable for ParserErrorTokenInfo {
-    fn append(&mut self, other: Self) -> Option<Self> {
-        trace!("Запрос на группировку {} и {}", self, other);
-        if self.kind != other.kind {
-            trace!("self.kind и other.kind не равны. Отказано.");
-            return Some(other);
-        }
-        if self.desc == other.desc {
-            trace!("self и other равны. Поглощено.");
-            return None;
-        }
-        trace!("self и other различны. Отказано.");
-        Some(other)
-    }
+//    fn append(&mut self, other: Self) -> Option<Self> {
+//        trace!("Запрос на группировку {} и {}", self, other);
+//        if self.kind != other.kind {
+//            trace!("self.kind и other.kind не равны. Отказано.");
+//            return Some(other);
+//        }
+//        if self.desc == other.desc {
+//            trace!("self и other равны. Поглощено.");
+//            return None;
+//        }
+//        trace!("self и other различны. Отказано.");
+//        Some(other)
+//    }
 }
 
 /**
