@@ -35,6 +35,14 @@ pub fn identifier<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'b st
         .map(|token| token.text)
 }
 
+/**
+    Правило "Сырой идентификатор".
+    Ищет токен типа `Word` и возвращает ссылку на него в случае успеха.
+*/
+pub fn identifier_raw<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'a Token<'b>> {
+    token(input, TokenKindLess::Word)
+}
+
 /// Функция сравнения ключевых слов. Игнорирует регистр.
 pub fn compare_words(a: &str, b: &str) -> bool {
     let left = a.chars().flat_map(|c| c.to_lowercase());
@@ -45,16 +53,16 @@ pub fn compare_words(a: &str, b: &str) -> bool {
 /**
     Правило "Ключевое слово".
     Ищет токен типа `Word` с текстом, эквивалентным данному.
-    Ничего не возвращает в случае успеха.
+    Возвращает ссылку на токен в случае успеха.
     Игнорирует регистр слова.
 */
-pub fn keyword<'a, 'b>(input: &'a [Token<'b>], expected_text: &str) -> ParserResult<'a, 'b, ()> {
+pub fn keyword<'a, 'b>(input: &'a [Token<'b>], expected_text: &str) -> ParserResult<'a, 'b, &'a Token<'b>> {
     match token(input, TokenKindLess::Word) {
         IResult::Done(i, output) => {
             if !compare_words(output.text, expected_text) {
                 return input.err(ParserErrorKind::expected_got_kind_text(TokenKindLess::Word, expected_text, TokenKindLess::Word, output.text))
             }
-            i.ok(())
+            i.ok(output)
         },
         IResult::Incomplete(n) => IResult::Incomplete(n),
         IResult::Error(e) => IResult::Error(e),
