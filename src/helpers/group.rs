@@ -1,27 +1,26 @@
 //! Группа элементов
 
-// TODO Отладить алгоритм комбинирования
-
 use std::mem::replace;
 
-/// Группа элементов
+use super::extract::extract;
+
+/**
+    Группа элементов
+
+    Служит инструментом группировки элементов между собой.
+    Элементы должны реализовывать типаж `Appendable` для того, чтобы можно было проводить попытки
+    группировки новых элементов с ними.
+
+    Без самостоятельной реализации типажа `Appendable` элементами поведение группы становится бессмысленным и она становится обычной обёрткой над `Vec<T>`.
+
+    К тому же, элементы должны реализовывать типаж `Default` для быстрого их извлечения в случае само-модификации группы из `Group::One` в `Group::Many`.
+*/
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Group<T> {
     None,
     One(T),
     Many(Vec<T>),
 }
-
-use std::fmt::{
-    Display,
-    Result as FResult,
-    Formatter,
-};
-
-use helpers::display_list::{
-    display_list,
-    list_to_string,
-};
 
 impl<T> Group<T> {
     /// Выполняет копирование всех хранимых ошибок в вектор и возвращает его
@@ -56,78 +55,50 @@ impl<T> Group<T> {
     /// Выполняет поглощение другой группы.
     /// После выполнения текущий объект будет содержать как свои элементы, так и элементы из переданного объекта.
     pub fn append_group(&mut self, other: Self)
-        where T: Appendable + Clone + Display {
-        trace!("Запрос на объединение {} и {}", self, other);
+        where T: Appendable + Default {
         let result = match self {
             &mut Group::None => {
-                trace!("self оказался пустым, возвращаем other: {}", other);
                 other
-            },
+            }
             &mut Group::One(ref mut self_item) => {
-                trace!("self оказался единичным");
                 let new_vec = match other {
                     Group::None => {
-                        trace!("а other - пустым. возвращаем self {}", self_item);
-                        return
-                    },
+                        return;
+                    }
                     Group::One(other_item) => {
-                        trace!("как и other");
                         let other_item = match self_item.append(other_item) {
                             Some(other_item) => other_item,
                             None => {
-                                trace!("но self поглотил other. возвращаем self {}", self_item);
-                                return
-                            },
+                                return;
+                            }
                         };
-                        vec![self_item.clone(), other_item]
+                        vec![extract(self_item), other_item]
                     }
                     Group::Many(mut other_vec) => {
-                        trace!("а other - множеством. добавляем свой элемент в него");
-                        Group::append_or_push(&mut other_vec, self_item.clone());
+                        Group::append_or_push(&mut other_vec, extract(self_item));
                         other_vec
                     }
                 };
-                trace!("вот что получилось: [\n{}]", list_to_string(new_vec.as_slice()));
                 Group::Many(new_vec)
             }
             &mut Group::Many(ref mut self_vec) => {
-                trace!("self оказался множеством");
                 match other {
                     Group::None => {
-                        trace!("а other - пустым. возвращаем self");
-                        return
-                    },
+                        return;
+                    }
                     Group::One(other_item) => {
-                        trace!("а other - единичным. добавляем его элемент в себя");
                         Group::append_or_push(self_vec, other_item);
                     }
                     Group::Many(mut other_vec) => {
-                        trace!("как и other");
                         for other_item in other_vec {
-                            trace!("добавляем в себя элемент из other");
                             Group::append_or_push(self_vec, other_item);
                         }
                     }
                 }
-                trace!("вот что получилось: [\n{}]", list_to_string(self_vec.as_slice()));
                 return;
             }
         };
         replace(self, result);
-        trace!("вот что получилось после замены: {}", self);
-    }
-}
-
-impl<T: Display> Display for Group<T> {
-    fn fmt(&self, f: &mut Formatter) -> FResult {
-        write!(f, "[")?;
-        match self {
-            &Group::One(ref e) => write!(f, "{}", e)?,
-            &Group::Many(ref vec) => display_list(f, vec.as_slice())?,
-            _ => {},
-        }
-        write!(f, "]")?;
-        Ok(())
     }
 }
 
@@ -138,7 +109,7 @@ pub trait Appendable: Sized {
     }
 }
 
-impl<T: Appendable + PartialEq + Clone + Display> Appendable for Group<T> {
+impl<T: Appendable + Default> Appendable for Group<T> {
     #[inline]
     fn append(&mut self, other: Self) -> Option<Self> {
         self.append_group(other);
