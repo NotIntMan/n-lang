@@ -19,7 +19,7 @@ use desc_lang::primitives::primitive_data_type;
 
 use super::*;
 
-// TODO Понять почему тут всё ломается
+/// "#[" identifier [(...identifier)] "]"
 parser_rule!(attribute(i) -> Attribute<'source> {
     do_parse!(i,
         apply!(symbols, "#[") >>
@@ -35,10 +35,12 @@ parser_rule!(attribute(i) -> Attribute<'source> {
     )
 });
 
+/// ...attribute
 parser_rule!(attributes(i) -> Vec<Attribute<'source>> {
     many0!(i, attribute)
 });
 
+/// attributes identifier ":" data_type
 parser_rule!(struct_field(i) -> (&'source str, Field<'source>) {
     do_parse!(i,
         attributes: attributes >>
@@ -49,6 +51,7 @@ parser_rule!(struct_field(i) -> (&'source str, Field<'source>) {
     )
 });
 
+/// attributes data_type
 parser_rule!(tuple_field(i) -> Field<'source> {
     do_parse!(i,
         attributes: attributes >>
@@ -67,6 +70,7 @@ fn slice_to_map<K: Eq + Hash + Clone + ToString, V: Clone>(input: &[(K, V)]) -> 
     Ok(result)
 }
 
+/// attributes "{" ...struct_field "}"
 parser_rule!(struct_body(i) -> StructureDataType<'source> {
     do_parse!(i,
         attributes: attributes >>
@@ -86,6 +90,7 @@ parser_rule!(struct_body(i) -> StructureDataType<'source> {
     )
 });
 
+/// attributes "(" ...tuple_field ")"
 parser_rule!(tuple_body(i) -> TupleDataType<'source> {
     do_parse!(i,
         attributes: attributes >>
@@ -104,15 +109,4 @@ pub fn data_type<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, DataTyp
         primitive_data_type => { |x| DataType::Primitive(x) } |
         identifier => { |x| DataType::Reference(x) }
     )
-}
-
-#[test]
-fn x0() {
-    use lexeme_scanner::Scanner;
-    use parser_basics::parse;
-    let tokens = Scanner::scan("(boolean, {a: integer, b: double})")
-        .expect("Scanner result must be ok");
-    let result = parse(tokens.as_slice(), data_type)
-        .expect("Parser result must be ok");
-    println!("{:#?}", result);
 }

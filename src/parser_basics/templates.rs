@@ -105,21 +105,6 @@ pub fn comma_list<
     list(input, element, prepare!(symbols(",")))
 }
 
-#[test]
-fn f() {
-    use lexeme_scanner::Scanner;
-    let buf = Scanner::scan("+, + , +")
-        .expect("Scanner result must be ok");
-    let pluses = prepare!(list(prepare!(symbols("+")), prepare!(symbols(","))));
-    let input = buf.as_slice();
-    assert_eq!(
-        pluses(input)
-            .to_result()
-            .expect("Parser result must be ok"),
-        vec![(), (), ()]
-    );
-}
-
 /**
     Шаблон "Обёртка".
     Используется для разбора `element`, который следует после `opening_paren` и до `closing_paren`.
@@ -218,22 +203,6 @@ pub fn rounded_comma_list<
     )
 }
 
-#[test]
-fn g() {
-    use lexeme_scanner::Scanner;
-    let buf = Scanner::scan("(+, +) , +")
-        .expect("Scanner result must be ok");
-    let pluses = prepare!(list(prepare!(symbols("+")), prepare!(symbols(","))));
-    let rounded_pluses = prepare!(round_wrap(pluses));
-    let input = buf.as_slice();
-    assert_eq!(
-        rounded_pluses(input)
-            .to_result()
-            .expect("Parser result must be ok"),
-        vec![(), ()]
-    );
-}
-
 /**
     Шаблон "Опционально".
     Пытается провести разбор данного парсера, но, в случае неудачи, не возвращает ошибку.
@@ -253,21 +222,6 @@ macro_rules! opt {
     ($i:expr, $f:expr) => {
         opt!($i, call!($f));
     };
-}
-
-#[test]
-fn a() {
-    use lexeme_scanner::Scanner;
-    let buf = Scanner::scan("(+, +) , +")
-        .expect("Scanner result must be ok");
-    let pluses = prepare!(rounded_comma_list(prepare!(symbols("+"))));
-    let input = buf.as_slice();
-    assert_eq!(
-        pluses(input)
-            .to_result()
-            .expect("Parser result must be ok"),
-        vec![(), ()]
-    );
 }
 
 /**
