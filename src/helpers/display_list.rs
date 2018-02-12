@@ -4,6 +4,7 @@ use std::fmt::{
     Formatter,
 };
 
+/// Функция-помощник, которая форматирует список значений, разделяя их запятой
 pub fn display_list<T: Display>(formatter: &mut Formatter, source: &[T]) -> FResult {
     let mut iter = source.iter();
     if let Some(item) = iter.next() {
@@ -15,10 +16,12 @@ pub fn display_list<T: Display>(formatter: &mut Formatter, source: &[T]) -> FRes
     Ok(())
 }
 
-pub fn list_to_string<T: Display>(source: &[T]) -> String {
-    let mut result = String::new();
-    for item in source.iter() {
-        result.push_str(&format!("  {}\n", item));
+/// Структура, оборачивающая функциюнал функции `display_list` для использования в привычном форматировании
+pub struct DisplayList<'a, T: 'a>(&'a [T]);
+
+impl<'a, T: 'a + Display> Display for DisplayList<'a, T> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> FResult {
+        display_list(f, self.0)
     }
-    result
 }
