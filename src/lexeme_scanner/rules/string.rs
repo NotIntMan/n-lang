@@ -16,17 +16,20 @@ use self::basics::*;
 pub fn string(input: &[u8], bracket: char, kind: TokenKindLess) -> BatcherResult {
     assert_eq(input, 0, bracket)?;
     let mut result = 1;
+    let mut length = 0;
     loop {
         match extract_char(input, result, "string body's symbol")? {
             '\\' => {
                 extract_char(input, result + 1, "escape symbol")?;
                 result += 2;
+                length += 1;
             }
             c => {
                 result += 1;
                 if c == bracket {
-                    return Ok((TokenKind::new_string_literal(kind, result - 2), result));
+                    return Ok((TokenKind::new_string_literal(kind, length), result));
                 }
+                length += 1;
             }
         }
     }
