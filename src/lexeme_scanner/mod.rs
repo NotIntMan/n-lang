@@ -27,17 +27,17 @@
 
     # Пояснение
 
-    В основе данного модуля лежит идея автоматов. Модуль `eaters` содержит набор
+    В основе данного модуля лежит идея автоматов. Модуль `rules` содержит набор
     функций, работающих по принципу детерминированных конечных автоматов.
 
-    Они, приняв на вход `ScannerBatchIterator`, "съедают" столько символов, скольно необходимо
-    для обработки лексемы, а затем возвращают тип обработанной лексемы (`TokenKind`). В случае, если ввод
-    не является корректным, функция возвращает ошибку (`ScannerError`).
+    Они, приняв на вход `&[u8]`, который де-факто используется как `&[char]`, "решают" столько символов, скольно необходимо
+    для обработки лексемы, а затем возвращают тип обработанной лексемы (`TokenKind`) вместе с её длиной (`usize`). В случае, если ввод
+    не является корректным, функция возвращает ошибку (`ScannerError`) и её местоположение (`usize`).
 
-    Функция `scan`, располагающаяся в корне модуля `eaters`, реализует композицию всех функций модуля,
+    Функция `scan`, располагающаяся в корне модуля `rules`, реализует композицию всех функций модуля,
     поэтому её так же можно считать функцией-автоматом, и именно её использует сканер.
 
-    Сканер, к слову, просто смотрит сколько символов было "потреблено" и, в зависимости от этого,
+    Сканер, к слову, просто смотрит сколько символов было "обработано" и, в зависимости от этого,
     генерирует текст и расположение для `Token`, который он вернёт позже.
 
     Некоторые типы лексем (`TokenKind`) отличаются от прочих:
@@ -49,20 +49,20 @@
         игнорировать этот тип лексек
 */
 
-pub mod eaters;
 pub mod position;
+pub mod rules;
 pub mod scanner;
-pub mod scan_error;
+pub mod scanner_error;
 pub mod token;
 
 pub use self::token::{
     Token,
     TokenKind,
+    TokenKindLess,
 };
 
 pub use self::scanner::{
     Scanner,
-    ScannerCursor,
 };
 
 pub use self::position::{
@@ -70,13 +70,10 @@ pub use self::position::{
     ItemPosition,
 };
 
-pub use self::scan_error::{
+pub use self::scanner_error::{
     ScannerError,
     ScannerErrorKind,
 };
 
 pub type ScannerItem<'a> = Result<Token<'a>, ScannerError>;
-pub type BatcherResult = Result<TokenKind, ScannerErrorKind>;
-
-#[cfg(test)]
-mod scanner_tests;
+pub type BatcherResult = Result<(TokenKind, usize), (ScannerErrorKind, usize)>;

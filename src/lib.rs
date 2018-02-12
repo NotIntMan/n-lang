@@ -9,9 +9,13 @@
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate generic_array;
+#[allow(unused_imports)]
+#[macro_use]
+pub extern crate nom;
 
 #[macro_use]
 pub mod helpers;
 pub mod lexeme_scanner;
-pub mod syntax_parser;
+#[macro_use]
+pub mod parser_basics;
+pub mod desc_lang;

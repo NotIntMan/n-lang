@@ -12,7 +12,7 @@ use std::cmp::{
 };
 
 /// Позиция символа
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SymbolPosition {
     /**
         Означает смещение от первого символа в терминологии массивов.
@@ -62,6 +62,22 @@ impl SymbolPosition {
         for c in s.chars() {
             self.step(c);
         }
+    }
+    /**
+        Создаёт новый `ItemPosition` с началом в данном объекте.
+        Конец `ItemPosition` вычисляется на основе данного текста.
+    */
+    #[inline]
+    pub fn into_item_pos(self, item_text: &str) -> ItemPosition {
+        let begin = self.clone();
+        let mut end = self.clone();
+        end.step_str(item_text);
+        ItemPosition { begin, end }
+    }
+    /// Выполняет клонирование данного объекта и применяет к нему метод `into_item_pos`.
+    #[inline]
+    pub fn make_item_pos(&self, item_text: &str) -> ItemPosition {
+        self.clone().into_item_pos(item_text)
     }
 }
 
@@ -115,7 +131,7 @@ impl PartialOrd for SymbolPosition {
 
     Служит для отображения позиции составного элемента текста. Имеет два поля типа `SymbolPosition`: начало и конец.
 */
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ItemPosition {
     pub begin: SymbolPosition,
     pub end: SymbolPosition,
