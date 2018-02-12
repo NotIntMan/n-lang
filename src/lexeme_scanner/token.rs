@@ -78,7 +78,7 @@ impl fmt::Display for TokenKindLess {
 }
 
 /// Токен. Содержит информацию о своём типе, местоположении и тексте элемента, который отображает.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub text: &'a str,
