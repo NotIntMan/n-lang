@@ -55,6 +55,7 @@ pub use self::parser_error::{
     ParserError,
     ParserErrorItem,
     ParserErrorKind,
+    ParserErrorTokenInfo,
 };
 
 pub use self::templates::{

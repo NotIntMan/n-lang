@@ -77,6 +77,3 @@ pub use self::scanner_error::{
 
 pub type ScannerItem<'a> = Result<Token<'a>, ScannerError>;
 pub type BatcherResult = Result<(TokenKind, usize), (ScannerErrorKind, usize)>;
-
-#[cfg(test)]
-mod scanner_tests;
