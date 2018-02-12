@@ -3,7 +3,7 @@
 
     # Грамматика
 
-    ```
+    ```md
     attribute = "#[" identifier [(...identifier)] "]"
 
     attributes = ...attribute

@@ -32,10 +32,10 @@ use super::{
     impl<'a> ParserInput for Input<'a> {
         type Error = ParserError;
         type ErrorKind = ParserErrorKind;
-        fn ok<T>(self, processed: usize, value: T) -> IResult<Self, T, Self::Error> {
+        fn ok_at<T>(self, processed: usize, value: T) -> IResult<Self, T, Self::Error> {
             IResult::Done(Input(&self.0[processed..]), value)
         }
-        fn err<T>(self, position: usize, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> {
+        fn err_at<T>(self, position: usize, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> {
             IResult::Error(ErrorKind::Custom(ParserError::new_without_pos(kind)))
         }
     }

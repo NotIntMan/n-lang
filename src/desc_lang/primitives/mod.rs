@@ -3,7 +3,7 @@
 
     # Грамматика
 
-    ```
+    ```md
     single_size = [(u32)]
 
     bit = "bit" single_size
