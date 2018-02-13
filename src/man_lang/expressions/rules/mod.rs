@@ -1,5 +1,6 @@
 pub mod literals;
 pub mod binary_operations;
+pub mod unary_operators;
 
 use lexeme_scanner::Token;
 use parser_basics::{

@@ -17,6 +17,7 @@ array!(pub const SYMBOLS_1: char =
     '*',
     '/',
     '%',
+    '~',
     '.',
     ',',
     '(',
@@ -26,7 +27,6 @@ array!(pub const SYMBOLS_1: char =
     '[',
     ']',
     '!',
-    '*',
     '#',
     ':',
 );

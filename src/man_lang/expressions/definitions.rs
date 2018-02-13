@@ -66,9 +66,38 @@ pub enum BinaryOperator {
     Interval,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrefixUnaryOperator {
+    // Logical operators
+    Not,
+    // Set operators
+    All,
+    Any,
+    // Arithmetic operators
+    Plus,
+    Minus,
+    Tilde,
+    // Language specific operators
+    Binary,
+    Row,
+    Exists,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostfixUnaryOperator {
+    // Primitive comparison operators
+    IsNull,
+    IsTrue,
+    IsFalse,
+    IsUnknown,
+//    FieldAppeal(&'a str),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression<'source> {
     Literal(Literal<'source>),
     Identifier(Token<'source>),
     BinaryOperation(Box<Expression<'source>>, BinaryOperator, Box<Expression<'source>>),
+    PrefixUnaryOperation(PrefixUnaryOperator, Box<Expression<'source>>),
+    PostfixUnaryOperation(PostfixUnaryOperator, Box<Expression<'source>>),
 }
