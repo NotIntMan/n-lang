@@ -8,7 +8,6 @@ use parser_basics::{
 use man_lang::expressions::{
     BinaryOperator,
     Expression,
-    expression,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,9 +30,13 @@ fn fold_left<'source>(
 
 type Resolver<'a, 'b> = (ResolutionOrder, BinaryOperator, Parser<'a, 'b, ()>);
 
-fn infix<'token, 'source>(input: &'token [Token<'source>], resolvers: &[Resolver<'token, 'source>]) -> ParserResult<'token, 'source, Expression<'source>> {
+fn infix<'token, 'source>(
+    input: &'token [Token<'source>],
+    resolvers: &[Resolver<'token, 'source>],
+    atom: Parser<'token, 'source, Expression<'source>>,
+) -> ParserResult<'token, 'source, Expression<'source>> {
     if resolvers.is_empty() {
-        return expression(input);
+        return atom(input);
     }
     let (
         order,
@@ -43,10 +46,10 @@ fn infix<'token, 'source>(input: &'token [Token<'source>], resolvers: &[Resolver
     match order {
         ResolutionOrder::Left => {
             do_parse!(input,
-                left: apply!(infix, &resolvers[1..]) >>
+                left: apply!(infix, &resolvers[1..], atom) >>
                 tails: many0!(do_parse!(
                     operation >>
-                    right: apply!(infix, &resolvers[1..]) >>
+                    right: apply!(infix, &resolvers[1..], atom) >>
                     (right)
                 )) >>
                 (fold_left(operator, left, tails))
@@ -54,10 +57,10 @@ fn infix<'token, 'source>(input: &'token [Token<'source>], resolvers: &[Resolver
         },
         ResolutionOrder::Right => {
             do_parse!(input,
-                left: apply!(infix, &resolvers[1..]) >>
+                left: apply!(infix, &resolvers[1..], atom) >>
                 tail: opt!(do_parse!(
                     operation >>
-                    right: apply!(infix, resolvers) >>
+                    right: apply!(infix, resolvers, atom) >>
                     (right)
                 )) >>
                 (match tail {
@@ -128,7 +131,10 @@ parser_rule!(arithmetic_pow(i) -> () { do_parse!(i, apply!(symbols, "**") >> (()
 /// ".."
 parser_rule!(interval(i) -> () { do_parse!(i, apply!(symbols, "..") >> (())) });
 
-pub fn binary_expression<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Expression<'source>> {
+pub fn binary_expression<'token, 'source>(
+    input: &'token [Token<'source>],
+    atom: Parser<'token, 'source, Expression<'source>>,
+) -> ParserResult<'token, 'source, Expression<'source>> {
     array!(let resolvers: Resolver<'token, 'source> =
         (ResolutionOrder::Left, BinaryOperator::Or, logic_or),
         (ResolutionOrder::Left, BinaryOperator::XOr, logic_xor),
@@ -153,10 +159,10 @@ pub fn binary_expression<'token, 'source>(input: &'token [Token<'source>]) -> Pa
         (ResolutionOrder::Left, BinaryOperator::Divide, arithmetic_divide),
         (ResolutionOrder::Left, BinaryOperator::Mod, arithmetic_mod),
         (ResolutionOrder::Left, BinaryOperator::Div, arithmetic_div),
-        (ResolutionOrder::Left, BinaryOperator::Pow, arithmetic_pow),
+        (ResolutionOrder::Right, BinaryOperator::Pow, arithmetic_pow),
         (ResolutionOrder::Left, BinaryOperator::Interval, interval),
     );
-    infix(input, &resolvers[..])
+    infix(input, &resolvers[..], atom)
 }
 
 #[test]
@@ -169,11 +175,13 @@ fn simple_infix_expression_parses_correctly() {
         Expression::Identifier(t) => t.text,
         e => panic!("This is not identifier {:?}", e),
     };
+    use super::expression;
+    parser_rule!(bin(i) -> Expression<'source> { binary_expression(i, expression) });
     use lexeme_scanner::Scanner;
     use parser_basics::parse;
     let tokens = Scanner::scan("a and b or c xor d")
         .expect("Scan result must be ok");
-    let result = parse(tokens.as_slice(), binary_expression)
+    let result = parse(tokens.as_slice(), bin)
         .expect("Parse result must be ok");
     let (left, op, right) = extract_binary_expression(result);
     assert_eq!(op, BinaryOperator::Or);
@@ -197,37 +205,37 @@ fn complex_infix_expression_parses_correctly() {
         Expression::Identifier(t) => t.text,
         e => panic!("This is not identifier {:?}", e),
     };
+    use super::expression;
+    parser_rule!(bin(i) -> Expression<'source> { binary_expression(i, expression) });
     use lexeme_scanner::Scanner;
     use parser_basics::parse;
     let tokens = Scanner::scan("a and b or c xor d or e ** f")
         .expect("Scan result must be ok");
-    let result = parse(tokens.as_slice(), binary_expression)
+    let result = parse(tokens.as_slice(), bin)
         .expect("Parse result must be ok");
     let (left, op, right) = extract_binary_expression(result);
     assert_eq!(op, BinaryOperator::Or);
     {
         let (left, op, right) = extract_binary_expression(left);
-        assert_eq!(op, BinaryOperator::And);
-        assert_eq!(extract_identifier(left), "a");
-        assert_eq!(extract_identifier(right), "b");
-    }
-    {
-        println!("{:#?}", right);
-        let (left, op, right) = extract_binary_expression(right);
         assert_eq!(op, BinaryOperator::Or);
         {
             let (left, op, right) = extract_binary_expression(left);
+            assert_eq!(op, BinaryOperator::And);
+            assert_eq!(extract_identifier(left), "a");
+            assert_eq!(extract_identifier(right), "b");
+        }
+        {
+            let (left, op, right) = extract_binary_expression(right);
             assert_eq!(op, BinaryOperator::XOr);
             assert_eq!(extract_identifier(left), "c");
             assert_eq!(extract_identifier(right), "d");
         }
-        {
-            println!("{:#?}", right);
-            let (left, op, right) = extract_binary_expression(right);
-            assert_eq!(op, BinaryOperator::Pow);
-            assert_eq!(extract_identifier(left), "e");
-            assert_eq!(extract_identifier(right), "f");
-        }
+    }
+    {
+        let (left, op, right) = extract_binary_expression(right);
+        assert_eq!(op, BinaryOperator::Pow);
+        assert_eq!(extract_identifier(left), "e");
+        assert_eq!(extract_identifier(right), "f");
     }
 }
 
@@ -245,13 +253,15 @@ fn simple_operations_of_all_types_parses_correctly() {
             e => panic!("This is not identifier {:?}", e.clone()),
         }
     }
+    use super::expression;
+    parser_rule!(bin(i) -> Expression<'source> { binary_expression(i, expression) });
     fn assert_operation(text: &str, operator: BinaryOperator) {
         use lexeme_scanner::Scanner;
         use parser_basics::parse;
         let input = format!("left_identifier {} RightIdentifier", text);
         let tokens = Scanner::scan(&input)
             .expect("Scan result must be ok");
-        let result = parse(tokens.as_slice(), binary_expression)
+        let result = parse(tokens.as_slice(), bin)
             .expect("Parse result must be ok");
         let (left, op, right) = extract_binary_expression(result);
         assert_eq!(op, operator);
