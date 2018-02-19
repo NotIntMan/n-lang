@@ -17,35 +17,16 @@ enum ResolutionOrder {
     Right,
 }
 
-// TODO Посмотреть, не удалить ли из этой функции вариант левосторонней свёртки
-// TODO А ещё подумать над правильностью реализации свёртки
-fn fold_operation<'source>(
-    order: ResolutionOrder,
+fn fold_left<'source>(
     operator: BinaryOperator,
     left: Expression<'source>,
-    mut tails: Vec<Expression<'source>>,
+    tails: Vec<Expression<'source>>,
 ) -> Expression<'source> {
-    match order {
-        ResolutionOrder::Left => {
-            let mut result = left;
-            for tail in tails {
-                result = Expression::BinaryOperation(Box::new(result), operator, Box::new(tail));
-            }
-            result
-        },
-        ResolutionOrder::Right => {
-            match tails.pop() {
-                None => left,
-                Some(tail) => {
-                    let mut result = tail;
-                    while let Some(tail) = tails.pop() {
-                        result = Expression::BinaryOperation(Box::new(result), operator, Box::new(tail));
-                    }
-                    Expression::BinaryOperation(Box::new(left), operator, Box::new(result))
-                },
-            }
-        },
+    let mut result = left;
+    for tail in tails {
+        result = Expression::BinaryOperation(Box::new(result), operator, Box::new(tail));
     }
+    result
 }
 
 type Resolver<'a, 'b> = (ResolutionOrder, BinaryOperator, Parser<'a, 'b, ()>);
@@ -63,6 +44,17 @@ fn infix<'token, 'source>(input: &'token [Token<'source>], resolvers: &[Resolver
         ResolutionOrder::Left => {
             do_parse!(input,
                 left: apply!(infix, &resolvers[1..]) >>
+                tails: many0!(do_parse!(
+                    operation >>
+                    right: apply!(infix, &resolvers[1..]) >>
+                    (right)
+                )) >>
+                (fold_left(operator, left, tails))
+            )
+        },
+        ResolutionOrder::Right => {
+            do_parse!(input,
+                left: apply!(infix, &resolvers[1..]) >>
                 tail: opt!(do_parse!(
                     operation >>
                     right: apply!(infix, resolvers) >>
@@ -72,17 +64,6 @@ fn infix<'token, 'source>(input: &'token [Token<'source>], resolvers: &[Resolver
                     Some(tail) => Expression::BinaryOperation(Box::new(left), operator, Box::new(tail)),
                     None => left,
                 })
-            )
-        },
-        ResolutionOrder::Right => {
-            do_parse!(input,
-                left: apply!(infix, &resolvers[1..]) >>
-                tails: many0!(do_parse!(
-                    operation >>
-                    right: apply!(infix, &resolvers[1..]) >>
-                    (right)
-                )) >>
-                (fold_operation(order, operator, left, tails))
             )
         },
     }
