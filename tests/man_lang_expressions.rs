@@ -250,7 +250,7 @@ fn simple_operations_of_all_types_parses_correctly() {
 fn extract_property_access_expression<'source>(expr: Expression<'source>, property_name: &str) -> Expression<'source> {
     match expr {
         Expression::PropertyAccess(expr, prop) => {
-            assert_eq!(prop, property_name);
+            assert_eq!(prop, [property_name]);
             *expr
         },
         e => panic!("This is not property access expression {:?}", e),

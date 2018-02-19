@@ -5,7 +5,7 @@ use parser_basics::{
     ParserResult,
     symbols,
 };
-
+use man_lang::others::property_path;
 use super::*;
 
 pub fn property_access<'token, 'source>(
@@ -16,11 +16,11 @@ pub fn property_access<'token, 'source>(
         atomic: atom >>
         tail: opt!(do_parse!(
             apply!(symbols, ".") >>
-            name: identifier >>
-            (name)
+            path: property_path >>
+            (path)
         )) >>
         (match tail {
-            Some(name) => Expression::PropertyAccess(Box::new(atomic), name),
+            Some(path) => Expression::PropertyAccess(Box::new(atomic), path),
             None => atomic,
         })
     )
