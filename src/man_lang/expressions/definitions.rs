@@ -100,7 +100,7 @@ pub enum Expression<'source> {
     BinaryOperation(Box<Expression<'source>>, BinaryOperator, Box<Expression<'source>>),
     PrefixUnaryOperation(PrefixUnaryOperator, Box<Expression<'source>>),
     PostfixUnaryOperation(PostfixUnaryOperator, Box<Expression<'source>>),
-    // TODO Property access expression
-    // TODO Set expression
-    // TODO Function call expression
+    PropertyAccess(Box<Expression<'source>>, &'source str),
+    Set(Vec<Expression<'source>>),
+    FunctionCall(&'source str, Vec<Expression<'source>>),
 }
