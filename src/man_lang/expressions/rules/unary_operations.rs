@@ -1,6 +1,7 @@
 use lexeme_scanner::Token;
 use parser_basics::{
     keyword,
+    Parser,
     ParserResult,
     symbols,
 };
@@ -60,8 +61,16 @@ pub fn prefix_unary_operator<'token, 'source>(input: &'token [Token<'source>]) -
 
 /// Создаёт новое `Expression::PrefixUnaryOperation`, помещая в него данный оператор и упакованное данное выражение
 #[inline]
-pub fn make_unary<'source>(operator: PrefixUnaryOperator, expr: Expression<'source>) -> Expression<'source> {
+pub fn make_prefix_unary<'source>(operator: PrefixUnaryOperator, expr: Expression<'source>) -> Expression<'source> {
     Expression::PrefixUnaryOperation(operator, Box::new(expr))
+}
+
+#[inline]
+pub fn fold_prefix_unary<'source>(mut operators: Vec<PrefixUnaryOperator>, mut expression: Expression<'source>) -> Expression<'source> {
+    while let Some(operator) = operators.pop() {
+        expression = make_prefix_unary(operator, expression);
+    }
+    expression
 }
 
 /// ["not"]
@@ -98,10 +107,25 @@ pub fn postfix_unary_operation<'token, 'source>(input: &'token [Token<'source>],
             for (not, what) in items {
                 result = Expression::PostfixUnaryOperation(what, Box::new(result));
                 if not {
-                    result = make_unary(PrefixUnaryOperator::Not, result)
+                    result = make_prefix_unary(PrefixUnaryOperator::Not, result)
                 }
             }
             result
         })
+    )
+}
+
+pub fn unary_operation<'token, 'source>(
+    input: &'token [Token<'source>],
+    atom: Parser<'token, 'source, Expression<'source>>,
+) -> ParserResult<'token, 'source, Expression<'source>> {
+    do_parse!(input,
+        expr: do_parse!(
+            prefix: many0!(prefix_unary_operator) >>
+            atomic: atom >>
+            (fold_prefix_unary(prefix, atomic))
+        ) >>
+        result: apply!(postfix_unary_operation, expr) >>
+        (result)
     )
 }
