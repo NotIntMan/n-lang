@@ -244,13 +244,13 @@ fn simple_operations_of_all_types_parses_correctly() {
     fn extract_binary_expression<'source>(expr: Expression<'source>) -> (Expression<'source>, BinaryOperator, Expression<'source>) {
         match expr {
             Expression::BinaryOperation(left, op, right) => (*left, op, *right),
-            e => panic!("This is not binary operation {:?}", e.clone()),
+            e => panic!("This is not binary operation {:?}", e),
         }
     }
     fn extract_identifier<'source>(expr: Expression<'source>) -> &'source str {
         match expr {
             Expression::Identifier(t) => t.text,
-            e => panic!("This is not identifier {:?}", e.clone()),
+            e => panic!("This is not identifier {:?}", e),
         }
     }
     use super::expression;
