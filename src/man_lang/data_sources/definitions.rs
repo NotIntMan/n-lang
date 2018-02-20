@@ -7,7 +7,7 @@ pub enum JoinCondition<'source> {
     Natural,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinType {
     Cross,
     Left,

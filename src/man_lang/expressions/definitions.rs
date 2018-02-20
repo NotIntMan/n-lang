@@ -1,13 +1,13 @@
 use lexeme_scanner::Token;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordLiteralType {
     True,
     False,
     Null,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LiteralType {
     NumberLiteral {
         negative: bool,
@@ -85,12 +85,10 @@ pub enum PrefixUnaryOperator {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PostfixUnaryOperator {
-    // Primitive comparison operators
     IsNull,
     IsTrue,
     IsFalse,
     IsUnknown,
-//    FieldAppeal(&'a str),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
