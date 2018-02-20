@@ -96,8 +96,8 @@ parser_rule!(shift_left(i) -> () { do_parse!(i, apply!(symbols, "<<") >> (())) }
 parser_rule!(shift_right(i) -> () { do_parse!(i, apply!(symbols, ">>") >> (())) });
 /// "is" "in"
 parser_rule!(is_in(i) -> () { do_parse!(i, apply!(keyword, "is") >> apply!(keyword, "in") >> (())) });
-/// "=="
-parser_rule!(equals(i) -> () { do_parse!(i, apply!(symbols, "==") >> (())) });
+/// "="
+parser_rule!(equals(i) -> () { do_parse!(i, apply!(symbols, "=") >> (())) });
 /// ">="
 parser_rule!(more_than_or_equals(i) -> () { do_parse!(i, apply!(symbols, ">=") >> (())) });
 /// ">"
