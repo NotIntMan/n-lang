@@ -32,6 +32,14 @@ parser_rule!(table(i) -> DataSource<'source> {
         name: identifier >>
         alias: opt!(do_parse!(
             opt!(apply!(keyword, "as")) >>
+            not!(apply!(keyword, "using")) >>
+            not!(apply!(keyword, "on")) >>
+            not!(apply!(keyword, "natural")) >>
+            not!(apply!(keyword, "inner")) >>
+            not!(apply!(keyword, "cross")) >>
+            not!(apply!(keyword, "left")) >>
+            not!(apply!(keyword, "right")) >>
+            not!(apply!(keyword, "full")) >>
             alias: identifier >>
             (alias)
         )) >>
