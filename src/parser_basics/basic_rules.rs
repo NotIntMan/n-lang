@@ -252,3 +252,11 @@ pub fn u32_literal<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, u32> 
         IResult::Error(e) => IResult::Error(e),
     }
 }
+
+/**
+    Правило "Конец ввода".
+    Ищет токен типа `EndOfInput` и возвращает его в случае успеха.
+*/
+pub fn end_of_input<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'a Token<'b>> {
+    token(input, TokenKindLess::EndOfInput)
+}
