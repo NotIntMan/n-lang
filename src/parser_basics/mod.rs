@@ -29,7 +29,9 @@ pub mod templates;
 
 pub use self::basic_rules::{
     braced_expression_literal,
+    end_of_input,
     identifier,
+    identifier_raw,
     keyword,
     number_literal,
     NumberLiteralSpec,

@@ -19,3 +19,4 @@ pub mod lexeme_scanner;
 #[macro_use]
 pub mod parser_basics;
 pub mod desc_lang;
+pub mod man_lang;

@@ -349,12 +349,18 @@ impl Group<ParserErrorItem> {
 /// Типаж Display у `ParserError` служит для отображения группы ошибок в человекочитаемом виде
 impl Display for Group<ParserErrorItem> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
-        let mut errors = self.extract_into_vec();
-        errors.sort();
-        writeln!(f, "There are some errors:")?;
-        for (i, error) in errors.into_iter().enumerate() {
-            writeln!(f, "  {}. {}", i + 1, error)?;
+        match self {
+            &Group::None => write!(f, "There are no errors detected."),
+            &Group::One(ref err) => write!(f, "There is error: {}", err),
+            &Group::Many(ref vec) => {
+                let mut errors = vec.clone();
+                errors.sort();
+                writeln!(f, "There are some errors:")?;
+                for (i, error) in errors.into_iter().enumerate() {
+                    writeln!(f, "  {}. {}", i + 1, error)?;
+                }
+                writeln!(f, "Solution of one of them may solve the problem.")
+            },
         }
-        writeln!(f, "Solution of one of them may solve the problem.")
     }
 }
