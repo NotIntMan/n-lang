@@ -67,9 +67,6 @@ impl<'a, 'b> ParserInput for &'a [Token<'b>] {
     fn ok_at<T>(self, processed: usize, value: T) -> IResult<Self, T, Self::Error> {
         IResult::Done(&self[processed..], value)
     }
-    fn ok<T>(self, value: T) -> IResult<Self, T, Self::Error> {
-        IResult::Done(&self, value)
-    }
     fn err_at<T>(self, position: usize, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> {
         let len = self.len();
         let error = if position < len {
@@ -85,5 +82,8 @@ impl<'a, 'b> ParserInput for &'a [Token<'b>] {
             }
         };
         IResult::Error(ErrorKind::Custom(error))
+    }
+    fn ok<T>(self, value: T) -> IResult<Self, T, Self::Error> {
+        IResult::Done(&self, value)
     }
 }
