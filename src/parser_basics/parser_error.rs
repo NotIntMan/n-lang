@@ -138,6 +138,13 @@ impl ParserErrorKind {
         let b = ParserErrorTokenInfo::new(Some(got_kind), Some(got_text.to_string()));
         ParserErrorKind::ExpectedGot(a, b)
     }
+    /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе ожидаемого и о типе и тексте полученного токенов
+    #[inline]
+    pub fn expected_got_kind_kind_text<A: ToString>(expected_kind: TokenKindLess, got_kind: TokenKindLess, got_text: A) -> Self {
+        let a = Group::One(ParserErrorTokenInfo::new(Some(expected_kind), None));
+        let b = ParserErrorTokenInfo::new(Some(got_kind), Some(got_text.to_string()));
+        ParserErrorKind::ExpectedGot(a, b)
+    }
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий описание ожидаемого токена и инофрмацию о типе и тексте полученного токена
     #[inline]
     pub fn expected_got_description<A: ToString, B: ToString>(expected: A, got_kind: TokenKindLess, got_text: B) -> Self {
@@ -261,7 +268,7 @@ pub struct ParserErrorItem {
 impl ParserErrorItem {
     /// Конструирует новую единицу ошибки из типа и позиции
     #[inline]
-    const fn new(kind: ParserErrorKind, pos: SymbolPosition) -> Self {
+    fn new(kind: ParserErrorKind, pos: SymbolPosition) -> Self {
         Self {
             kind,
             pos: Some(pos),
@@ -269,7 +276,7 @@ impl ParserErrorItem {
     }
     /// Конструирует новую единицу ошибки из типа, но без позиции
     #[inline]
-    const fn new_without_pos(kind: ParserErrorKind) -> Self {
+    fn new_without_pos(kind: ParserErrorKind) -> Self {
         Self {
             kind,
             pos: None,
@@ -332,14 +339,14 @@ pub type ParserError = Group<ParserErrorItem>;
 impl Group<ParserErrorItem> {
     /// Конструирует единичную ошибку из типа и позиции
     #[inline]
-    pub const fn new(kind: ParserErrorKind, pos: SymbolPosition) -> ParserError {
+    pub fn new(kind: ParserErrorKind, pos: SymbolPosition) -> ParserError {
         Group::One(
             ParserErrorItem::new(kind, pos)
         )
     }
     /// Конструирует единичную ошибку из типа, но без позиции
     #[inline]
-    pub const fn new_without_pos(kind: ParserErrorKind) -> ParserError {
+    pub fn new_without_pos(kind: ParserErrorKind) -> ParserError {
         Group::One(
             ParserErrorItem::new_without_pos(kind)
         )

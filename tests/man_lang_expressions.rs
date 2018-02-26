@@ -228,7 +228,7 @@ fn simple_operations_of_all_types_parses_correctly() {
     assert_operation("<<", BinaryOperator::ShiftLeft);
     assert_operation(">>", BinaryOperator::ShiftRight);
     assert_operation("is in", BinaryOperator::IsIn);
-    assert_operation("==", BinaryOperator::Equals);
+    assert_operation("=", BinaryOperator::Equals);
     assert_operation(">=", BinaryOperator::MoreThanOrEquals);
     assert_operation(">", BinaryOperator::MoreThan);
     assert_operation("<=", BinaryOperator::LessThanOrEquals);

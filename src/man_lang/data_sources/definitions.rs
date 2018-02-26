@@ -1,4 +1,5 @@
 use man_lang::expressions::Expression;
+use man_lang::selections::Selection;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JoinCondition<'source> {
@@ -27,5 +28,8 @@ pub enum DataSource<'source> {
         left: Box<DataSource<'source>>,
         right: Box<DataSource<'source>>,
     },
-    // TODO SELECT query as data source
+    Selection {
+        query: Box<Selection<'source>>,
+        alias: &'source str,
+    },
 }

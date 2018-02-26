@@ -2,6 +2,7 @@
 
 #[macro_use]
 pub mod array_macro;
+pub mod assertion;
 #[macro_use]
 pub mod count_expression_macro;
 pub mod extract;

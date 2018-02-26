@@ -1,9 +1,4 @@
 #![feature(range_contains)]
-#![feature(rustc_private)]
-#![feature(conservative_impl_trait)]
-#![feature(plugin)]
-#![cfg_attr(test, plugin(stainless))]
-#![feature(const_fn)]
 
 #[allow(unused_imports)]
 #[macro_use]
@@ -12,6 +7,9 @@ extern crate env_logger;
 #[allow(unused_imports)]
 #[macro_use]
 pub extern crate nom;
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
 
 #[macro_use]
 pub mod helpers;

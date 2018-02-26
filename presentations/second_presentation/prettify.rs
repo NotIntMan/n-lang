@@ -212,6 +212,7 @@ fn pretty_data_source(source: &DataSource, padding: usize) -> String {
                     new_line(format!("справа: {}", pretty_data_source(&*right, padding + 2)), padding),
             )
         }
+        &DataSource::Selection { query: _, alias: _ } => format!("выборка из базы данных (данные опущены т.к. не имеют отношения к теме презентации)"),
     }
 }
 

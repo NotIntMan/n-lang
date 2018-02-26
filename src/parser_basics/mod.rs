@@ -33,6 +33,7 @@ pub use self::basic_rules::{
     identifier,
     identifier_raw,
     keyword,
+    not_keyword_identifier,
     number_literal,
     NumberLiteralSpec,
     none,

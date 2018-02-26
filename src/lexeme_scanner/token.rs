@@ -1,7 +1,7 @@
 //! Набор структур для отображения элемента лексического разбора
 
 use std::fmt;
-
+use helpers::assertion::Assertion;
 use super::*;
 
 /// Тип токена
@@ -83,6 +83,13 @@ pub struct Token<'a> {
     pub kind: TokenKind,
     pub text: &'a str,
     pub pos: SymbolPosition,
+}
+
+impl<'a> Assertion for Token<'a> {
+    fn assert(&self, other: &Self) {
+        assert_eq!(self.kind, other.kind);
+        assert_eq!(self.text, other.text);
+    }
 }
 
 impl TokenKind {

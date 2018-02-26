@@ -3,11 +3,13 @@ use parser_basics::{
     comma_list,
     identifier,
     keyword,
+    not_keyword_identifier,
     ParserResult,
     symbols,
 };
 use man_lang::expressions::expression;
 use man_lang::others::property_path;
+use man_lang::selections::selection;
 use super::*;
 
 parser_rule!(join_condition(i) -> JoinCondition<'source> {
@@ -30,19 +32,7 @@ parser_rule!(join_condition(i) -> JoinCondition<'source> {
 parser_rule!(table(i) -> DataSource<'source> {
     do_parse!(i,
         name: identifier >>
-        alias: opt!(do_parse!(
-            opt!(apply!(keyword, "as")) >>
-            not!(apply!(keyword, "using")) >>
-            not!(apply!(keyword, "on")) >>
-            not!(apply!(keyword, "natural")) >>
-            not!(apply!(keyword, "inner")) >>
-            not!(apply!(keyword, "cross")) >>
-            not!(apply!(keyword, "left")) >>
-            not!(apply!(keyword, "right")) >>
-            not!(apply!(keyword, "full")) >>
-            alias: identifier >>
-            (alias)
-        )) >>
+        alias: opt!(not_keyword_identifier) >>
         (DataSource::Table { name, alias })
     )
 });
@@ -55,6 +45,14 @@ parser_rule!(join_source(i) -> DataSource<'source> {
             source: data_source >>
             apply!(symbols, ")") >>
             (source)
+        )
+        | do_parse!(
+            apply!(symbols, "(") >>
+            query: selection >>
+            apply!(symbols, ")") >>
+            opt!(apply!(keyword, "as")) >>
+            alias: not_keyword_identifier >>
+            (DataSource::Selection { query: Box::new(query), alias })
         )
     )
 });
@@ -141,7 +139,7 @@ fn fold_join<'source>(mut origin: DataSource<'source>, tails: Vec<JoinTail<'sour
 /// Функция, выполняющая разбор источника данных запроса (таблиц и их объединений)
 pub fn data_source<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataSource<'source>> {
     do_parse!(input,
-        origin: table >>
+        origin: alt!(join_source) >>
         tails: many0!(join_tail) >>
         (fold_join(origin, tails))
     )
