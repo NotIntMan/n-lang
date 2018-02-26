@@ -223,16 +223,22 @@ pub fn special_number_literal<'a, 'b>(input: &'a [Token<'b>], spec: NumberLitera
     }
 }
 
+/// Спецификация для правила "Специальный числовой литерал".
+/// Описывает целочисленный неотрицательный числовой литерал в любой системе исчисления.
+/// Используется правилом "u32-литерал".
 pub const UNSIGNED_INTEGER_SPEC: NumberLiteralSpec = NumberLiteralSpec {
     negative: Some(false),
     fractional: Some(false),
     radix: None,
 };
 
+/// Генерирует ошибку, которая "ожидала" целочисленный неотрицательный числовой литерал, а получила другой числовой литерал.
 fn make_parse_error(input: &str) -> ParserErrorKind {
     ParserErrorKind::expected_got_description("integer literal", TokenKindLess::NumberLiteral,input)
 }
 
+/// Совершает попытку разбора целочисленного неотрицательного литерала.
+/// Полностью соответствует спецификации числовых литералов языка.
 pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
     let mut chars = input.chars()
         .skip_while(|c| c.is_whitespace());
@@ -276,6 +282,11 @@ pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
     Ok(result)
 }
 
+/**
+    Правило "u32-литерал".
+    Ищет целочисленных неотрицательный литерал, проводит его разбор и возвращает значение.
+    В случае неудачи возвращает ошибку.
+*/
 pub fn u32_literal<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, u32> {
     match special_number_literal(input, UNSIGNED_INTEGER_SPEC.clone()) {
         IResult::Done(input, result) => {
