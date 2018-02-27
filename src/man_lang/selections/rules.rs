@@ -57,7 +57,7 @@ parser_rule!(select_result(i) -> SelectionResult<'source> {
     )
 });
 
-parser_rule!(select_condition(i, prefix_keyword_text: &str) -> Expression<'source> {
+parser_rule!(pub select_condition(i, prefix_keyword_text: &str) -> Expression<'source> {
     do_parse!(i,
         apply!(keyword, prefix_keyword_text) >>
         expr: expression >>
@@ -82,7 +82,7 @@ parser_rule!(select_sorting_item(i) -> SelectionSortingItem<'source> {
     )
 });
 
-parser_rule!(select_sorting(i, prefix_keyword_text: &str) -> Vec<SelectionSortingItem<'source>> {
+parser_rule!(pub select_sorting(i, prefix_keyword_text: &str) -> Vec<SelectionSortingItem<'source>> {
     do_parse!(i,
         apply!(keyword, prefix_keyword_text) >>
         apply!(keyword, "by") >>
