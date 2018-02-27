@@ -58,6 +58,7 @@ array!(pub const KEYWORD_LIST: &'static str =
     "having",
     "order",
     "limit",
+    "set",
 );
 
 /**
