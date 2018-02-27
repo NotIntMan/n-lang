@@ -173,3 +173,9 @@ impl<'source> Assertion<str> for Expression<'source> {
         self.assert(&other_expr);
     }
 }
+
+impl<'a, 'source> Assertion<&'a str> for Expression<'source> {
+    fn assert(&self, other: &&'a str) {
+        self.assert(*other)
+    }
+}
