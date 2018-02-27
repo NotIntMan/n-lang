@@ -121,6 +121,11 @@ parser_rule!(join_tail(i) -> JoinTail<'source> {
             source: join_source >>
             ((JoinType::Cross, None, source))
         )
+        | do_parse!(
+            apply!(symbols, ",") >>
+            source: join_source >>
+            ((JoinType::Cross, None, source))
+        )
     )
 });
 
