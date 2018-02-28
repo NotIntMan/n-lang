@@ -21,7 +21,7 @@ parser_rule!(variable_definition(i) -> Statement<'source> {
             (data_type)
         )) >>
         default_value: opt!(do_parse!(
-            apply!(symbols, "=") >>
+            apply!(symbols, ":=") >>
             expression: expression >>
             (expression)
         )) >>
@@ -36,7 +36,7 @@ parser_rule!(variable_definition(i) -> Statement<'source> {
 parser_rule!(variable_assignment(i) -> Statement<'source> {
     do_parse!(i,
         name: identifier >>
-        apply!(symbols, "=") >>
+        apply!(symbols, ":=") >>
         expression: expression >>
         (Statement::VariableAssignment {
             name,
@@ -50,7 +50,11 @@ parser_rule!(condition(i) -> Statement<'source> {
         apply!(keyword, "if") >>
         condition: expression >>
         then_body: map!(block, |stmt| Box::new(stmt)) >>
-        else_body: opt!(map!(block, |stmt| Box::new(stmt))) >>
+        else_body: opt!(do_parse!(
+            apply!(keyword, "else") >>
+            stmt: block >>
+            (Box::new(stmt))
+        )) >>
         (Statement::Condition {
             condition,
             then_body,
@@ -166,16 +170,15 @@ mod tests {
     use lexeme_scanner::Scanner;
     use parser_basics::parse;
     use man_lang::statements::{
+        CycleControlOperator,
         CycleType,
         statement,
         Statement,
     };
 
-    // TODO Протестировать модуль
-
     #[test]
     fn simple_definition_parses_correctly() {
-        let tokens = Scanner::scan("let my_first_variable: boolean = false")
+        let tokens = Scanner::scan("let my_first_variable: boolean := false")
             .expect("Scanner result must be ok");
         let result = parse(tokens.as_slice(), statement)
             .expect("Parser result must be ok");
@@ -191,7 +194,7 @@ mod tests {
 
     #[test]
     fn simple_not_perfect_definition_parses_correctly() {
-        let tokens = Scanner::scan("let my_first_variable = false")
+        let tokens = Scanner::scan("let my_first_variable := false")
             .expect("Scanner result must be ok");
         let result = parse(tokens.as_slice(), statement)
             .expect("Parser result must be ok");
@@ -219,7 +222,7 @@ mod tests {
 
     #[test]
     fn simple_assignment_parses_correctly() {
-        let tokens = Scanner::scan("super_variable = 2 + 2")
+        let tokens = Scanner::scan("super_variable := 2 + 2")
             .expect("Scanner result must be ok");
         let result = parse(tokens.as_slice(), statement)
             .expect("Parser result must be ok");
@@ -271,7 +274,6 @@ mod tests {
                         },
                         o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
                     },
-                    // FIXME Почему-то тест падает потому, что в else_body ничего нет.
                     None => panic!("Option::Some(_) != Option::None"),
                 }
             },
@@ -280,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_cycle_parses_correctly() {
+    fn simple_simple_cycle_parses_correctly() {
         let tokens = Scanner::scan("loop { 2 + 2 }")
             .expect("Scanner result must be ok");
         let result = parse(tokens.as_slice(), statement)
@@ -298,4 +300,188 @@ mod tests {
             o => panic!("Pattern Statement::Cycle does not match this value {:?}", o),
         }
     }
+
+    #[test]
+    fn simple_while_cycle_parses_correctly() {
+        let tokens = Scanner::scan("while true { 2 + 2 }")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Cycle { ref cycle_type, ref body } => {
+                match cycle_type {
+                    &CycleType::PrePredicated(ref predicate) => {
+                        predicate.assert("true");
+                    },
+                    o => panic!("Pattern CycleType::PrePredicated does not match this value {:?}", o),
+                }
+                match &**body {
+                    &Statement::Expression { ref expression } => {
+                        expression.assert("2 + 2");
+                    },
+                    o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
+                }
+            },
+            o => panic!("Pattern Statement::Cycle does not match this value {:?}", o),
+        }
+    }
+
+    #[test]
+    fn simple_do_while_cycle_parses_correctly() {
+        let tokens = Scanner::scan("do { 2 + 2 } while true")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Cycle { ref cycle_type, ref body } => {
+                match cycle_type {
+                    &CycleType::PostPredicated(ref predicate) => {
+                        predicate.assert("true");
+                    },
+                    o => panic!("Pattern CycleType::PostPredicated does not match this value {:?}", o),
+                }
+                match &**body {
+                    &Statement::Expression { ref expression } => {
+                        expression.assert("2 + 2");
+                    },
+                    o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
+                }
+            },
+            o => panic!("Pattern Statement::Cycle does not match this value {:?}", o),
+        }
+    }
+
+    #[test]
+    fn cycle_control_operators_parses_correctly() {
+        let tokens = Scanner::scan("break")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::CycleControl { ref operator, ref name } => {
+                assert_eq!(*operator, CycleControlOperator::Break);
+                assert_eq!(*name, None);
+            },
+            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
+        }
+        let tokens = Scanner::scan("break cycle_name")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::CycleControl { ref operator, ref name } => {
+                assert_eq!(*operator, CycleControlOperator::Break);
+                assert_eq!(*name, Some("cycle_name"));
+            },
+            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
+        }
+        let tokens = Scanner::scan("continue")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::CycleControl { ref operator, ref name } => {
+                assert_eq!(*operator, CycleControlOperator::Continue);
+                assert_eq!(*name, None);
+            },
+            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
+        }
+        let tokens = Scanner::scan("continue cycle_name")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::CycleControl { ref operator, ref name } => {
+                assert_eq!(*operator, CycleControlOperator::Continue);
+                assert_eq!(*name, Some("cycle_name"));
+            },
+            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
+        }
+    }
+
+    #[test]
+    fn return_operator_parses_correctly() {
+        let tokens = Scanner::scan("return")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Return { ref value } => {
+                assert_eq!(*value, None);
+            },
+            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
+        }
+        let tokens = Scanner::scan("return false")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Return { ref value } => {
+                value.assert(&Some("false"));
+            },
+            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
+        }
+    }
+
+    #[test]
+    fn simple_block_of_statements_parses_correctly() {
+        let tokens = Scanner::scan("{ a := 2; return a }")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Block { ref statements } => {
+                match &statements[0] {
+                    &Statement::VariableAssignment { name, ref expression } => {
+                        assert_eq!(name, "a");
+                        expression.assert("2");
+                    },
+                    o => panic!("Pattern Statement::VariableAssignment does not match this value {:?}", o),
+                }
+                match &statements[1] {
+                    &Statement::Return { ref value } => {
+                        value.assert(&Some("a"));
+                    },
+                    o => panic!("Pattern Statement::Return does not match this value {:?}", o),
+                }
+            },
+            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
+        }
+    }
+
+    #[test]
+    fn weird_block_of_statements_parses_correctly() {
+        let tokens = Scanner::scan("{}")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Nothing => {},
+            o => panic!("Pattern Statement::Nothing does not match this value {:?}", o),
+        }
+        let tokens = Scanner::scan("{ return a }")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Return { ref value } => {
+                value.assert(&Some("a"));
+            },
+            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
+        }
+    }
+
+    #[test]
+    fn simple_expression_as_statement_parses_correctly() {
+        let tokens = Scanner::scan("a + b * c")
+            .expect("Scanner result must be ok");
+        let result = parse(tokens.as_slice(), statement)
+            .expect("Parser result must be ok");
+        match result {
+            Statement::Expression { ref expression } => {
+                expression.assert("a + b * c");
+            },
+            o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
+        }
+}
 }
