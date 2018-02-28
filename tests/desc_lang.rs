@@ -1,6 +1,7 @@
 extern crate n_transpiler;
+extern crate indexmap;
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use n_transpiler::lexeme_scanner::Scanner;
 use n_transpiler::parser_basics::parse;
@@ -134,7 +135,7 @@ fn struct_and_tuple_bodies_parses_correctly() {
                 field_type: DataType::Compound(CompoundDataType::Structure(StructureDataType {
                     attributes: vec![],
                     fields: {
-                        let mut map = HashMap::new();
+                        let mut map = IndexMap::new();
                         map.insert("a", Field {
                             attributes: vec![],
                             field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {

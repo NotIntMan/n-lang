@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::hash::Hash;
 
 use lexeme_scanner::Token;
@@ -60,8 +60,8 @@ parser_rule!(tuple_field(i) -> Field<'source> {
     )
 });
 
-fn slice_to_map<K: Eq + Hash + Clone + ToString, V: Clone>(input: &[(K, V)]) -> Result<HashMap<K, V>, ParserErrorKind> {
-    let mut result = HashMap::new();
+fn slice_to_map<K: Eq + Hash + Clone + ToString, V: Clone>(input: &[(K, V)]) -> Result<IndexMap<K, V>, ParserErrorKind> {
+    let mut result = IndexMap::new();
     for &(ref key, ref value) in input {
         if let Some(_) = result.insert(key.clone(), value.clone()) {
             return Err(ParserErrorKind::key_is_not_unique(key.clone()));
