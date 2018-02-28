@@ -123,7 +123,7 @@ parser_rule!(return_stmt(i) -> Statement<'source> {
     )
 });
 
-parser_rule!(block(i) -> Statement<'source> {
+parser_rule!(pub block(i) -> Statement<'source> {
     do_parse!(i,
         apply!(symbols, "{") >>
         statements: apply!(list, statement, prepare!(symbols(";"))) >>
@@ -177,27 +177,21 @@ mod tests {
     #[test]
     fn simple_definition_parses_correctly() {
         let result = parse!("let my_first_variable: boolean := false", statement);
-        match result {
-            Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-                assert_eq!(name, "my_first_variable");
-                data_type.assert(&Some("boolean"));
-                default_value.assert(&Some("false"));
-            },
-            o => panic!("Pattern Statement::VariableDefinition does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
+            assert_eq!(name, "my_first_variable");
+            data_type.assert(&Some("boolean"));
+            default_value.assert(&Some("false"));
+        });
     }
 
     #[test]
     fn simple_not_perfect_definition_parses_correctly() {
         let result = parse!("let my_first_variable := false", statement);
-        match result {
-            Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-                assert_eq!(name, "my_first_variable");
-                assert_eq!(*data_type, None);
-                default_value.assert(&Some("false"));
-            },
-            o => panic!("Pattern Statement::VariableDefinition does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
+            assert_eq!(name, "my_first_variable");
+            assert_eq!(*data_type, None);
+            default_value.assert(&Some("false"));
+        });
         let result = parse!("let my_first_variable: boolean", statement);
         match result {
             Statement::VariableDefinition { name, ref data_type, ref default_value } => {
@@ -212,53 +206,41 @@ mod tests {
     #[test]
     fn simple_assignment_parses_correctly() {
         let result = parse!("super_variable := 2 + 2", statement);
-        match result {
-            Statement::VariableAssignment { name, ref expression } => {
-                assert_eq!(name, "super_variable");
-                expression.assert("2+2");
-            },
-            o => panic!("Pattern Statement::VariableAssignment does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::VariableAssignment { name, ref expression } => {
+            assert_eq!(name, "super_variable");
+            expression.assert("2+2");
+        });
     }
 
     #[test]
     fn simple_condition_parses_correctly() {
         let result = parse!("if it.hasNext { it.next }", statement);
-        match result {
-            Statement::Condition { ref condition, ref then_body, ref else_body } => {
-                condition.assert("it.hasNext");
-                match &**then_body {
-                    &Statement::Expression { ref expression } => {
-                        expression.assert("it.next()");
-                    },
-                    o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
-                }
-                assert_eq!(*else_body, None)
-            },
-            o => panic!("Pattern Statement::Condition does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Condition { ref condition, ref then_body, ref else_body } => {
+            condition.assert("it.hasNext");
+            match_it!(&**then_body, &Statement::Expression { ref expression } => {
+                expression.assert("it.next()");
+            });
+            assert_eq!(*else_body, None)
+        });
         let result = parse!("if it.hasNext { it.next } else { null }", statement);
-        match result {
-            Statement::Condition { ref condition, ref then_body, ref else_body } => {
-                condition.assert("it.hasNext");
-                match &**then_body {
+        match_it!(result, Statement::Condition { ref condition, ref then_body, ref else_body } => {
+            condition.assert("it.hasNext");
+            match &**then_body {
+                &Statement::Expression { ref expression } => {
+                    expression.assert("it.next()");
+                },
+                o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
+            }
+            match *else_body {
+                Some(ref b) => match &**b {
                     &Statement::Expression { ref expression } => {
-                        expression.assert("it.next()");
+                        expression.assert("null");
                     },
                     o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
-                }
-                match *else_body {
-                    Some(ref b) => match &**b {
-                        &Statement::Expression { ref expression } => {
-                            expression.assert("null");
-                        },
-                        o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
-                    },
-                    None => panic!("Option::Some(_) != Option::None"),
-                }
-            },
-            o => panic!("Pattern Statement::Condition does not match this value {:?}", o),
-        }
+                },
+                None => panic!("Option::Some(_) != Option::None"),
+            }
+        });
     }
 
     #[test]
@@ -281,148 +263,100 @@ mod tests {
     #[test]
     fn simple_while_cycle_parses_correctly() {
         let result = parse!("while true { 2 + 2 }", statement);
-        match result {
-            Statement::Cycle { ref cycle_type, ref body } => {
-                match cycle_type {
-                    &CycleType::PrePredicated(ref predicate) => {
-                        predicate.assert("true");
-                    },
-                    o => panic!("Pattern CycleType::PrePredicated does not match this value {:?}", o),
-                }
-                match &**body {
-                    &Statement::Expression { ref expression } => {
-                        expression.assert("2 + 2");
-                    },
-                    o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
-                }
-            },
-            o => panic!("Pattern Statement::Cycle does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Cycle { ref cycle_type, ref body } => {
+            match_it!(cycle_type, &CycleType::PrePredicated(ref predicate) => {
+                predicate.assert("true");
+            });
+            match_it!(&**body, &Statement::Expression { ref expression } => {
+                expression.assert("2 + 2");
+            });
+        });
     }
 
     #[test]
     fn simple_do_while_cycle_parses_correctly() {
         let result = parse!("do { 2 + 2 } while true", statement);
-        match result {
-            Statement::Cycle { ref cycle_type, ref body } => {
-                match cycle_type {
-                    &CycleType::PostPredicated(ref predicate) => {
-                        predicate.assert("true");
-                    },
-                    o => panic!("Pattern CycleType::PostPredicated does not match this value {:?}", o),
-                }
-                match &**body {
-                    &Statement::Expression { ref expression } => {
-                        expression.assert("2 + 2");
-                    },
-                    o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
-                }
-            },
-            o => panic!("Pattern Statement::Cycle does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Cycle { ref cycle_type, ref body } => {
+            match_it!(cycle_type, &CycleType::PostPredicated(ref predicate) => {
+                predicate.assert("true");
+            });
+            match_it!(&**body, &Statement::Expression { ref expression } => {
+                expression.assert("2 + 2");
+            });
+        });
     }
 
     #[test]
     fn cycle_control_operators_parses_correctly() {
         let result = parse!("break", statement);
-        match result {
-            Statement::CycleControl { ref operator, ref name } => {
-                assert_eq!(*operator, CycleControlOperator::Break);
-                assert_eq!(*name, None);
-            },
-            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+            assert_eq!(*operator, CycleControlOperator::Break);
+            assert_eq!(*name, None);
+        });
         let result = parse!("break cycle_name", statement);
-        match result {
-            Statement::CycleControl { ref operator, ref name } => {
-                assert_eq!(*operator, CycleControlOperator::Break);
-                assert_eq!(*name, Some("cycle_name"));
-            },
-            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+            assert_eq!(*operator, CycleControlOperator::Break);
+            assert_eq!(*name, Some("cycle_name"));
+        });
         let result = parse!("continue", statement);
-        match result {
-            Statement::CycleControl { ref operator, ref name } => {
-                assert_eq!(*operator, CycleControlOperator::Continue);
-                assert_eq!(*name, None);
-            },
-            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+            assert_eq!(*operator, CycleControlOperator::Continue);
+            assert_eq!(*name, None);
+        });
         let result = parse!("continue cycle_name", statement);
-        match result {
-            Statement::CycleControl { ref operator, ref name } => {
-                assert_eq!(*operator, CycleControlOperator::Continue);
-                assert_eq!(*name, Some("cycle_name"));
-            },
-            o => panic!("Pattern Statement::CycleControl does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+            assert_eq!(*operator, CycleControlOperator::Continue);
+            assert_eq!(*name, Some("cycle_name"));
+        });
     }
 
     #[test]
     fn return_operator_parses_correctly() {
         let result = parse!("return", statement);
-        match result {
-            Statement::Return { ref value } => {
-                assert_eq!(*value, None);
-            },
-            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Return { ref value } => {
+            assert_eq!(*value, None);
+        });
         let result = parse!("return false", statement);
-        match result {
-            Statement::Return { ref value } => {
-                value.assert(&Some("false"));
-            },
-            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Return { ref value } => {
+            value.assert(&Some("false"));
+        });
     }
 
     #[test]
     fn simple_block_of_statements_parses_correctly() {
         let result = parse!("{ a := 2; return a }", statement);
-        match result {
-            Statement::Block { ref statements } => {
-                match &statements[0] {
-                    &Statement::VariableAssignment { name, ref expression } => {
-                        assert_eq!(name, "a");
-                        expression.assert("2");
-                    },
-                    o => panic!("Pattern Statement::VariableAssignment does not match this value {:?}", o),
-                }
-                match &statements[1] {
-                    &Statement::Return { ref value } => {
-                        value.assert(&Some("a"));
-                    },
-                    o => panic!("Pattern Statement::Return does not match this value {:?}", o),
-                }
-            },
-            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Block { ref statements } => {
+            match &statements[0] {
+                &Statement::VariableAssignment { name, ref expression } => {
+                    assert_eq!(name, "a");
+                    expression.assert("2");
+                },
+                o => panic!("Pattern Statement::VariableAssignment does not match this value {:?}", o),
+            }
+            match &statements[1] {
+                &Statement::Return { ref value } => {
+                    value.assert(&Some("a"));
+                },
+                o => panic!("Pattern Statement::Return does not match this value {:?}", o),
+            }
+        });
     }
 
     #[test]
     fn weird_block_of_statements_parses_correctly() {
         let result = parse!("{}", statement);
-        match result {
-            Statement::Nothing => {},
-            o => panic!("Pattern Statement::Nothing does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Nothing => {});
         let result = parse!("{ return a }", statement);
-        match result {
-            Statement::Return { ref value } => {
-                value.assert(&Some("a"));
-            },
-            o => panic!("Pattern Statement::Return does not match this value {:?}", o),
-        }
+        match_it!(result, Statement::Return { ref value } => {
+            value.assert(&Some("a"));
+        });
     }
 
     #[test]
     fn simple_expression_as_statement_parses_correctly() {
         let result = parse!("a + b * c", statement);
-        match result {
-            Statement::Expression { ref expression } => {
-                expression.assert("a + b * c");
-            },
-            o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
-        }
-}
+        match_it!(result, Statement::Expression { ref expression } => {
+            expression.assert("a + b * c");
+        });
+    }
 }
