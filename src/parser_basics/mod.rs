@@ -22,6 +22,8 @@ pub mod basic_rules;
 pub mod input;
 pub mod parser_error;
 #[macro_use]
+pub mod parse_macro;
+#[macro_use]
 pub mod rule_macro;
 pub mod token;
 #[macro_use]
