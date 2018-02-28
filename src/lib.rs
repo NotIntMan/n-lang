@@ -10,6 +10,7 @@ pub extern crate nom;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+extern crate indexmap;
 
 #[macro_use]
 pub mod helpers;
