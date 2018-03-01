@@ -7,5 +7,19 @@ use parser_basics::{
 };
 
 pub fn property_path<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<&'source str>> {
-    list(input, identifier, prepare!(symbols(".")))
+    do_parse!(input,
+        first: identifier >>
+        others: opt!(do_parse!(
+            apply!(symbols, ".") >>
+            list: apply!(list, identifier, prepare!(symbols("."))) >>
+            (list)
+        )) >>
+        (match others {
+            Some(mut vec) => {
+                vec.insert(0, first);
+                vec
+            },
+            None => vec![first],
+        })
+    )
 }
