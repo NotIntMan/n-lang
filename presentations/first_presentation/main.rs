@@ -72,7 +72,7 @@ pub fn stringify_type(input: &DataType, margin_left: usize) -> String {
         &DataType::Compound(CompoundDataType::Structure(ref s)) => {
             result.push_str("структура");
             result.push_str(&stringify_attributes(s.attributes.as_slice(), &margin));
-            for (name, field) in s.fields.iter() {
+            for &(ref name, ref field) in s.fields.iter() {
                 result.push('\n');
                 result.push_str(&margin);
                 result.push_str(&format!("с полем {} {}", *name, stringify_field(field, margin_left + 2)));

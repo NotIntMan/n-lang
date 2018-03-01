@@ -1,4 +1,3 @@
-use indexmap::IndexMap;
 use helpers::assertion::Assertion;
 
 use desc_lang::primitives::PrimitiveDataType;
@@ -18,7 +17,7 @@ pub struct Field<'source> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct StructureDataType<'source> {
     pub attributes: Vec<Attribute<'source>>,
-    pub fields: IndexMap<&'source str, Field<'source>>,
+    pub fields: Vec<(&'source str, Field<'source>)>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

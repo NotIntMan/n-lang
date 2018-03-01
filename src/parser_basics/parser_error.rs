@@ -102,8 +102,6 @@ pub enum ParserErrorKind {
     UnexpectedEnd(Group<String>),
     /// Неожиданный ввод. Сообщает о том, что ожидалась лексема одного вида, а была получена - другого.
     ExpectedGot(Group<ParserErrorTokenInfo>, ParserErrorTokenInfo),
-    /// Ключ не уникален. Сообщает о том, что в определении структуры находится два поля с одинаковым именем.
-    KeyIsNotUnique(Group<String>),
     /// Прочая ошибка. Сообщает о том, что произошло что-то где-то за пределами парсера.
     CustomError(Group<String>),
 }
@@ -157,11 +155,6 @@ impl ParserErrorKind {
     pub fn custom_error<A: ToString>(msg: A) -> Self {
         ParserErrorKind::CustomError(Group::One(msg.to_string()))
     }
-    /// Конструирует новый `ParserErrorKind::KeyIsNotUnique`, содержащий сообщение имя повторяющегося ключа
-    #[inline]
-    pub fn key_is_not_unique<A: ToString>(msg: A) -> Self {
-        ParserErrorKind::KeyIsNotUnique(Group::One(msg.to_string()))
-    }
 }
 
 impl Appendable for ParserErrorKind {
@@ -199,15 +192,6 @@ impl Appendable for ParserErrorKind {
                     }
                 }
             }
-            &mut ParserErrorKind::KeyIsNotUnique(ref mut self_group) => {
-                match other {
-                    ParserErrorKind::KeyIsNotUnique(other_group) => {
-                        self_group.append_group(other_group);
-                        None
-                    }
-                    other_else => Some(other_else),
-                }
-            }
             &mut ParserErrorKind::CustomError(ref mut self_group) => {
                 match other {
                     ParserErrorKind::CustomError(other_group) => {
@@ -238,12 +222,6 @@ impl Display for ParserErrorKind {
                 write!(f, "expected: ")?;
                 display_list(f, &exp.extract_into_vec())?;
                 write!(f, ", got: {}", got)?;
-                Ok(())
-            }
-            &ParserErrorKind::KeyIsNotUnique(ref key) => {
-                write!(f, "key")?;
-                display_list(f, &key.extract_into_vec())?;
-                write!(f, "is not unique")?;
                 Ok(())
             }
             &ParserErrorKind::CustomError(ref messages) => display_list(f, &messages.extract_into_vec()),
