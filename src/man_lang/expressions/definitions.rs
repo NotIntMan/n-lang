@@ -106,7 +106,7 @@ pub enum Expression<'source> {
     PostfixUnaryOperation(PostfixUnaryOperator, Box<Expression<'source>>),
     PropertyAccess(Box<Expression<'source>>, Vec<&'source str>),
     Set(Vec<Expression<'source>>),
-    FunctionCall(&'source str, Vec<Expression<'source>>),
+    FunctionCall(Vec<&'source str>, Vec<Expression<'source>>),
 }
 
 impl<'source> Assertion for Expression<'source> {

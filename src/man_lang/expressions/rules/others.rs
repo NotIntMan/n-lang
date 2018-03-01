@@ -1,11 +1,13 @@
 use parser_basics::{
     comma_list,
-    identifier,
     Parser,
     ParserResult,
     symbols,
 };
-use man_lang::others::property_path;
+use man_lang::others::{
+    property_path,
+    module_path,
+};
 use super::*;
 
 pub fn property_access<'token, 'source>(
@@ -52,7 +54,7 @@ pub fn function_call<'token, 'source>(
     atom: Parser<'token, 'source, Expression<'source>>,
 ) -> ParserResult<'token, 'source, Expression<'source>> {
     do_parse!(input,
-        name: identifier >>
+        name: module_path >>
         args: apply!(expression_set, atom) >>
         (Expression::FunctionCall(name, args))
     )
