@@ -59,6 +59,7 @@ array!(pub const KEYWORD_LIST: &'static str =
     "order",
     "limit",
     "set",
+    "join",
 );
 
 /**
