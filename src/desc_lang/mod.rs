@@ -1,3 +1,4 @@
 pub mod compounds;
-pub mod primitives;
 pub mod functions;
+pub mod modules;
+pub mod primitives;
