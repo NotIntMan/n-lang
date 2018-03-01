@@ -101,12 +101,19 @@ parser_rule!(tuple_body(i) -> TupleDataType<'source> {
     )
 });
 
-/// Парсер, реализующий разбор грамматики составных и простых типов
-pub fn data_type<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, DataType<'b>> {
+/// Парсер, реализующий разбор грамматики составных типов
+pub fn compound_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataType<'source>> {
     alt!(input,
-        struct_body => { |x| DataType::Compound(CompoundDataType::Structure(x)) } |
-        tuple_body => { |x| DataType::Compound(CompoundDataType::Tuple(x)) } |
-        primitive_data_type => { |x| DataType::Primitive(x) } |
-        identifier => { |x| DataType::Reference(x) }
+        struct_body => { |x| DataType::Compound(CompoundDataType::Structure(x)) }
+        | tuple_body => { |x| DataType::Compound(CompoundDataType::Tuple(x)) }
+    )
+}
+
+/// Парсер, реализующий разбор грамматики составных и простых типов
+pub fn data_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataType<'source>> {
+    alt!(input,
+        compound_type
+        | primitive_data_type => { |x| DataType::Primitive(x) }
+        | identifier => { |x| DataType::Reference(x) }
     )
 }
