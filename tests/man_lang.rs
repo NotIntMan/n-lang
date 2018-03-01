@@ -8,6 +8,8 @@ use n_transpiler::helpers::assertion::Assertion;
 use n_transpiler::man_lang::expressions::*;
 use n_transpiler::man_lang::data_sources::*;
 use n_transpiler::man_lang::selections::*;
+use n_transpiler::man_lang::other_requests::*;
+use n_transpiler::man_lang::statements::*;
 
 fn extract_literal<'source>(expr: Expression<'source>) -> LiteralType {
     match_it!(expr, Expression::Literal(lit) => lit.literal_type)
@@ -442,4 +444,276 @@ fn complex_query_parses_correctly() {
         .assert("max(c.cost) > 5");
     assert_eq!(subquery_3.order_by_clause, None);
     assert_eq!(subquery_3.limit_clause, None);
+}
+
+#[test]
+fn simple_updating_query_parses_correctly() {
+    let update = parse!("update foo set a.x = 2", updating);
+    assert_eq!(update.low_priority, false);
+    assert_eq!(update.ignore, false);
+    assert_table(&update.source, "foo", None);
+    update.assignments.assert(&[
+        ("a.x", Some("2"))
+    ]);
+    assert_eq!(update.where_clause, None);
+    assert_eq!(update.order_by_clause, None);
+    assert_eq!(update.limit_clause, None);
+}
+
+#[test]
+fn simple_inserting_values_query_parses_correctly() {
+    let insert = parse!("insert into foo(start.x, end.z) values (1, 2), (2, 3), (3, 4)", inserting);
+    assert_eq!(insert.priority, InsertingPriority::Usual);
+    assert_eq!(insert.ignore, false);
+    assert_table(&insert.target, "foo", None);
+    match_it!(&insert.source, &InsertingSource::ValueLists { ref properties, ref lists } => {
+        assert_eq!(*properties, Some(vec![
+            vec!["start", "x"],
+            vec!["end", "z"],
+        ]));
+        let mut list_iterator = lists.iter();
+        let list = list_iterator.next()
+            .expect("List of lists must contain list");
+        list.as_slice().assert(&["1", "2"]);
+        let list = list_iterator.next()
+            .expect("List of lists must contain list");
+        list.as_slice().assert(&["2", "3"]);
+        let list = list_iterator.next()
+            .expect("List of lists must contain list");
+        list.as_slice().assert(&["3", "4"]);
+        assert_eq!(list_iterator.next(), None);
+    });
+    assert_eq!(insert.on_duplicate_key_update, None);
+}
+
+#[test]
+fn simple_inserting_assigned_values_query_parses_correctly() {
+    let insert = parse!("insert high_priority into foo set start.x = 1, end.z = 2 on duplicate key update start.x = 1, end.z = 3", inserting);
+    assert_eq!(insert.priority, InsertingPriority::High);
+    assert_eq!(insert.ignore, false);
+    assert_table(&insert.target, "foo", None);
+    match_it!(&insert.source, &InsertingSource::AssignmentList { ref assignments } => {
+        assignments.as_slice().assert(&[
+            ("start.x", Some("1")),
+            ("end.z", Some("2")),
+        ]);
+    });
+    match_it!(&insert.on_duplicate_key_update, &Some(ref assignments) => {
+        assignments.as_slice()
+            .assert(&[
+                ("start.x", Some("1")),
+                ("end.z", Some("3")),
+            ]);
+    });
+}
+
+#[test]
+fn simple_inserting_from_selection_query_parses_correctly() {
+    let insert = parse!("insert delayed ignore into foo(start.x, end.z) select * from bar", inserting);
+    assert_eq!(insert.priority, InsertingPriority::Delayed);
+    assert_eq!(insert.ignore, true);
+    assert_table(&insert.target, "foo", None);
+    match_it!(&insert.source, &InsertingSource::Selection { ref properties, ref query } => {
+        assert_eq!(*properties, Some(vec![
+            vec!["start", "x"],
+            vec!["end", "z"],
+        ]));
+        assert_eq!(query.distinct, false);
+        assert_eq!(query.high_priority, false);
+        assert_eq!(query.straight_join, false);
+        assert_eq!(query.result_size, SelectionResultSize::Usual);
+        assert_eq!(query.cache, false);
+        assert_eq!(query.result, SelectionResult::All);
+        assert_table(&query.source, "bar", None);
+        assert_eq!(query.where_clause, None);
+        assert_eq!(query.group_by_clause, None);
+        assert_eq!(query.having_clause, None);
+        assert_eq!(query.order_by_clause, None);
+        assert_eq!(query.limit_clause, None);
+    });
+    assert_eq!(insert.on_duplicate_key_update, None);
+}
+
+#[test]
+fn simple_deleting_query_parses_correctly() {
+    let delete = parse!("delete quick from bar where 42 > 80", deleting);
+    assert_eq!(delete.low_priority, false);
+    assert_eq!(delete.quick, true);
+    assert_eq!(delete.ignore, false);
+    assert_table(&delete.source, "bar", None);
+    match_it!(&delete.where_clause, &Some(ref clause) => { clause.assert("42 > 80"); });
+    assert_eq!(delete.order_by_clause, None);
+    assert_eq!(delete.limit_clause, None);
+}
+
+#[test]
+fn simple_definition_parses_correctly() {
+    let result = parse!("let my_first_variable: boolean := false", statement);
+    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
+        assert_eq!(name, "my_first_variable");
+        data_type.assert(&Some("boolean"));
+        default_value.assert(&Some("false"));
+    });
+}
+
+#[test]
+fn simple_not_perfect_definition_parses_correctly() {
+    let result = parse!("let my_first_variable := false", statement);
+    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
+        assert_eq!(name, "my_first_variable");
+        assert_eq!(*data_type, None);
+        default_value.assert(&Some("false"));
+    });
+    let result = parse!("let my_first_variable: boolean", statement);
+    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
+        assert_eq!(name, "my_first_variable");
+        data_type.assert(&Some("boolean"));
+        assert_eq!(*default_value, None);
+    });
+}
+
+#[test]
+fn simple_assignment_parses_correctly() {
+    let result = parse!("super_variable := 2 + 2", statement);
+    match_it!(result, Statement::VariableAssignment { name, ref expression } => {
+        assert_eq!(name, "super_variable");
+        expression.assert("2+2");
+    });
+}
+
+#[test]
+fn simple_condition_parses_correctly() {
+    let result = parse!("if it.hasNext { it.next }", statement);
+    match_it!(result, Statement::Condition { ref condition, ref then_body, ref else_body } => {
+        condition.assert("it.hasNext");
+        match_it!(&**then_body, &Statement::Expression { ref expression } => {
+            expression.assert("it.next()");
+        });
+        assert_eq!(*else_body, None)
+    });
+    let result = parse!("if it.hasNext { it.next } else { null }", statement);
+    match_it!(result, Statement::Condition { ref condition, ref then_body, ref else_body } => {
+        condition.assert("it.hasNext");
+        match &**then_body {
+            &Statement::Expression { ref expression } => {
+                expression.assert("it.next()");
+            },
+            o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
+        }
+        match *else_body {
+            Some(ref b) => match &**b {
+                &Statement::Expression { ref expression } => {
+                    expression.assert("null");
+                },
+                o => panic!("Pattern Statement::Expression does not match this value {:?}", o),
+            },
+            None => panic!("Option::Some(_) != Option::None"),
+        }
+    });
+}
+
+#[test]
+fn simple_simple_cycle_parses_correctly() {
+    let result = parse!("loop { 2 + 2 }", statement);
+    match_it!(result, Statement::Cycle { ref cycle_type, ref body } => {
+        assert_eq!(*cycle_type, CycleType::Simple);
+        match_it!(&**body, &Statement::Expression { ref expression } => {
+            expression.assert("2 + 2");
+        });
+    });
+}
+
+#[test]
+fn simple_while_cycle_parses_correctly() {
+    let result = parse!("while true { 2 + 2 }", statement);
+    match_it!(result, Statement::Cycle { ref cycle_type, ref body } => {
+        match_it!(cycle_type, &CycleType::PrePredicated(ref predicate) => {
+            predicate.assert("true");
+        });
+        match_it!(&**body, &Statement::Expression { ref expression } => {
+            expression.assert("2 + 2");
+        });
+    });
+}
+
+#[test]
+fn simple_do_while_cycle_parses_correctly() {
+    let result = parse!("do { 2 + 2 } while true", statement);
+    match_it!(result, Statement::Cycle { ref cycle_type, ref body } => {
+        match_it!(cycle_type, &CycleType::PostPredicated(ref predicate) => {
+            predicate.assert("true");
+        });
+        match_it!(&**body, &Statement::Expression { ref expression } => {
+            expression.assert("2 + 2");
+        });
+    });
+}
+
+#[test]
+fn cycle_control_operators_parses_correctly() {
+    let result = parse!("break", statement);
+    match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+        assert_eq!(*operator, CycleControlOperator::Break);
+        assert_eq!(*name, None);
+    });
+    let result = parse!("break cycle_name", statement);
+    match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+        assert_eq!(*operator, CycleControlOperator::Break);
+        assert_eq!(*name, Some("cycle_name"));
+    });
+    let result = parse!("continue", statement);
+    match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+        assert_eq!(*operator, CycleControlOperator::Continue);
+        assert_eq!(*name, None);
+    });
+    let result = parse!("continue cycle_name", statement);
+    match_it!(result, Statement::CycleControl { ref operator, ref name } => {
+        assert_eq!(*operator, CycleControlOperator::Continue);
+        assert_eq!(*name, Some("cycle_name"));
+    });
+}
+
+#[test]
+fn return_operator_parses_correctly() {
+    let result = parse!("return", statement);
+    match_it!(result, Statement::Return { ref value } => {
+        assert_eq!(*value, None);
+    });
+    let result = parse!("return false", statement);
+    match_it!(result, Statement::Return { ref value } => {
+        value.assert(&Some("false"));
+    });
+}
+
+#[test]
+fn simple_block_of_statements_parses_correctly() {
+    let result = parse!("{ a := 2; return a }", statement);
+    match_it!(result, Statement::Block { ref statements } => {
+        match_it!(&statements[0], &Statement::VariableAssignment { name, ref expression } => {
+            assert_eq!(name, "a");
+            expression.assert("2");
+        });
+        match_it!(&statements[1], &Statement::Return { ref value } => {
+            value.assert(&Some("a"));
+        });
+        assert_eq!(statements.len(), 2);
+    });
+}
+
+#[test]
+fn weird_block_of_statements_parses_correctly() {
+    let result = parse!("{}", statement);
+    match_it!(result, Statement::Nothing => {});
+    let result = parse!("{ return a }", statement);
+    match_it!(result, Statement::Return { ref value } => {
+        value.assert(&Some("a"));
+    });
+}
+
+#[test]
+fn simple_expression_as_statement_parses_correctly() {
+    let result = parse!("a + b * c", statement);
+    match_it!(result, Statement::Expression { ref expression } => {
+        expression.assert("a + b * c");
+    });
 }
