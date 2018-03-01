@@ -7,6 +7,7 @@ use parser_basics::{
 };
 
 use desc_lang::primitives::primitive_data_type;
+use man_lang::others::module_path;
 
 use super::*;
 
@@ -52,7 +53,7 @@ parser_rule!(tuple_field(i) -> Field<'source> {
 });
 
 /// attributes "{" ...struct_field "}"
-parser_rule!(struct_body(i) -> StructureDataType<'source> {
+parser_rule!(pub struct_body(i) -> StructureDataType<'source> {
     do_parse!(i,
         attributes: attributes >>
         apply!(symbols, "{") >>
@@ -86,6 +87,6 @@ pub fn data_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
     alt!(input,
         compound_type
         | primitive_data_type => { |x| DataType::Primitive(x) }
-        | identifier => { |x| DataType::Reference(x) }
+        | module_path => { |x| DataType::Reference(x) }
     )
 }

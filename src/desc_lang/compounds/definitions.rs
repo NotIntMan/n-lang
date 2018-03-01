@@ -36,7 +36,7 @@ pub enum CompoundDataType<'source> {
 pub enum DataType<'source> {
     Compound(CompoundDataType<'source>),
     Primitive(PrimitiveDataType),
-    Reference(&'source str),
+    Reference(Vec<&'source str>),
 }
 
 impl<'source> Assertion<str> for DataType<'source> {
