@@ -78,7 +78,6 @@ fn pretty_binary_operator(op: BinaryOperator) -> &'static str {
         BinaryOperator::Mod => "остаток от деления",
         BinaryOperator::Div => "частное деления",
         BinaryOperator::Pow => "возведение в степень",
-        BinaryOperator::Collate => "Collate (он не должен быть тут и будет удалён)",
         BinaryOperator::Interval => "создание промежутка",
     }
 }

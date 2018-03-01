@@ -69,8 +69,6 @@ pub enum BinaryOperator {
     Div,
     Pow,
     // Language specific operators
-    // TODO Collate, как мне кажется, не вписвается в модель бинарных операций. Может, переместить его в декларации и высказывания? Или в унарные выражения?
-    Collate,
     Interval,
 }
 

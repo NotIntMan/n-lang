@@ -7,7 +7,7 @@ extern crate pretty_assertions;
 use n_transpiler::helpers::assertion::Assertion;
 use n_transpiler::man_lang::expressions::*;
 use n_transpiler::man_lang::data_sources::*;
-use man_lang::selections::*;
+use n_transpiler::man_lang::selections::*;
 
 fn extract_literal<'source>(expr: Expression<'source>) -> LiteralType {
     match_it!(expr, Expression::Literal(lit) => lit.literal_type)
