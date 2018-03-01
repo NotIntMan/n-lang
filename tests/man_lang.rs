@@ -213,7 +213,7 @@ fn simple_operations_of_all_types_parses_correctly() {
 fn property_access_and_set_and_function_call_expression_parses_correctly() {
     let result = parse!("foo(bar, bar.baz, (box, boz))", expression);
     let mut args = match_it!(result, Expression::FunctionCall(name, args) => {
-        assert_eq!(name, "foo");
+        assert_eq!(name, vec!["foo"]);
         args
     });
     assert_identifier(args.remove(0), "bar");
@@ -238,18 +238,18 @@ fn simple_join_parses_correctly() {
         (*left, *right)
     });
     match_it!(left, DataSource::Table { name, alias } => {
-        assert_eq!(name, "foo");
+        assert_eq!(name, vec!["foo"]);
         assert_eq!(alias, Some("f"));
     });
     match_it!(right, DataSource::Table { name, alias } => {
-        assert_eq!(name, "bar");
+        assert_eq!(name, vec!["bar"]);
         assert_eq!(alias, Some("b"));
     });
 }
 
 fn assert_table(source: &DataSource, table_name: &str, table_alias: Option<&str>) {
-    match_it!(source, &DataSource::Table { name, alias } => {
-            assert_eq!(name, table_name);
+    match_it!(source, &DataSource::Table { ref name, alias } => {
+            assert_eq!(*name, vec![table_name]);
             assert_eq!(alias, table_alias);
         });
 }
