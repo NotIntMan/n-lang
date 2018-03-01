@@ -1,14 +1,16 @@
 use lexeme_scanner::Token;
 use parser_basics::{
     comma_list,
-    identifier,
     keyword,
     not_keyword_identifier,
     ParserResult,
     symbols,
 };
 use man_lang::expressions::expression;
-use man_lang::others::property_path;
+use man_lang::others::{
+    property_path,
+    module_path,
+};
 use man_lang::selections::selection;
 use super::*;
 
@@ -31,7 +33,7 @@ parser_rule!(join_condition(i) -> JoinCondition<'source> {
 
 parser_rule!(table(i) -> DataSource<'source> {
     do_parse!(i,
-        name: identifier >>
+        name: module_path >>
         alias: opt!(not_keyword_identifier) >>
         (DataSource::Table { name, alias })
     )

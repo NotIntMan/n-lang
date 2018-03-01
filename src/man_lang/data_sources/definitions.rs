@@ -19,7 +19,7 @@ pub enum JoinType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DataSource<'source> {
     Table {
-        name: &'source str,
+        name: Vec<&'source str>,
         alias: Option<&'source str>,
     },
     Join {
