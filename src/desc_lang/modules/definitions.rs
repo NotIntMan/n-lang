@@ -1,4 +1,5 @@
 use desc_lang::compounds::{
+    Attribute,
     DataType,
     Field,
 };
@@ -34,13 +35,14 @@ pub enum ModuleDefinitionValue<'source> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleDefinitionItem<'source> {
     pub public: bool,
+    pub attributes: Vec<Attribute<'source>>,
     pub value: ModuleDefinitionValue<'source>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleDefinition<'source> {
-    name: &'source str,
-    items: Vec<ModuleDefinitionItem<'source>>,
+    pub name: &'source str,
+    pub items: Vec<ModuleDefinitionItem<'source>>,
 }
 
 impl<'source> ModuleDefinitionValue<'source> {
