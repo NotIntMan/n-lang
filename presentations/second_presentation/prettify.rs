@@ -129,6 +129,19 @@ fn pretty_property_path(path: &Vec<&str>) -> String {
     result
 }
 
+fn pretty_module_path(path: &Vec<&str>) -> String {
+    let mut result = String::with_capacity(path.len() * 10);
+    let mut iter = path.iter();
+    if let Some(s) = iter.next() {
+        result.push_str(*s);
+    }
+    for s in iter {
+        result.push_str("::");
+        result.push_str(*s);
+    }
+    result
+}
+
 fn pretty_property_path_list(list: &Vec<Vec<&str>>, padding: usize) -> String {
     let mut result = String::with_capacity(list.len() * 128);
     for (i, expr) in list.iter().enumerate() {
@@ -187,11 +200,11 @@ fn pretty_expression(expr: &Expression, padding: usize) -> String {
                 format!("набор значений:{}", pretty_expression_list(expressions, padding + 2))
             }
         }
-        &Expression::FunctionCall(name, ref arguments) => {
+        &Expression::FunctionCall(ref name, ref arguments) => {
             if arguments.is_empty() {
-                format!("вызов функции {} без аргументов", name)
+                format!("вызов функции {} без аргументов", pretty_module_path(name))
             } else {
-                format!("вызов функции {} с аргументами:{}", name, pretty_expression_list(arguments, padding + 2))
+                format!("вызов функции {} с аргументами:{}", pretty_module_path(name), pretty_expression_list(arguments, padding + 2))
             }
         }
     }
@@ -199,9 +212,9 @@ fn pretty_expression(expr: &Expression, padding: usize) -> String {
 
 fn pretty_data_source(source: &DataSource, padding: usize) -> String {
     match source {
-        &DataSource::Table { name, alias } => match alias {
-            Some(alias) => format!("таблица {} (с синонимом {})", name, alias),
-            None => format!("таблица {}", name),
+        &DataSource::Table { ref name, alias } => match alias {
+            Some(alias) => format!("таблица {} (с синонимом {})", pretty_module_path(name), alias),
+            None => format!("таблица {}", pretty_module_path(name)),
         },
         &DataSource::Join { join_type, ref condition, ref left, ref right } => {
             format!("{}{}{}{}",

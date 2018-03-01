@@ -181,8 +181,15 @@ pub fn stringify_type(input: &DataType, margin_left: usize) -> String {
             });
         },
         &DataType::Reference(ref refer) => {
-            result.push_str("ссылка на тип по имени ");
-            result.push_str(*refer);
+            result.push_str("ссылка на тип ");
+            let mut path_iter = refer.iter();
+            if let Some(path_item) = path_iter.next() {
+                result.push_str(*path_item);
+            }
+            for path_item in path_iter {
+                result.push_str("::");
+                result.push_str(*path_item);
+            }
         },
     }
     result
