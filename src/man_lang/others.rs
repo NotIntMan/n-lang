@@ -6,12 +6,12 @@ use parser_basics::{
     symbols,
 };
 
-pub fn property_path<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<&'source str>> {
+pub fn path<'token, 'source>(input: &'token [Token<'source>], delimiter: &str) -> ParserResult<'token, 'source, Vec<&'source str>> {
     do_parse!(input,
         first: identifier >>
         others: opt!(do_parse!(
-            apply!(symbols, ".") >>
-            list: apply!(list, identifier, prepare!(symbols("."))) >>
+            apply!(symbols, delimiter) >>
+            list: apply!(list, identifier, prepare!(symbols(delimiter))) >>
             (list)
         )) >>
         (match others {
@@ -22,4 +22,12 @@ pub fn property_path<'token, 'source>(input: &'token [Token<'source>]) -> Parser
             None => vec![first],
         })
     )
+}
+
+pub fn property_path<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<&'source str>> {
+    path(input, ".")
+}
+
+pub fn module_path<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<&'source str>> {
+    path(input, "::")
 }
