@@ -15,21 +15,9 @@ pub struct Field<'source> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct StructureDataType<'source> {
-    pub attributes: Vec<Attribute<'source>>,
-    pub fields: Vec<(&'source str, Field<'source>)>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct TupleDataType<'source> {
-    pub attributes: Vec<Attribute<'source>>,
-    pub fields: Vec<Field<'source>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CompoundDataType<'source> {
-    Structure(StructureDataType<'source>),
-    Tuple(TupleDataType<'source>),
+    Structure(Vec<(&'source str, Field<'source>)>),
+    Tuple(Vec<Field<'source>>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

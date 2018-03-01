@@ -28,7 +28,7 @@ parser_rule!(attribute(i) -> Attribute<'source> {
 });
 
 /// ...attribute
-parser_rule!(attributes(i) -> Vec<Attribute<'source>> {
+parser_rule!(pub attributes(i) -> Vec<Attribute<'source>> {
     many0!(i, attribute)
 });
 
@@ -53,24 +53,22 @@ parser_rule!(tuple_field(i) -> Field<'source> {
 });
 
 /// attributes "{" ...struct_field "}"
-parser_rule!(pub struct_body(i) -> StructureDataType<'source> {
+parser_rule!(pub struct_body(i) -> Vec<(&'source str, Field<'source>)> {
     do_parse!(i,
-        attributes: attributes >>
         apply!(symbols, "{") >>
         fields: apply!(comma_list, struct_field) >>
         apply!(symbols, "}") >>
-        (StructureDataType { attributes, fields })
+        (fields)
     )
 });
 
 /// attributes "(" ...tuple_field ")"
-parser_rule!(tuple_body(i) -> TupleDataType<'source> {
+parser_rule!(tuple_body(i) -> Vec<Field<'source>> {
     do_parse!(i,
-        attributes: attributes >>
         apply!(symbols, "(") >>
         fields: apply!(comma_list, tuple_field) >>
         apply!(symbols, ")") >>
-        (TupleDataType { attributes, fields })
+        (fields)
     )
 });
 

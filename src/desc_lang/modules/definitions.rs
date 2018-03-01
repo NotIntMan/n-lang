@@ -1,6 +1,6 @@
 use desc_lang::compounds::{
     DataType,
-    StructureDataType,
+    Field,
 };
 use desc_lang::functions::FunctionDefinition;
 
@@ -13,7 +13,7 @@ pub struct DataTypeDefinition<'source> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableDefinition<'source> {
     pub name: &'source str,
-    pub body: StructureDataType<'source>,
+    pub body: Vec<(&'source str, Field<'source>)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub struct ExternalItemImport<'source> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ModuleDefinitionItem<'source> {
+pub enum ModuleDefinitionValue<'source> {
     DataType(DataTypeDefinition<'source>),
     Table(TableDefinition<'source>),
     Function(FunctionDefinition<'source>),
@@ -32,14 +32,20 @@ pub enum ModuleDefinitionItem<'source> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleDefinitionItem<'source> {
+    pub public: bool,
+    pub value: ModuleDefinitionValue<'source>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleDefinition<'source> {
     name: &'source str,
     items: Vec<ModuleDefinitionItem<'source>>,
 }
 
-impl<'source> ModuleDefinitionItem<'source> {
+impl<'source> ModuleDefinitionValue<'source> {
     fn name(&self) -> &'source str {
-        use self::ModuleDefinitionItem::*;
+        use self::ModuleDefinitionValue::*;
         match self {
             &DataType(ref def) => def.name,
             &Table(ref def) => def.name,
