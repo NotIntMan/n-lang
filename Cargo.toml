@@ -7,6 +7,9 @@ authors = ["NotIntMan"]
 name = "n_transpiler"
 path = "src/lib.rs"
 
+[features]
+parser_trace = []
+
 [[bin]]
 name = "first_presentation"
 path = "presentations/first_presentation/main.rs"

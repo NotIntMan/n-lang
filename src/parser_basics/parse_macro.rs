@@ -15,9 +15,16 @@
 #[macro_export]
 macro_rules! parse {
     ($text: expr, $rule: expr) => {{
-        let tokens = $crate::lexeme_scanner::Scanner::scan($text)
-            .expect("Scanner result must be ok");
-        $crate::parser_basics::parse(tokens.as_slice(), $rule)
-            .expect("Parser result must be ok")
-    }}
+        match_it!(
+            $crate::lexeme_scanner::Scanner::scan($text),
+            Ok(tokens) => {
+                #[cfg(feature = "parser_trace")]
+                trace!("Parsed tokens: {:#?}", tokens);
+                match_it!(
+                    $crate::parser_basics::parse(tokens.as_slice(), $rule),
+                    Ok(parser_result) => { parser_result }
+                )
+            }
+        )
+    }};
 }

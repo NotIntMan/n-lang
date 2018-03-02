@@ -1,7 +1,6 @@
 use lexeme_scanner::Token;
 use parser_basics::{
     identifier,
-    list,
     ParserResult,
     symbols,
 };
@@ -9,17 +8,17 @@ use parser_basics::{
 pub fn path<'token, 'source>(input: &'token [Token<'source>], delimiter: &str) -> ParserResult<'token, 'source, Vec<&'source str>> {
     do_parse!(input,
         first: identifier >>
-        others: opt!(do_parse!(
+        others: many0!(do_parse!(
             apply!(symbols, delimiter) >>
-            list: apply!(list, identifier, prepare!(symbols(delimiter))) >>
-            (list)
+            element: identifier >>
+            (element)
         )) >>
-        (match others {
-            Some(mut vec) => {
-                vec.insert(0, first);
-                vec
-            },
-            None => vec![first],
+        ({
+            let mut result = others;
+            result.insert(0, first);
+            #[cfg(feature="parser_trace")]
+            trace!("Path found: {:?}", result);
+            result
         })
     )
 }

@@ -1,5 +1,8 @@
 #[macro_use]
 extern crate nom;
+#[cfg(feature="parser_trace")]
+#[macro_use]
+extern crate log;
 #[macro_use]
 extern crate n_transpiler;
 

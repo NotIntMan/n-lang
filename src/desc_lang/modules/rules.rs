@@ -2,6 +2,7 @@ use lexeme_scanner::Token;
 use parser_basics::{
     identifier,
     keyword,
+    none,
     symbols,
     ParserResult,
 };
@@ -50,17 +51,40 @@ parser_rule!(module_definitions(i) -> ModuleDefinitionValue<'source> {
     )
 });
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExternalItemTail<'source> {
+    None,
+    Asterisk,
+    Alias(&'source str),
+}
+
 parser_rule!(external_item_definition(i) -> ModuleDefinitionValue<'source> {
     do_parse!(i,
         apply!(keyword, "use") >>
         path: module_path >>
-        alias: opt!(do_parse!(
-            apply!(keyword, "as") >>
-            name: identifier >>
-            (name)
-        )) >>
-        opt!(apply!(symbols, ";")) >>
-        (ModuleDefinitionValue::Import(ExternalItemImport { path, alias }))
+        tail: alt!(
+            do_parse!(
+                apply!(symbols, "::") >>
+                apply!(symbols, "*") >>
+                (ExternalItemTail::Asterisk)
+            )
+            | do_parse!(
+                apply!(keyword, "as") >>
+                alias: identifier >>
+                (ExternalItemTail::Alias(alias))
+            )
+            | none => { |_| ExternalItemTail::None }
+        ) >>
+        apply!(symbols, ";") >>
+        (match tail {
+            ExternalItemTail::None => ModuleDefinitionValue::Import(ExternalItemImport { path, alias: None }),
+            ExternalItemTail::Asterisk => {
+                let mut path = path;
+                path.push("*");
+                ModuleDefinitionValue::Import(ExternalItemImport { path, alias: None })
+            },
+            ExternalItemTail::Alias(alias) => ModuleDefinitionValue::Import(ExternalItemImport { path, alias: Some(alias) }),
+        })
     )
 });
 

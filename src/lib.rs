@@ -1,9 +1,8 @@
 #![feature(range_contains)]
 
-#[allow(unused_imports)]
+#[cfg(feature="parser_trace")]
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 #[allow(unused_imports)]
 #[macro_use]
 pub extern crate nom;

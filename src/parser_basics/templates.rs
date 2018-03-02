@@ -233,21 +233,65 @@ macro_rules! opt {
 */
 #[macro_export]
 macro_rules! alt {
-    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) => { $gen:expr }) => {
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) => { $gen:expr }) => {{
+        #[cfg(feature="parser_trace")]
+        trace!("alt! macro goes into {} rule", stringify!($rule!($i, $($args)*)));
         match $rule!($i, $($args)*) {
-            $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, $gen(o)),
-            $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
-            $crate::nom::IResult::Error(e) => $crate::nom::IResult::Error(e),
+            $crate::nom::IResult::Done(i, o) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got success result and pass it into closure");
+                $crate::nom::IResult::Done(i, $gen(o))
+            },
+            $crate::nom::IResult::Incomplete(n) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got incomplete status and return it");
+                $crate::nom::IResult::Incomplete(n)
+            },
+            $crate::nom::IResult::Error(e) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got error and return it {:?}", e);
+                $crate::nom::IResult::Error(e)
+            },
         }
-    };
-    (__impl $i: expr, $rule: ident! ( $($args:tt)* )) => {
-        $rule!($i, $($args)*)
-    };
-    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) => { $gen:expr } | $($rest: tt)+) => {
+    }};
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* )) => {{
+        #[cfg(feature="parser_trace")]
+        trace!("alt! macro goes into {} rule", stringify!($rule!($i, $($args)*)));
         match $rule!($i, $($args)*) {
-            $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, $gen(o)),
-            $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
+            $crate::nom::IResult::Done(i, o) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got success result and return it");
+                $crate::nom::IResult::Done(i, o)
+            },
+            $crate::nom::IResult::Incomplete(n) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got incomplete status and return it");
+                $crate::nom::IResult::Incomplete(n)
+            },
+            $crate::nom::IResult::Error(e) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got error and return it {:?}", e);
+                $crate::nom::IResult::Error(e)
+            },
+        }
+    }};
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) => { $gen:expr } | $($rest: tt)+) => {{
+        #[cfg(feature="parser_trace")]
+        trace!("alt! macro goes into {} rule", stringify!($rule!($i, $($args)*)));
+        match $rule!($i, $($args)*) {
+            $crate::nom::IResult::Done(i, o) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got success result and pass it into closure");
+                $crate::nom::IResult::Done(i, $gen(o))
+            },
+            $crate::nom::IResult::Incomplete(n) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got incomplete status and return it");
+                $crate::nom::IResult::Incomplete(n)
+            },
             $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(mut e)) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got error and tries to parse another rule. Error: {}", e);
                 match alt!(__impl $i, $($rest)+) {
                     $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
                     $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
@@ -260,12 +304,24 @@ macro_rules! alt {
             },
             $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
         }
-    };
-    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) | $($rest: tt)+) => {
+    }};
+    (__impl $i: expr, $rule: ident! ( $($args:tt)* ) | $($rest: tt)+) => {{
+        #[cfg(feature="parser_trace")]
+        trace!("alt! macro goes into {} rule", stringify!($rule!($i, $($args)*)));
         match $rule!($i, $($args)*) {
-            $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
-            $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
+            $crate::nom::IResult::Done(i, o) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got success result and pass it into closure");
+                $crate::nom::IResult::Done(i, o)
+            },
+            $crate::nom::IResult::Incomplete(n) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got incomplete status and return it");
+                $crate::nom::IResult::Incomplete(n)
+            },
             $crate::nom::IResult::Error($crate::nom::ErrorKind::Custom(mut e)) => {
+                #[cfg(feature="parser_trace")]
+                trace!("alt! macro got error and tries to parse another rule. Error: {}", e);
                 match alt!(__impl $i, $($rest)+) {
                     $crate::nom::IResult::Done(i, o) => $crate::nom::IResult::Done(i, o),
                     $crate::nom::IResult::Incomplete(n) => $crate::nom::IResult::Incomplete(n),
@@ -278,7 +334,11 @@ macro_rules! alt {
             },
             $crate::nom::IResult::Error(other) => $crate::nom::IResult::Error(other),
         }
-    };
+    }};
     (__impl $i: expr, $rule: ident $($rest: tt)*) => { alt!(__impl $i, call!($rule) $($rest)*) };
-    ($i: expr, $($rest :tt)+) => { alt!(__impl $i, $($rest)+) };
+    ($i: expr, $($rest :tt)+) => {{
+        #[cfg(feature="parser_trace")]
+        trace!("alt! macro is started parsing");
+        alt!(__impl $i, $($rest)+)
+    }};
 }

@@ -3,8 +3,15 @@ extern crate n_transpiler;
 extern crate indexmap;
 #[macro_use]
 extern crate pretty_assertions;
+#[macro_use]
+extern crate nom;
+#[allow(unused_imports)]
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 use n_transpiler::helpers::assertion::Assertion;
+use n_transpiler::parser_basics::end_of_input;
 use n_transpiler::desc_lang::primitives::*;
 use n_transpiler::desc_lang::compounds::*;
 use n_transpiler::desc_lang::functions::*;
@@ -230,13 +237,21 @@ fn simple_const_time_function_parses_correctly() {
     assert_eq!(statement_iterator.next(), None);
 }
 
+parser_rule!(module_only(i) -> Vec<ModuleDefinitionItem<'source>> {
+    do_parse!(i,
+        module: module >>
+        end_of_input >>
+        (module)
+    )
+});
+
 #[test]
 fn module_of_two_usage_parses_correctly() {
     let result: Vec<ModuleDefinitionItem> = parse!("\
         use foo::bar as Bar;
         #[no_mandle]
         pub use foo::TakeAll;
-    ", module);
+    ", module_only);
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].public, false);
     assert_eq!(result[0].attributes.len(), 0);
@@ -251,6 +266,41 @@ fn module_of_two_usage_parses_correctly() {
     match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
         assert_eq!(*path, ["foo", "TakeAll"]);
         assert_eq!(alias, None);
+    });
+}
+
+fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<ModuleDefinitionItem>) {
+    assert_eq!(module.len(), 2);
+    assert_eq!(module[0].public, true);
+    assert_eq!(module[0].attributes.len(), 1);
+    assert_eq!(module[0].attributes[0].name, "derive");
+    assert_eq!(module[0].attributes[0].arguments, Some(vec!["Hash"]));
+    match_it!(&module[0].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { name, ref body }) => {
+        assert_eq!(name, "Complex");
+        body.assert("{ real: double, imag: float }");
+    });
+    assert_eq!(module[1].public, true);
+    assert_eq!(module[1].attributes.len(), 0);
+    match_it!(&module[1].value, &ModuleDefinitionValue::Table(TableDefinition { name, ref body }) => {
+        assert_eq!(name, "Signals");
+        let mut body_iter = body.iter();
+        match_it!(body_iter.next(), Some(&("id", ref field)) => {
+            assert_eq!(field.attributes.len(), 2);
+            assert_eq!(field.attributes[0].name, "primary_key");
+            assert_eq!(field.attributes[0].arguments, None);
+            assert_eq!(field.attributes[1].name, "auto_increment");
+            assert_eq!(field.attributes[1].arguments, None);
+            field.field_type.assert("unsigned integer");
+        });
+        match_it!(body_iter.next(), Some(&("value", ref field)) => {
+            assert_eq!(field.attributes.len(), 2);
+            assert_eq!(field.attributes[0].name, "check");
+            assert_eq!(field.attributes[0].arguments, Some(vec!["A", "B"]));
+            assert_eq!(field.attributes[1].name, "check_fn");
+            assert_eq!(field.attributes[1].arguments, Some(vec!["X", "YY"]));
+            field.field_type.assert("Complex");
+        });
+        assert_eq!(body_iter.next(), None);
     });
 }
 
@@ -271,37 +321,51 @@ fn module_of_table_and_struct_parses_correctly() {
             #[check_fn(X, YY)]
             value: Complex,
         }
-    ", module);
-    assert_eq!(result.len(), 2);
-    assert_eq!(result[0].public, true);
-    assert_eq!(result[0].attributes.len(), 1);
-    assert_eq!(result[0].attributes[0].name, "derive");
-    assert_eq!(result[0].attributes[0].arguments, Some(vec!["Hash"]));
-    match_it!(&result[0].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { name, ref body }) => {
-        assert_eq!(name, "Complex");
-        body.assert("{ real: double, imag: float }");
+    ", module_only);
+    assert_module_of_complex_number_struct_and_wave_signals_table(&result);
+}
+
+#[test]
+fn simple_submodule_parses_correctly() {
+    let _ = env_logger::try_init();
+    let result: Vec<ModuleDefinitionItem> = parse!("\
+        mod wave {
+            #[derive(Hash)]
+            pub struct Complex {
+                real: double,
+                imag: float,
+            }
+
+            pub table Signals {
+                #[primary_key]
+                #[auto_increment]
+                id: unsigned integer,
+                #[check(A, B)]
+                #[check_fn(X, YY)]
+                value: Complex,
+            }
+        }
+
+        pub use wave::*;
+        pub use wave::Complex as ComplexNumber;
+    ", module_only);
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0].public, false);
+    assert_eq!(result[0].attributes.len(), 0);
+    match_it!(&result[0].value, &ModuleDefinitionValue::Module(ModuleDefinition { name, ref items }) => {
+        assert_eq!(name, "wave");
+        assert_module_of_complex_number_struct_and_wave_signals_table(items);
     });
     assert_eq!(result[1].public, true);
     assert_eq!(result[1].attributes.len(), 0);
-    match_it!(&result[1].value, &ModuleDefinitionValue::Table(TableDefinition { name, ref body }) => {
-        assert_eq!(name, "Signals");
-        let mut body_iter = body.iter();
-        match_it!(body_iter.next(), Some(&("id", ref field)) => {
-            assert_eq!(field.attributes.len(), 2);
-            assert_eq!(field.attributes[0].name, "primary_key");
-            assert_eq!(field.attributes[0].arguments, None);
-            assert_eq!(field.attributes[1].name, "auto_increment");
-            assert_eq!(field.attributes[1].arguments, None);
-            field.field_type.assert("unsigned integer");
-        });
-        match_it!(body_iter.next(), Some(&("value", ref field)) => {
-            assert_eq!(field.attributes.len(), 2);
-            assert_eq!(field.attributes[0].name, "check");
-            assert_eq!(field.attributes[0].arguments, Some(vec!["A", "B"]));
-            assert_eq!(field.attributes[1].name, "check_fn");
-            assert_eq!(field.attributes[1].arguments, Some(vec!["X", "YY"]));
-            field.field_type.assert("Complex");
-        });
-        assert_eq!(body_iter.next(), None);
+    match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
+        assert_eq!(*path, ["wave", "*"]);
+        assert_eq!(alias, None);
+    });
+    assert_eq!(result[2].public, true);
+    assert_eq!(result[2].attributes.len(), 0);
+    match_it!(&result[2].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
+        assert_eq!(*path, ["wave", "Complex"]);
+        assert_eq!(alias, Some("ComplexNumber"));
     });
 }
