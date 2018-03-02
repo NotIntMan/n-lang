@@ -348,8 +348,10 @@ fn simple_submodule_parses_correctly() {
 
         pub use wave::*;
         pub use wave::Complex as ComplexNumber;
+
+        pub struct CachedSignal(Signals, Complex)
     ", module_only);
-    assert_eq!(result.len(), 3);
+    assert_eq!(result.len(), 4);
     assert_eq!(result[0].public, false);
     assert_eq!(result[0].attributes.len(), 0);
     match_it!(&result[0].value, &ModuleDefinitionValue::Module(ModuleDefinition { name, ref items }) => {
@@ -367,5 +369,11 @@ fn simple_submodule_parses_correctly() {
     match_it!(&result[2].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
         assert_eq!(*path, ["wave", "Complex"]);
         assert_eq!(alias, Some("ComplexNumber"));
+    });
+    assert_eq!(result[3].public, true);
+    assert_eq!(result[3].attributes.len(), 0);
+    match_it!(&result[3].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { name, ref body }) => {
+        assert_eq!(name, "CachedSignal");
+        body.assert("(Signals, Complex)");
     });
 }
