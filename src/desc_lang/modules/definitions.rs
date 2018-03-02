@@ -45,30 +45,29 @@ pub struct ModuleDefinition<'source> {
     pub items: Vec<ModuleDefinitionItem<'source>>,
 }
 
-impl<'source> ModuleDefinitionValue<'source> {
-    fn name(&self) -> &'source str {
-        use self::ModuleDefinitionValue::*;
-        match self {
-            &DataType(ref def) => def.name,
-            &Table(ref def) => def.name,
-            &Function(ref def) => def.name,
-            &Module(ref def) => def.name,
-            &Import(ref def) => {
-                def.alias.or_else(|| def.path.last().map(|name| *name));
-                match def.alias {
-                    Some(alias) => alias,
-                    None => match def.path.last() {
-                        Some(name) => *name,
-                        None => panic!("Empty module path should not exists in definitions!"),
-                    }
-                }
-            },
-        }
-    }
-    fn into_named_pair(self) -> (&'source str, Self) {
-        let name = self.name();
-        (name, self)
-    }
-}
-
-// TODO Подумать над идеей подмодулей и синтаксисом вызова функций из них
+// TODO Подумать нужен ли этот код вообще т.к. импорт может быть вида foo::* и не иметь синтаксически детерминированного имени.
+//impl<'source> ModuleDefinitionValue<'source> {
+//    fn name(&self) -> &'source str {
+//        use self::ModuleDefinitionValue::*;
+//        match self {
+//            &DataType(ref def) => def.name,
+//            &Table(ref def) => def.name,
+//            &Function(ref def) => def.name,
+//            &Module(ref def) => def.name,
+//            &Import(ref def) => {
+//                def.alias.or_else(|| def.path.last().map(|name| *name));
+//                match def.alias {
+//                    Some(alias) => alias,
+//                    None => match def.path.last() {
+//                        Some(name) => *name,
+//                        None => panic!("Empty module path should not exists in definitions!"),
+//                    }
+//                }
+//            },
+//        }
+//    }
+//    fn into_named_pair(self) -> (&'source str, Self) {
+//        let name = self.name();
+//        (name, self)
+//    }
+//}
