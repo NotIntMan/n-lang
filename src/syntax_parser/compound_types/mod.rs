@@ -20,6 +20,7 @@
     ```
 
     Правило `identifier` определено в модуле `parser_basics`.
+
     Правило `primitive_data_type` определено в модуле `syntax_parser::primitive_types`.
 */
 

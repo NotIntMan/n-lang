@@ -110,7 +110,7 @@ parser_rule!(less_than(i) -> () { do_parse!(i, apply!(symbols, "<") >> (())) });
 parser_rule!(like(i) -> () { do_parse!(i, apply!(keyword, "like") >> (())) });
 /// "sounds" "like"
 parser_rule!(sounds_like(i) -> () { do_parse!(i, apply!(keyword, "sounds") >> apply!(keyword, "like") >> (())) });
-/// regexp"
+/// "regexp"
 parser_rule!(reg_exp(i) -> () { do_parse!(i, apply!(keyword, "regexp") >> (())) });
 /// "+"
 parser_rule!(arithmetic_plus(i) -> () { do_parse!(i, apply!(symbols, "+") >> (())) });
