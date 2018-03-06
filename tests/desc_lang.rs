@@ -198,10 +198,12 @@ fn simple_const_time_function_parses_correctly() {
     match_it!(statement, Statement::VariableDefinition { name, data_type, default_value } => {
             assert_eq!(name, "a");
             assert_eq!(data_type, None);
-            match_it!(default_value, Some(Expression::BinaryOperation(left, op, right)) => {
-                assert_eq!(op, BinaryOperator::Divide);
-                left.assert("k");
-                right.assert("2");
+            match_it!(default_value, Some(StatementSource::Expression(expr)) => {
+                match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+                    assert_eq!(op, BinaryOperator::Divide);
+                    left.assert("k");
+                    right.assert("2");
+                });
             });
         });
     let statement = statement_iterator.next()
@@ -213,26 +215,32 @@ fn simple_const_time_function_parses_correctly() {
                 unsigned: false,
                 zerofill: false,
             }))));
-            match_it!(default_value, Some(Expression::BinaryOperation(left, op, right)) => {
-                assert_eq!(op, BinaryOperator::Plus);
-                left.assert("k");
-                right.assert("1");
+            match_it!(default_value, Some(StatementSource::Expression(expr)) => {
+                match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+                    assert_eq!(op, BinaryOperator::Plus);
+                    left.assert("k");
+                    right.assert("1");
+                });
             });
         });
     let statement = statement_iterator.next()
         .expect("Function's body must have the second statement");
-    match_it!(statement, Statement::VariableAssignment { name, expression } => {
+    match_it!(statement, Statement::VariableAssignment { name, source } => {
             assert_eq!(name, "b");
-            match_it!(expression, Expression::BinaryOperation(left, op, right) => {
-                assert_eq!(op, BinaryOperator::Times);
-                left.assert("a");
-                right.assert("b");
+            match_it!(source, StatementSource::Expression(expr) => {
+                match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+                    assert_eq!(op, BinaryOperator::Times);
+                    left.assert("a");
+                    right.assert("b");
+                });
             });
         });
     let statement = statement_iterator.next()
         .expect("Function's body must have the second statement");
     match_it!(statement, Statement::Return { value } => {
-            value.assert(&Some("b"));
+            match_it!(value, Some(StatementSource::Expression(expr)) => {
+                expr.assert("b");
+            });
         });
     assert_eq!(statement_iterator.next(), None);
 }

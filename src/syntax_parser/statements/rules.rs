@@ -9,7 +9,15 @@ use parser_basics::{
 };
 use syntax_parser::compound_types::data_type;
 use syntax_parser::expressions::expression;
+use syntax_parser::selections::selection;
 use super::*;
+
+parser_rule!(stmt_source(i) -> StatementSource<'source> {
+    alt!(i,
+        selection => { |x| StatementSource::Selection(x) }
+        | expression => { |x| StatementSource::Expression(x) }
+    )
+});
 
 parser_rule!(variable_definition(i) -> Statement<'source> {
     do_parse!(i,
@@ -22,8 +30,8 @@ parser_rule!(variable_definition(i) -> Statement<'source> {
         )) >>
         default_value: opt!(do_parse!(
             apply!(symbols, ":=") >>
-            expression: expression >>
-            (expression)
+            source: stmt_source >>
+            (source)
         )) >>
         (Statement::VariableDefinition {
             name,
@@ -37,10 +45,10 @@ parser_rule!(variable_assignment(i) -> Statement<'source> {
     do_parse!(i,
         name: identifier >>
         apply!(symbols, ":=") >>
-        expression: expression >>
+        source: stmt_source >>
         (Statement::VariableAssignment {
             name,
-            expression,
+            source,
         })
     )
 });
@@ -116,7 +124,7 @@ parser_rule!(cycle_control(i) -> Statement<'source> {
 parser_rule!(return_stmt(i) -> Statement<'source> {
     do_parse!(i,
         apply!(keyword, "return") >>
-        value: opt!(expression) >>
+        value: opt!(stmt_source) >>
         (Statement::Return {
             value,
         })

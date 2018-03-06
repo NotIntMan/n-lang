@@ -552,7 +552,9 @@ fn simple_definition_parses_correctly() {
     match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
         assert_eq!(name, "my_first_variable");
         data_type.assert(&Some("boolean"));
-        default_value.assert(&Some("false"));
+        match_it!(default_value, &Some(StatementSource::Expression(ref expr)) => {
+            expr.assert("false");
+        });
     });
 }
 
@@ -562,7 +564,9 @@ fn simple_not_perfect_definition_parses_correctly() {
     match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
         assert_eq!(name, "my_first_variable");
         assert_eq!(*data_type, None);
-        default_value.assert(&Some("false"));
+        match_it!(default_value, &Some(StatementSource::Expression(ref expr)) => {
+            expr.assert("false");
+        });
     });
     let result = parse!("let my_first_variable: boolean", statement);
     match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
@@ -575,9 +579,11 @@ fn simple_not_perfect_definition_parses_correctly() {
 #[test]
 fn simple_assignment_parses_correctly() {
     let result = parse!("super_variable := 2 + 2", statement);
-    match_it!(result, Statement::VariableAssignment { name, ref expression } => {
+    match_it!(result, Statement::VariableAssignment { name, ref source } => {
         assert_eq!(name, "super_variable");
-        expression.assert("2+2");
+        match_it!(source, &StatementSource::Expression(ref expr) => {
+            expr.assert("2+2");
+        });
     });
 }
 
@@ -681,7 +687,9 @@ fn return_operator_parses_correctly() {
     });
     let result = parse!("return false", statement);
     match_it!(result, Statement::Return { ref value } => {
-        value.assert(&Some("false"));
+        match_it!(value, &Some(StatementSource::Expression(ref expr)) => {
+            expr.assert("false");
+        });
     });
 }
 
@@ -689,12 +697,16 @@ fn return_operator_parses_correctly() {
 fn simple_block_of_statements_parses_correctly() {
     let result = parse!("{ a := 2; return a }", statement);
     match_it!(result, Statement::Block { ref statements } => {
-        match_it!(&statements[0], &Statement::VariableAssignment { name, ref expression } => {
+        match_it!(&statements[0], &Statement::VariableAssignment { name, ref source } => {
             assert_eq!(name, "a");
-            expression.assert("2");
+            match_it!(source, &StatementSource::Expression(ref expr) => {
+                expr.assert("2");
+            });
         });
         match_it!(&statements[1], &Statement::Return { ref value } => {
-            value.assert(&Some("a"));
+            match_it!(value, &Some(StatementSource::Expression(ref expr)) => {
+                expr.assert("a");
+            });
         });
         assert_eq!(statements.len(), 2);
     });
@@ -706,7 +718,9 @@ fn weird_block_of_statements_parses_correctly() {
     match_it!(result, Statement::Nothing => {});
     let result = parse!("{ return a }", statement);
     match_it!(result, Statement::Return { ref value } => {
-        value.assert(&Some("a"));
+        match_it!(value, &Some(StatementSource::Expression(ref expr)) => {
+            expr.assert("a");
+        });
     });
 }
 
@@ -717,3 +731,5 @@ fn simple_expression_as_statement_parses_correctly() {
         expression.assert("a + b * c");
     });
 }
+
+// TODO Протестировать SELECT запросы в качестве источника данных

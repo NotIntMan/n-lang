@@ -1,5 +1,11 @@
 use syntax_parser::compound_types::DataType;
 use syntax_parser::expressions::Expression;
+use syntax_parser::selections::Selection;
+//use syntax_parser::other_requests::{
+//    Deleting,
+//    Inserting,
+//    Updating,
+//};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CycleType<'source> {
@@ -15,16 +21,22 @@ pub enum CycleControlOperator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StatementSource<'source> {
+    Expression(Expression<'source>),
+    Selection(Selection<'source>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement<'source> {
     Nothing,
     VariableDefinition {
         name: &'source str,
         data_type: Option<DataType<'source>>,
-        default_value: Option<Expression<'source>>,
+        default_value: Option<StatementSource<'source>>,
     },
     VariableAssignment {
         name: &'source str,
-        expression: Expression<'source>,
+        source: StatementSource<'source>,
     },
     Condition {
         condition: Expression<'source>,
@@ -40,7 +52,7 @@ pub enum Statement<'source> {
         name: Option<&'source str>,
     },
     Return {
-        value: Option<Expression<'source>>,
+        value: Option<StatementSource<'source>>,
     },
     Block {
         statements: Vec<Statement<'source>>,
@@ -48,10 +60,19 @@ pub enum Statement<'source> {
     Expression {
         expression: Expression<'source>,
     },
+//    TODO Запросы манипуляции как высказывания
+//
+//    DeletingRequest {
+//        request: Deleting<'source>,
+//    },
+//    InsertingRequest {
+//        request: Inserting<'source>,
+//    },
+//    UpdatingRequest {
+//        request: Updating<'source>,
+//    },
 }
 
 impl<'source> Default for Statement<'source> {
     fn default() -> Self { Statement::Nothing }
 }
-
-// TODO Не забыть про запросы манипуляции в телах функции. Скорее всего, они станут высказываниями или выражениями (но лучше - высказываниями).
