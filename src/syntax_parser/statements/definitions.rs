@@ -53,3 +53,5 @@ pub enum Statement<'source> {
 impl<'source> Default for Statement<'source> {
     fn default() -> Self { Statement::Nothing }
 }
+
+// TODO Не забыть про запросы манипуляции в телах функции. Скорее всего, они станут высказываниями или выражениями (но лучше - высказываниями).
