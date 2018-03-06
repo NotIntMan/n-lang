@@ -733,3 +733,4 @@ fn simple_expression_as_statement_parses_correctly() {
 }
 
 // TODO Протестировать SELECT запросы в качестве источника данных
+// TODO Протестировать DELETE, INSERT и UPDATE запросы в качестве высказываний

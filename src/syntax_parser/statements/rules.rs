@@ -10,6 +10,11 @@ use parser_basics::{
 use syntax_parser::compound_types::data_type;
 use syntax_parser::expressions::expression;
 use syntax_parser::selections::selection;
+use syntax_parser::other_requests::{
+    deleting,
+    inserting,
+    updating,
+};
 use super::*;
 
 parser_rule!(stmt_source(i) -> StatementSource<'source> {
@@ -156,10 +161,19 @@ parser_rule!(expr(i) -> Statement<'source> {
     )
 });
 
+parser_rule!(request(i) -> Statement<'source> {
+    alt!(i,
+        deleting => { |request| Statement::DeletingRequest { request } }
+        | inserting => { |request| Statement::InsertingRequest { request } }
+        | updating => { |request| Statement::UpdatingRequest { request } }
+    )
+});
+
 /// Выполняет разбор императивных высказываний
 pub fn statement<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Statement<'source>> {
     alt!(input,
-        variable_definition
+        request
+        | variable_definition
         | variable_assignment
         | condition
         | simple_cycle

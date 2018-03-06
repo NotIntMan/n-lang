@@ -1,11 +1,11 @@
 use syntax_parser::compound_types::DataType;
 use syntax_parser::expressions::Expression;
 use syntax_parser::selections::Selection;
-//use syntax_parser::other_requests::{
-//    Deleting,
-//    Inserting,
-//    Updating,
-//};
+use syntax_parser::other_requests::{
+    Deleting,
+    Inserting,
+    Updating,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CycleType<'source> {
@@ -62,15 +62,15 @@ pub enum Statement<'source> {
     },
 //    TODO Запросы манипуляции как высказывания
 //
-//    DeletingRequest {
-//        request: Deleting<'source>,
-//    },
-//    InsertingRequest {
-//        request: Inserting<'source>,
-//    },
-//    UpdatingRequest {
-//        request: Updating<'source>,
-//    },
+    DeletingRequest {
+        request: Deleting<'source>,
+    },
+    InsertingRequest {
+        request: Inserting<'source>,
+    },
+    UpdatingRequest {
+        request: Updating<'source>,
+    },
 }
 
 impl<'source> Default for Statement<'source> {
