@@ -146,7 +146,7 @@ fn fold_join<'source>(mut origin: DataSource<'source>, tails: Vec<JoinTail<'sour
 /// Функция, выполняющая разбор источника данных запроса (таблиц и их объединений)
 pub fn data_source<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataSource<'source>> {
     do_parse!(input,
-        origin: alt!(join_source) >>
+        origin: join_source >>
         tails: many0!(join_tail) >>
         (fold_join(origin, tails))
     )
