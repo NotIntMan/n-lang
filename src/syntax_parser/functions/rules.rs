@@ -7,11 +7,11 @@ use parser_basics::{
 };
 use lexeme_scanner::Token;
 use parser_basics::ParserResult;
-use desc_lang::compounds::{
+use syntax_parser::compound_types::{
     data_type,
     DataType,
 };
-use man_lang::statements::block;
+use syntax_parser::statements::block;
 use super::*;
 
 parser_rule!(type_of(i) -> DataType<'source> {

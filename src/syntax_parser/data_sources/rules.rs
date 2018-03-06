@@ -6,12 +6,12 @@ use parser_basics::{
     ParserResult,
     symbols,
 };
-use man_lang::expressions::expression;
-use man_lang::others::{
+use syntax_parser::expressions::expression;
+use syntax_parser::others::{
     property_path,
     module_path,
 };
-use man_lang::selections::selection;
+use syntax_parser::selections::selection;
 use super::*;
 
 parser_rule!(join_condition(i) -> JoinCondition<'source> {

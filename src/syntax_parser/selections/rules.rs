@@ -8,8 +8,8 @@ use parser_basics::{
     symbols,
     u32_literal,
 };
-use man_lang::expressions::{expression, Expression};
-use man_lang::data_sources::data_source;
+use syntax_parser::expressions::{expression, Expression};
+use syntax_parser::data_sources::data_source;
 use super::*;
 
 parser_rule!(select_distincty(i) -> bool {

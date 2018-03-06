@@ -6,13 +6,13 @@ use parser_basics::{
     symbols,
     ParserResult,
 };
-use desc_lang::compounds::{
+use syntax_parser::compound_types::{
     attributes,
     compound_type,
     struct_body,
 };
-use man_lang::others::module_path;
-use desc_lang::functions::function_definition;
+use syntax_parser::others::module_path;
+use syntax_parser::functions::function_definition;
 use super::*;
 
 parser_rule!(data_type_definition(i) -> ModuleDefinitionValue<'source> {

@@ -13,8 +13,8 @@ use n_transpiler::lexeme_scanner::{
     Scanner,
 };
 use n_transpiler::parser_basics::parse;
-use n_transpiler::desc_lang::primitives::*;
-use n_transpiler::desc_lang::compounds::*;
+use n_transpiler::syntax_parser::primitive_types::*;
+use n_transpiler::syntax_parser::compound_types::*;
 
 pub fn generate_margin(size: usize) -> String {
     let mut result = String::new();

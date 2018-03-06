@@ -1,7 +1,7 @@
 use helpers::assertion::Assertion;
-use man_lang::expressions::Expression;
-use man_lang::data_sources::DataSource;
-use man_lang::selections::{
+use syntax_parser::expressions::Expression;
+use syntax_parser::data_sources::DataSource;
+use syntax_parser::selections::{
     Selection,
     SelectionSortingItem,
 };
@@ -22,7 +22,7 @@ impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignme
     fn assert(&self, other: &(&str, Option<&str>)) {
         let other_property_tokens = ::lexeme_scanner::Scanner::scan(other.0)
             .expect("Scanner result must be ok");
-        let other_property = ::parser_basics::parse(other_property_tokens.as_slice(), ::man_lang::others::property_path)
+        let other_property = ::parser_basics::parse(other_property_tokens.as_slice(), ::syntax_parser::others::property_path)
             .expect("Parser result must be ok");
         assert_eq!(self.property, other_property);
         match other.1 {

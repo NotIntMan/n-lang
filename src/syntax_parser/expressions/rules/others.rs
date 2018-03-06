@@ -4,7 +4,7 @@ use parser_basics::{
     ParserResult,
     symbols,
 };
-use man_lang::others::{
+use syntax_parser::others::{
     property_path,
     module_path,
 };

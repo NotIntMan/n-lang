@@ -1,9 +1,9 @@
-use desc_lang::compounds::{
+use syntax_parser::compound_types::{
     Attribute,
     DataType,
     Field,
 };
-use desc_lang::functions::FunctionDefinition;
+use syntax_parser::functions::FunctionDefinition;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinition<'source> {

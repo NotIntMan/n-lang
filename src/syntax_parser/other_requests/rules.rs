@@ -7,13 +7,13 @@ use parser_basics::{
     symbols,
     u32_literal,
 };
-use man_lang::data_sources::data_source;
-use man_lang::expressions::{
+use syntax_parser::data_sources::data_source;
+use syntax_parser::expressions::{
     Expression,
     expression,
 };
-use man_lang::others::property_path;
-use man_lang::selections::{
+use syntax_parser::others::property_path;
+use syntax_parser::selections::{
     selection,
     select_condition,
     select_sorting,

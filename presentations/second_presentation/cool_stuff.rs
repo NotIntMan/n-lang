@@ -2,8 +2,8 @@ use std::io::{BufRead, stdin, stdout, Write};
 
 use n_transpiler::lexeme_scanner::Scanner;
 use n_transpiler::parser_basics::{parse, end_of_input};
-use n_transpiler::man_lang::expressions::expression;
-use n_transpiler::man_lang::data_sources::data_source;
+use n_transpiler::syntax_parser::expressions::expression;
+use n_transpiler::syntax_parser::data_sources::data_source;
 
 use super::prettify::Pretty;
 

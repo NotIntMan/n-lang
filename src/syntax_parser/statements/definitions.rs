@@ -1,5 +1,5 @@
-use desc_lang::compounds::DataType;
-use man_lang::expressions::Expression;
+use syntax_parser::compound_types::DataType;
+use syntax_parser::expressions::Expression;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CycleType<'source> {

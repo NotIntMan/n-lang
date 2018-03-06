@@ -1,5 +1,5 @@
-use man_lang::expressions::Expression;
-use man_lang::data_sources::DataSource;
+use syntax_parser::expressions::Expression;
+use syntax_parser::data_sources::DataSource;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectionResultSize {

@@ -1,6 +1,6 @@
 use helpers::assertion::Assertion;
 
-use desc_lang::primitives::PrimitiveDataType;
+use syntax_parser::primitive_types::PrimitiveDataType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Attribute<'source> {
@@ -33,7 +33,7 @@ impl<'source> Assertion<str> for DataType<'source> {
             .expect("Scanner result must be ok");
         let other_data_type = ::parser_basics::parse(
             tokens.as_slice(),
-            ::desc_lang::compounds::data_type
+            ::syntax_parser::compound_types::data_type
         ).expect("Parser result must be ok");
         assert_eq!(*self, other_data_type);
     }

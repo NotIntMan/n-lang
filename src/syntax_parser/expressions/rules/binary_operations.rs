@@ -5,7 +5,7 @@ use parser_basics::{
     ParserResult,
     symbols,
 };
-use man_lang::expressions::{
+use syntax_parser::expressions::{
     BinaryOperator,
     Expression,
 };

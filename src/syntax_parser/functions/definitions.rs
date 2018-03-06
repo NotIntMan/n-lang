@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
-use desc_lang::compounds::DataType;
-use man_lang::statements::Statement;
+use syntax_parser::compound_types::DataType;
+use syntax_parser::statements::Statement;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionBody<'source> {

@@ -1,5 +1,5 @@
-use man_lang::expressions::Expression;
-use man_lang::selections::Selection;
+use syntax_parser::expressions::Expression;
+use syntax_parser::selections::Selection;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JoinCondition<'source> {

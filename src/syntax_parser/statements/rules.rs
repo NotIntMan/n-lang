@@ -7,8 +7,8 @@ use parser_basics::{
     symbols,
     ParserResult,
 };
-use desc_lang::compounds::data_type;
-use man_lang::expressions::expression;
+use syntax_parser::compound_types::data_type;
+use syntax_parser::expressions::expression;
 use super::*;
 
 parser_rule!(variable_definition(i) -> Statement<'source> {

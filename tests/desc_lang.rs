@@ -12,12 +12,12 @@ extern crate env_logger;
 
 use n_transpiler::helpers::assertion::Assertion;
 use n_transpiler::parser_basics::end_of_input;
-use n_transpiler::desc_lang::primitives::*;
-use n_transpiler::desc_lang::compounds::*;
-use n_transpiler::desc_lang::functions::*;
-use n_transpiler::desc_lang::modules::*;
-use n_transpiler::man_lang::statements::*;
-use n_transpiler::man_lang::expressions::*;
+use n_transpiler::syntax_parser::primitive_types::*;
+use n_transpiler::syntax_parser::compound_types::*;
+use n_transpiler::syntax_parser::functions::*;
+use n_transpiler::syntax_parser::modules::*;
+use n_transpiler::syntax_parser::statements::*;
+use n_transpiler::syntax_parser::expressions::*;
 
 #[test]
 fn simple_type_parses_correctly() {

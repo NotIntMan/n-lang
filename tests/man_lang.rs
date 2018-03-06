@@ -5,11 +5,11 @@ extern crate indexmap;
 extern crate pretty_assertions;
 
 use n_transpiler::helpers::assertion::Assertion;
-use n_transpiler::man_lang::expressions::*;
-use n_transpiler::man_lang::data_sources::*;
-use n_transpiler::man_lang::selections::*;
-use n_transpiler::man_lang::other_requests::*;
-use n_transpiler::man_lang::statements::*;
+use n_transpiler::syntax_parser::expressions::*;
+use n_transpiler::syntax_parser::data_sources::*;
+use n_transpiler::syntax_parser::selections::*;
+use n_transpiler::syntax_parser::other_requests::*;
+use n_transpiler::syntax_parser::statements::*;
 
 fn extract_literal<'source>(expr: Expression<'source>) -> LiteralType {
     match_it!(expr, Expression::Literal(lit) => lit.literal_type)

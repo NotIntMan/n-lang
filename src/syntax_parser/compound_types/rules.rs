@@ -6,8 +6,8 @@ use parser_basics::{
     symbols,
 };
 
-use desc_lang::primitives::primitive_data_type;
-use man_lang::others::module_path;
+use syntax_parser::primitive_types::primitive_data_type;
+use syntax_parser::others::module_path;
 
 use super::*;
 
