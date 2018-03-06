@@ -1,10 +1,10 @@
 [package]
-name = "n_transpiler"
-version = "0.1.0"
-authors = ["NotIntMan"]
+name = "n_lang"
+version = "0.0.0"
+authors = ["Dmitry Demin"]
 
 [lib]
-name = "n_transpiler"
+name = "n_lang"
 path = "src/lib.rs"
 
 [features]

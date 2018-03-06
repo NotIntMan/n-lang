@@ -21,9 +21,9 @@ use super::{
 
     # extern crate nom;
     # use nom::{IResult, ErrorKind};
-    # extern crate n_transpiler;
-    # use n_transpiler::lexeme_scanner::Token;
-    # use n_transpiler::parser_basics::{ParserInput, ParserError, ParserErrorKind};
+    # extern crate n_lang;
+    # use n_lang::lexeme_scanner::Token;
+    # use n_lang::parser_basics::{ParserInput, ParserError, ParserErrorKind};
 
     struct Input<'a>(&'a [u8]);
 

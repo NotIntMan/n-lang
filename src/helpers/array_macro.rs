@@ -12,7 +12,7 @@
 
     ```rust
     # #[macro_use]
-    # extern crate n_transpiler;
+    # extern crate n_lang;
     # fn main() {
     array!(pub const U8_PUBLIC_CONST_ARRAY: usize = 9);
     array!(const USIZE_CONST_ARRAY: usize = 1, 2, 3);

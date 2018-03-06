@@ -4,7 +4,7 @@ extern crate nom;
 #[macro_use]
 extern crate log;
 #[macro_use]
-extern crate n_transpiler;
+extern crate n_lang;
 
 pub mod prettify;
 pub mod cool_stuff;

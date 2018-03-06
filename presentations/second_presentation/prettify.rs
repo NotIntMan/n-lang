@@ -1,9 +1,9 @@
-use n_transpiler::syntax_parser::data_sources::{
+use n_lang::syntax_parser::data_sources::{
     DataSource,
     JoinCondition,
     JoinType,
 };
-use n_transpiler::syntax_parser::expressions::{
+use n_lang::syntax_parser::expressions::{
     BinaryOperator,
     Expression,
     LiteralType,

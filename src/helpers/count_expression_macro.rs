@@ -7,7 +7,7 @@
 
     ```rust
     # #[macro_use]
-    # extern crate n_transpiler;
+    # extern crate n_lang;
     # fn main() {
     assert_eq!(count_expressions!(), 0);
     assert_eq!(count_expressions!(a), 1);

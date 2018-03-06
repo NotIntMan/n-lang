@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate n_transpiler;
+extern crate n_lang;
 extern crate indexmap;
 #[macro_use]
 extern crate pretty_assertions;
@@ -10,14 +10,14 @@ extern crate nom;
 extern crate log;
 extern crate env_logger;
 
-use n_transpiler::helpers::assertion::Assertion;
-use n_transpiler::parser_basics::end_of_input;
-use n_transpiler::syntax_parser::primitive_types::*;
-use n_transpiler::syntax_parser::compound_types::*;
-use n_transpiler::syntax_parser::functions::*;
-use n_transpiler::syntax_parser::modules::*;
-use n_transpiler::syntax_parser::statements::*;
-use n_transpiler::syntax_parser::expressions::*;
+use n_lang::helpers::assertion::Assertion;
+use n_lang::parser_basics::end_of_input;
+use n_lang::syntax_parser::primitive_types::*;
+use n_lang::syntax_parser::compound_types::*;
+use n_lang::syntax_parser::functions::*;
+use n_lang::syntax_parser::modules::*;
+use n_lang::syntax_parser::statements::*;
+use n_lang::syntax_parser::expressions::*;
 
 #[test]
 fn simple_type_parses_correctly() {

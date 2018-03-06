@@ -7,7 +7,7 @@
     # Пример
 
     ```rust
-    # use n_transpiler::lexeme_scanner::{
+    # use n_lang::lexeme_scanner::{
     #     TokenKind,
     #     Scanner,
     # };

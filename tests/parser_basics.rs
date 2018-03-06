@@ -1,15 +1,15 @@
 #[macro_use]
-extern crate n_transpiler;
+extern crate n_lang;
 
 #[macro_use]
 extern crate nom;
 
 use nom::ErrorKind;
-use n_transpiler::lexeme_scanner::{
+use n_lang::lexeme_scanner::{
     TokenKindLess,
     Scanner,
 };
-use n_transpiler::parser_basics::{
+use n_lang::parser_basics::{
     ParserErrorKind,
     token,
 };

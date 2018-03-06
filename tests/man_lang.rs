@@ -1,15 +1,15 @@
 #[macro_use]
-extern crate n_transpiler;
+extern crate n_lang;
 extern crate indexmap;
 #[macro_use]
 extern crate pretty_assertions;
 
-use n_transpiler::helpers::assertion::Assertion;
-use n_transpiler::syntax_parser::expressions::*;
-use n_transpiler::syntax_parser::data_sources::*;
-use n_transpiler::syntax_parser::selections::*;
-use n_transpiler::syntax_parser::other_requests::*;
-use n_transpiler::syntax_parser::statements::*;
+use n_lang::helpers::assertion::Assertion;
+use n_lang::syntax_parser::expressions::*;
+use n_lang::syntax_parser::data_sources::*;
+use n_lang::syntax_parser::selections::*;
+use n_lang::syntax_parser::other_requests::*;
+use n_lang::syntax_parser::statements::*;
 
 fn extract_literal<'source>(expr: Expression<'source>) -> LiteralType {
     match_it!(expr, Expression::Literal(lit) => lit.literal_type)

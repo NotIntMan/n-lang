@@ -1,5 +1,5 @@
 extern crate env_logger;
-extern crate n_transpiler;
+extern crate n_lang;
 
 use env_logger::try_init;
 use std::process::exit;
@@ -8,13 +8,13 @@ use std::io::{
     stdin,
 };
 
-use n_transpiler::lexeme_scanner::{
+use n_lang::lexeme_scanner::{
     Token,
     Scanner,
 };
-use n_transpiler::parser_basics::parse;
-use n_transpiler::syntax_parser::primitive_types::*;
-use n_transpiler::syntax_parser::compound_types::*;
+use n_lang::parser_basics::parse;
+use n_lang::syntax_parser::primitive_types::*;
+use n_lang::syntax_parser::compound_types::*;
 
 pub fn generate_margin(size: usize) -> String {
     let mut result = String::new();
