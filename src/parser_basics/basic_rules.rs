@@ -60,6 +60,8 @@ array!(pub const KEYWORD_LIST: &'static str =
     "limit",
     "set",
     "join",
+    "value",
+    "values",
 );
 
 /**

@@ -60,8 +60,6 @@ pub enum Statement<'source> {
     Expression {
         expression: Expression<'source>,
     },
-//    TODO Запросы манипуляции как высказывания
-//
     DeletingRequest {
         request: Deleting<'source>,
     },

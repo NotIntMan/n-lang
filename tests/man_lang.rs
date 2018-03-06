@@ -732,5 +732,73 @@ fn simple_expression_as_statement_parses_correctly() {
     });
 }
 
-// TODO Протестировать SELECT запросы в качестве источника данных
-// TODO Протестировать DELETE, INSERT и UPDATE запросы в качестве высказываний
+#[test]
+fn simple_select_query_as_source_for_variable_parses_correctly() {
+    let result = parse!("x := select * from foo", statement);
+    match_it!(result, Statement::VariableAssignment { name, ref source } => {
+        assert_eq!(name, "x");
+        match_it!(source, &StatementSource::Selection(ref query) => {
+            assert_eq!(query.distinct, false);
+            assert_eq!(query.high_priority, false);
+            assert_eq!(query.straight_join, false);
+            assert_eq!(query.result_size, SelectionResultSize::Usual);
+            assert_eq!(query.cache, false);
+            assert_eq!(query.result, SelectionResult::All);
+            assert_table(&query.source, "foo", None);
+            assert_eq!(query.where_clause, None);
+            assert_eq!(query.group_by_clause, None);
+            assert_eq!(query.having_clause, None);
+            assert_eq!(query.order_by_clause, None);
+            assert_eq!(query.limit_clause, None);
+        });
+    });
+}
+
+#[test]
+fn simple_delete_query_as_statement_parses_correctly() {
+    let result = parse!("delete quick from bar where 42 > 80", statement);
+    match_it!(result, Statement::DeletingRequest { ref request } => {
+        assert_eq!(request.low_priority, false);
+        assert_eq!(request.quick, true);
+        assert_eq!(request.ignore, false);
+        assert_table(&request.source, "bar", None);
+        match_it!(&request.where_clause, &Some(ref clause) => { clause.assert("42 > 80"); });
+        assert_eq!(request.order_by_clause, None);
+        assert_eq!(request.limit_clause, None);
+    });
+}
+
+#[test]
+fn simple_insert_query_as_statement_parses_correctly() {
+    let result = parse!("insert into foo value (1, 2)", statement);
+    match_it!(result, Statement::InsertingRequest { ref request } => {
+        assert_eq!(request.priority, InsertingPriority::Usual);
+        assert_eq!(request.ignore, false);
+        assert_table(&request.target, "foo", None);
+        match_it!(&request.source, &InsertingSource::ValueLists { ref properties, ref lists } => {
+            assert_eq!(*properties, None);
+            let mut list_iterator = lists.iter();
+            let list = list_iterator.next()
+                .expect("List of lists must contain list");
+            list.as_slice().assert(&["1", "2"]);
+            assert_eq!(list_iterator.next(), None);
+        });
+        assert_eq!(request.on_duplicate_key_update, None);
+    });
+}
+
+#[test]
+fn simple_update_query_as_statement_parses_correctly() {
+    let result = parse!("update foo set a.x = 2", statement);
+    match_it!(result, Statement::UpdatingRequest { ref request } => {
+        assert_eq!(request.low_priority, false);
+        assert_eq!(request.ignore, false);
+        assert_table(&request.source, "foo", None);
+        request.assignments.assert(&[
+            ("a.x", Some("2"))
+        ]);
+        assert_eq!(request.where_clause, None);
+        assert_eq!(request.order_by_clause, None);
+        assert_eq!(request.limit_clause, None);
+    });
+}
