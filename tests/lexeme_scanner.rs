@@ -1,7 +1,7 @@
-extern crate n_transpiler;
+extern crate n_lang;
 extern crate env_logger;
 
-use n_transpiler::lexeme_scanner::{
+use n_lang::lexeme_scanner::{
     Scanner,
     ScannerError,
     ScannerErrorKind,

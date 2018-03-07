@@ -1,11 +1,11 @@
-extern crate n_transpiler;
+extern crate n_lang;
 
-use n_transpiler::helpers::group::{
+use n_lang::helpers::group::{
     Appendable,
     Group,
 };
-use n_transpiler::lexeme_scanner::TokenKindLess;
-use n_transpiler::parser_basics::{
+use n_lang::lexeme_scanner::TokenKindLess;
+use n_lang::parser_basics::{
     ParserError,
     ParserErrorItem,
     ParserErrorKind,

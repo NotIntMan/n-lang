@@ -43,6 +43,46 @@ pub fn identifier_raw<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'
     token(input, TokenKindLess::Word)
 }
 
+array!(pub const KEYWORD_LIST: &'static str =
+    "as",
+    "using",
+    "on",
+    "natural",
+    "inner",
+    "cross",
+    "left",
+    "right",
+    "full",
+    "where",
+    "group",
+    "having",
+    "order",
+    "limit",
+    "set",
+    "join",
+    "value",
+    "values",
+);
+
+/**
+    Правило "Не ключевой идентификатор".
+    Ищет токен типа `Word` и возвращает ссылку на него в случае успеха.
+    Если текст токена содержится в списке ключевых слов `KEYWORD_LIST`, возвращает ошибку `ExpectedGot`.
+*/
+pub fn not_keyword_identifier<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'b str> {
+    match identifier(input) {
+        IResult::Done(new_input, result) => {
+            if KEYWORD_LIST.contains(&result) {
+                input.err(ParserErrorKind::expected_got_description("not keyword identifier", TokenKindLess::Word, result))
+            } else {
+                new_input.ok(result)
+            }
+        },
+        IResult::Incomplete(n) => IResult::Incomplete(n),
+        IResult::Error(e) => IResult::Error(e),
+    }
+}
+
 /// Функция сравнения ключевых слов. Игнорирует регистр.
 pub fn compare_words(a: &str, b: &str) -> bool {
     let left = a.chars().flat_map(|c| c.to_lowercase());
@@ -187,16 +227,22 @@ pub fn special_number_literal<'a, 'b>(input: &'a [Token<'b>], spec: NumberLitera
     }
 }
 
+/// Спецификация для правила "Специальный числовой литерал".
+/// Описывает целочисленный неотрицательный числовой литерал в любой системе исчисления.
+/// Используется правилом "u32-литерал".
 pub const UNSIGNED_INTEGER_SPEC: NumberLiteralSpec = NumberLiteralSpec {
     negative: Some(false),
     fractional: Some(false),
     radix: None,
 };
 
+/// Генерирует ошибку, которая "ожидала" целочисленный неотрицательный числовой литерал, а получила другой числовой литерал.
 fn make_parse_error(input: &str) -> ParserErrorKind {
     ParserErrorKind::expected_got_description("integer literal", TokenKindLess::NumberLiteral,input)
 }
 
+/// Совершает попытку разбора целочисленного неотрицательного литерала.
+/// Полностью соответствует спецификации числовых литералов языка.
 pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
     let mut chars = input.chars()
         .skip_while(|c| c.is_whitespace());
@@ -240,6 +286,11 @@ pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
     Ok(result)
 }
 
+/**
+    Правило "u32-литерал".
+    Ищет целочисленных неотрицательный литерал, проводит его разбор и возвращает значение.
+    В случае неудачи возвращает ошибку.
+*/
 pub fn u32_literal<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, u32> {
     match special_number_literal(input, UNSIGNED_INTEGER_SPEC.clone()) {
         IResult::Done(input, result) => {

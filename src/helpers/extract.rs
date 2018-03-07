@@ -6,6 +6,7 @@ use std::mem::replace;
 
     Полезно для извлечения строк, векторов и пр. контейнеров, работающих с динамической памятью.
 */
+#[inline]
 pub fn extract<T: Default>(source: &mut T) -> T {
     replace(source, T::default())
 }

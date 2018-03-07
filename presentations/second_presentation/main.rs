@@ -1,7 +1,10 @@
 #[macro_use]
 extern crate nom;
+#[cfg(feature="parser_trace")]
 #[macro_use]
-extern crate n_transpiler;
+extern crate log;
+#[macro_use]
+extern crate n_lang;
 
 pub mod prettify;
 pub mod cool_stuff;

@@ -22,6 +22,8 @@ pub mod basic_rules;
 pub mod input;
 pub mod parser_error;
 #[macro_use]
+pub mod parse_macro;
+#[macro_use]
 pub mod rule_macro;
 pub mod token;
 #[macro_use]
@@ -33,6 +35,7 @@ pub use self::basic_rules::{
     identifier,
     identifier_raw,
     keyword,
+    not_keyword_identifier,
     number_literal,
     NumberLiteralSpec,
     none,

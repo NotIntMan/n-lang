@@ -1,22 +1,19 @@
 #![feature(range_contains)]
-#![feature(rustc_private)]
-#![feature(conservative_impl_trait)]
-#![feature(plugin)]
-#![cfg_attr(test, plugin(stainless))]
-#![feature(const_fn)]
 
-#[allow(unused_imports)]
+#[cfg(feature="parser_trace")]
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 #[allow(unused_imports)]
 #[macro_use]
 pub extern crate nom;
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
+extern crate indexmap;
 
 #[macro_use]
 pub mod helpers;
 pub mod lexeme_scanner;
 #[macro_use]
 pub mod parser_basics;
-pub mod desc_lang;
-pub mod man_lang;
+pub mod syntax_parser;

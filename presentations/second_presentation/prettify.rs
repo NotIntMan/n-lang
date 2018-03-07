@@ -1,9 +1,9 @@
-use n_transpiler::man_lang::data_sources::{
+use n_lang::syntax_parser::data_sources::{
     DataSource,
     JoinCondition,
     JoinType,
 };
-use n_transpiler::man_lang::expressions::{
+use n_lang::syntax_parser::expressions::{
     BinaryOperator,
     Expression,
     LiteralType,
@@ -78,7 +78,6 @@ fn pretty_binary_operator(op: BinaryOperator) -> &'static str {
         BinaryOperator::Mod => "остаток от деления",
         BinaryOperator::Div => "частное деления",
         BinaryOperator::Pow => "возведение в степень",
-        BinaryOperator::Collate => "Collate (он не должен быть тут и будет удалён)",
         BinaryOperator::Interval => "создание промежутка",
     }
 }
@@ -125,6 +124,19 @@ fn pretty_property_path(path: &Vec<&str>) -> String {
     }
     for s in iter {
         result.push_str(".");
+        result.push_str(*s);
+    }
+    result
+}
+
+fn pretty_module_path(path: &Vec<&str>) -> String {
+    let mut result = String::with_capacity(path.len() * 10);
+    let mut iter = path.iter();
+    if let Some(s) = iter.next() {
+        result.push_str(*s);
+    }
+    for s in iter {
+        result.push_str("::");
         result.push_str(*s);
     }
     result
@@ -188,11 +200,11 @@ fn pretty_expression(expr: &Expression, padding: usize) -> String {
                 format!("набор значений:{}", pretty_expression_list(expressions, padding + 2))
             }
         }
-        &Expression::FunctionCall(name, ref arguments) => {
+        &Expression::FunctionCall(ref name, ref arguments) => {
             if arguments.is_empty() {
-                format!("вызов функции {} без аргументов", name)
+                format!("вызов функции {} без аргументов", pretty_module_path(name))
             } else {
-                format!("вызов функции {} с аргументами:{}", name, pretty_expression_list(arguments, padding + 2))
+                format!("вызов функции {} с аргументами:{}", pretty_module_path(name), pretty_expression_list(arguments, padding + 2))
             }
         }
     }
@@ -200,9 +212,9 @@ fn pretty_expression(expr: &Expression, padding: usize) -> String {
 
 fn pretty_data_source(source: &DataSource, padding: usize) -> String {
     match source {
-        &DataSource::Table { name, alias } => match alias {
-            Some(alias) => format!("таблица {} (с синонимом {})", name, alias),
-            None => format!("таблица {}", name),
+        &DataSource::Table { ref name, alias } => match alias {
+            Some(alias) => format!("таблица {} (с синонимом {})", pretty_module_path(name), alias),
+            None => format!("таблица {}", pretty_module_path(name)),
         },
         &DataSource::Join { join_type, ref condition, ref left, ref right } => {
             format!("{}{}{}{}",
@@ -212,6 +224,7 @@ fn pretty_data_source(source: &DataSource, padding: usize) -> String {
                     new_line(format!("справа: {}", pretty_data_source(&*right, padding + 2)), padding),
             )
         }
+        &DataSource::Selection { query: _, alias: _ } => format!("выборка из базы данных (данные опущены т.к. не имеют отношения к теме презентации)"),
     }
 }
 

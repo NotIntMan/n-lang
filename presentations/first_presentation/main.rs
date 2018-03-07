@@ -1,5 +1,5 @@
 extern crate env_logger;
-extern crate n_transpiler;
+extern crate n_lang;
 
 use env_logger::try_init;
 use std::process::exit;
@@ -8,13 +8,13 @@ use std::io::{
     stdin,
 };
 
-use n_transpiler::lexeme_scanner::{
+use n_lang::lexeme_scanner::{
     Token,
     Scanner,
 };
-use n_transpiler::parser_basics::parse;
-use n_transpiler::desc_lang::primitives::*;
-use n_transpiler::desc_lang::compounds::*;
+use n_lang::parser_basics::parse;
+use n_lang::syntax_parser::primitive_types::*;
+use n_lang::syntax_parser::compound_types::*;
 
 pub fn generate_margin(size: usize) -> String {
     let mut result = String::new();
@@ -71,8 +71,7 @@ pub fn stringify_type(input: &DataType, margin_left: usize) -> String {
     match input {
         &DataType::Compound(CompoundDataType::Structure(ref s)) => {
             result.push_str("структура");
-            result.push_str(&stringify_attributes(s.attributes.as_slice(), &margin));
-            for (name, field) in s.fields.iter() {
+            for &(ref name, ref field) in s.iter() {
                 result.push('\n');
                 result.push_str(&margin);
                 result.push_str(&format!("с полем {} {}", *name, stringify_field(field, margin_left + 2)));
@@ -80,8 +79,7 @@ pub fn stringify_type(input: &DataType, margin_left: usize) -> String {
         }
         &DataType::Compound(CompoundDataType::Tuple(ref s)) => {
             result.push_str("кортеж");
-            result.push_str(&stringify_attributes(s.attributes.as_slice(), &margin));
-            for field in s.fields.iter() {
+            for field in s.iter() {
                 result.push('\n');
                 result.push_str(&margin);
                 result.push_str(&format!("с полем {}", stringify_field(field, margin_left + 2)));
@@ -181,8 +179,15 @@ pub fn stringify_type(input: &DataType, margin_left: usize) -> String {
             });
         },
         &DataType::Reference(ref refer) => {
-            result.push_str("ссылка на тип по имени ");
-            result.push_str(*refer);
+            result.push_str("ссылка на тип ");
+            let mut path_iter = refer.iter();
+            if let Some(path_item) = path_iter.next() {
+                result.push_str(*path_item);
+            }
+            for path_item in path_iter {
+                result.push_str("::");
+                result.push_str(*path_item);
+            }
         },
     }
     result
