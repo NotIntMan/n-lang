@@ -1,6 +1,0 @@
-nightly:cargo:
-  image: rustdocker/rust:nightly
-  stage: test
-  script:
-    - rustc --version && cargo --version
-    - cargo test --verbose --jobs 1
