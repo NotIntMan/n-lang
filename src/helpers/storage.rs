@@ -43,7 +43,7 @@ impl<Index> TextIndex<Index> {
     }
 }
 
-type MatrixTextIndex = TextIndex<(usize, usize)>;
+pub type MatrixTextIndex = TextIndex<(usize, usize)>;
 
 impl MatrixTextIndex {
     fn new_for_matrix(index: usize, sub_index: usize, p: ItemPosition) -> Self {
