@@ -10,3 +10,4 @@ pub mod group;
 pub mod display_list;
 #[macro_use]
 pub mod match_it_macro;
+pub mod storage;
