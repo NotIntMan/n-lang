@@ -58,9 +58,24 @@
 //    data_source: Resolver,
 ////    items:
 //}
+use std::path::PathBuf;
+use indexmap::IndexMap;
+
 pub mod module_path;
+pub mod names_storage;
+
+use self::module_path::ModulePath;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Module {
+    path: ModulePath,
+    names: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Project {
-
+    root: Module,
+    // Это свойство планируется применять в реализации подключаемых библиотек (в т.ч. стандартной библиотеки СУБД)
+    additional_modules: Vec<Module>,
+    sources: IndexMap<PathBuf, String>,
 }
