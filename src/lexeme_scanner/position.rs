@@ -5,7 +5,11 @@ use std::fmt::{
     Result,
     Formatter,
 };
-
+use std::ops::{
+    Range,
+    Index,
+    IndexMut,
+};
 use std::cmp::{
     Ordering,
     PartialOrd,
@@ -131,22 +135,60 @@ impl PartialOrd for SymbolPosition {
 
     Служит для отображения позиции составного элемента текста. Имеет два поля типа `SymbolPosition`: начало и конец.
 */
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ItemPosition {
     pub begin: SymbolPosition,
     pub end: SymbolPosition,
 }
 
+fn min_max(a: usize, b: usize) -> (usize, usize) {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+fn safe_dif(a: usize, b: usize) -> usize {
+    match a.checked_sub(b) {
+        Some(x) => x,
+        None => b - a,
+    }
+}
+
 impl ItemPosition {
+    /// Формирует новый `ItemPosition` на основе текста, который был до него и текста, который включён в элемент
+    pub fn new(before: &str, text: &str) -> Self {
+        let mut begin = SymbolPosition::default();
+        begin.step_str(before);
+        let mut end = begin;
+        end.step_str(text);
+        ItemPosition { begin, end }
+    }
     /// Возвращает длину элемента в символах
     pub fn len(&self) -> usize {
-        self.end.offset - self.begin.offset
+        safe_dif(self.end.offset, self.begin.offset)
     }
     /// Возвращает количество строк, на которых располагается элемент
     pub fn lines(&self) -> usize {
-        1 + match self.end.line.checked_sub(self.begin.line) {
-            Some(v) => v,
-            None => self.begin.line - self.end.line
-        }
+        1 + safe_dif(self.end.line, self.begin.line)
+    }
+    /// Формирует интервал (`Range`), который можно передать строке и получить текст элемента
+    pub fn into_range(self) -> Range<usize> {
+        let (min, max) = min_max(self.begin.offset, self.end.offset);
+        min..max
+    }
+}
+
+impl Index<ItemPosition> for String {
+    type Output = str;
+    fn index(&self, index: ItemPosition) -> &str {
+        &self[index.into_range()]
+    }
+}
+
+impl IndexMut<ItemPosition> for String {
+    fn index_mut(&mut self, index: ItemPosition) -> &mut str {
+        &mut self[index.into_range()]
     }
 }
