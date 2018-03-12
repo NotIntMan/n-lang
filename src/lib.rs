@@ -1,4 +1,5 @@
 #![feature(range_contains)]
+#![feature(ptr_internals)]
 
 #[cfg(feature="parser_trace")]
 #[macro_use]
@@ -17,3 +18,4 @@ pub mod lexeme_scanner;
 #[macro_use]
 pub mod parser_basics;
 pub mod syntax_parser;
+pub mod project_analyzer;
