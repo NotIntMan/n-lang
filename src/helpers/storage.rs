@@ -43,6 +43,14 @@ impl<Index> TextIndex<Index> {
     }
 }
 
+type MatrixTextIndex = TextIndex<(usize, usize)>;
+
+impl MatrixTextIndex {
+    fn new_for_matrix(index: usize, sub_index: usize, p: ItemPosition) -> Self {
+        TextIndex::new((index, sub_index), p)
+    }
+}
+
 impl<Index, Store> SourceStorage<str, TextIndex<Index>> for Store
     where Store: SourceStorage<String, Index> {
     fn get_element(&self, index: TextIndex<Index>) -> Option<&str> {
@@ -100,45 +108,27 @@ fn matrix_text_store_returns_slices_correctly() {
         vec!["Hello".to_string(), "my".to_string(), "world".to_string()],
     ];
     assert_eq!(
-        store.get_element(TextIndex::new(
-            (0usize, 0usize),
-            ItemPosition::new("w", "orl"),
-        )),
+        store.get_element(TextIndex::new_for_matrix(0usize, 0usize, ItemPosition::new("w", "orl"))),
         Some("orl")
     );
     assert_eq!(
-        store.get_element(TextIndex::new(
-            (1, 0),
-            ItemPosition::new("", "Hel"),
-        )),
+        store.get_element(TextIndex::new_for_matrix(1, 0, ItemPosition::new("", "Hel"))),
         Some("Hel")
     );
     assert_eq!(
-        store.get_element(TextIndex::new(
-            (1, 1),
-            ItemPosition::new("", "w"),
-        )),
+        store.get_element(TextIndex::new_for_matrix(1, 1, ItemPosition::new("", "w"))),
         Some("w")
     );
     assert_eq!(
-        store.get_element(TextIndex::new(
-            (2, 0),
-            ItemPosition::new("Hello", ""),
-        )),
+        store.get_element(TextIndex::new_for_matrix(2, 0, ItemPosition::new("Hello", ""))),
         Some("")
     );
     assert_eq!(
-        store.get_element(TextIndex::new(
-            (2, 1),
-            ItemPosition::new("m", "y"),
-        )),
+        store.get_element(TextIndex::new_for_matrix(2, 1, ItemPosition::new("m", "y"))),
         Some("y")
     );
     assert_eq!(
-        store.get_element(TextIndex::new(
-            (2, 2),
-            ItemPosition::new("", "world"),
-        )),
+        store.get_element(TextIndex::new_for_matrix(2, 2, ItemPosition::new("", "world"))),
         Some("world")
     );
 }
