@@ -10,14 +10,6 @@ path = "src/lib.rs"
 [features]
 parser_trace = []
 
-[[bin]]
-name = "first_presentation"
-path = "presentations/first_presentation/main.rs"
-
-[[bin]]
-name = "second_presentation"
-path = "presentations/second_presentation/main.rs"
-
 [dependencies]
 nom = "3.2.1"
 log = "0.4.1"
