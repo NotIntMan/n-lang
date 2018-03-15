@@ -73,7 +73,7 @@ impl SymbolPosition {
     */
     #[inline]
     pub fn into_item_pos(self, item_text: &str) -> ItemPosition {
-        let begin = self.clone();
+        let begin = self;
         let mut end = self.clone();
         end.step_str(item_text);
         ItemPosition { begin, end }
