@@ -46,11 +46,11 @@
 
 ## Авторы
 
-- Дмитрий Демин ([github.com/NIM-Pro][NIM-Pro])
+- Дмитрий Демин ([github.com/0xDE11A][0xDE11A])
 
 [Rust]: https://www.rust-lang.org
 [Cargo]: https://crates.io
 [Nom]: https://crates.io/crates/nom
 [Log]: https://crates.io/crates/log
 [PrettyAssertion]: https://crates.io/crates/pretty_assertions
-[NIM-Pro]: https://github.com/NIM-Pro
+[0xDE11A]: https://github.com/0xDE11A
