@@ -1,14 +1,14 @@
-use lexeme_scanner::ItemPosition;
-
-pub trait SourceStorage<Element: ? Sized, Index = usize> {
-    fn get_element(&self, index: Index) -> Option<&Element>;
+pub trait SourceStorage<Index = usize> {
+    type Element: ? Sized;
+    fn get_element(&self, index: Index) -> Option<&Self::Element>;
 }
 
-pub trait Storage<Element, Index = usize>: SourceStorage<Element, Index> {
+pub trait Storage<Element, Index = usize>: SourceStorage<Index> {
     fn store_element(&mut self, element: Element) -> Index;
 }
 
-impl<T> SourceStorage<T> for Vec<T> {
+impl<T> SourceStorage for Vec<T> {
+    type Element = T;
     fn get_element(&self, index: usize) -> Option<&T> {
         self.get(index)
     }
@@ -22,41 +22,13 @@ impl<T> Storage<T> for Vec<T> {
     }
 }
 
-impl<T> SourceStorage<T, (usize, usize)> for Vec<Vec<T>>
+impl<T> SourceStorage<(usize, usize)> for Vec<Vec<T>>
 {
+    type Element = T;
     fn get_element(&self, index: (usize, usize)) -> Option<&T> {
         let (index, sub_index) = index;
         let sub_store: &Vec<T> = self.get_element(index)?;
         sub_store.get_element(sub_index)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct TextIndex<Index> {
-    index: Index,
-    position: ItemPosition,
-}
-
-impl<Index> TextIndex<Index> {
-    fn new(index: Index, position: ItemPosition) -> Self {
-        TextIndex { index, position }
-    }
-}
-
-pub type MatrixTextIndex = TextIndex<(usize, usize)>;
-
-impl MatrixTextIndex {
-    fn new_for_matrix(index: usize, sub_index: usize, p: ItemPosition) -> Self {
-        TextIndex::new((index, sub_index), p)
-    }
-}
-
-impl<Index, Store> SourceStorage<str, TextIndex<Index>> for Store
-    where Store: SourceStorage<String, Index> {
-    fn get_element(&self, index: TextIndex<Index>) -> Option<&str> {
-        let TextIndex { index, position } = index;
-        let string: &String = self.get_element(index)?;
-        Some(&string[position])
     }
 }
 
@@ -98,37 +70,4 @@ fn matrix_text_store_returns_elements_correctly() {
     assert_eq!(store.get_element((2, 2)), Some(&"Cena".to_string()));
     assert_eq!(store.get_element((1, 3)), None);
     assert_eq!(store.get_element((3, 0)), None);
-}
-
-#[test]
-fn matrix_text_store_returns_slices_correctly() {
-    let store = vec![
-        vec!["world".to_string()],
-        vec!["Hello".to_string(), "world".to_string()],
-        vec!["Hello".to_string(), "my".to_string(), "world".to_string()],
-    ];
-    assert_eq!(
-        store.get_element(TextIndex::new_for_matrix(0usize, 0usize, ItemPosition::new("w", "orl"))),
-        Some("orl")
-    );
-    assert_eq!(
-        store.get_element(TextIndex::new_for_matrix(1, 0, ItemPosition::new("", "Hel"))),
-        Some("Hel")
-    );
-    assert_eq!(
-        store.get_element(TextIndex::new_for_matrix(1, 1, ItemPosition::new("", "w"))),
-        Some("w")
-    );
-    assert_eq!(
-        store.get_element(TextIndex::new_for_matrix(2, 0, ItemPosition::new("Hello", ""))),
-        Some("")
-    );
-    assert_eq!(
-        store.get_element(TextIndex::new_for_matrix(2, 1, ItemPosition::new("m", "y"))),
-        Some("y")
-    );
-    assert_eq!(
-        store.get_element(TextIndex::new_for_matrix(2, 2, ItemPosition::new("", "world"))),
-        Some("world")
-    );
 }
