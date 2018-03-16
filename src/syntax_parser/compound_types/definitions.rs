@@ -8,6 +8,17 @@ pub struct Attribute<'source> {
     pub arguments: Option<Vec<&'source str>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticAttribute {
+    pub name: String,
+    pub arguments: Option<Vec<String>>,
+}
+
+derive_convert!(Attribute<'source> => SemanticAttribute {
+    name,
+    arguments is mappable iterable value,
+});
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field<'source> {
     pub attributes: Vec<Attribute<'source>>,
@@ -43,4 +54,11 @@ impl<'a, 'source> Assertion<&'a str> for DataType<'source> {
     fn assert(&self, other: &&'a str) {
         self.assert(*other)
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum SemanticDataType {
+//    Compound(CompoundDataType<'source>),
+    Primitive(PrimitiveDataType),
+    Reference(Vec<String>),
 }
