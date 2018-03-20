@@ -5,9 +5,11 @@ use std::ops::Range;
 use nom::IResult;
 
 use lexeme_scanner::{
+    ItemPosition,
     Token,
     TokenKind,
     TokenKindLess,
+    SymbolPosition,
 };
 use super::{
     ParserErrorKind,
@@ -15,6 +17,7 @@ use super::{
     ParserResult,
     token,
     exact_token,
+    some_token,
 };
 
 /**
@@ -310,4 +313,27 @@ pub fn u32_literal<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, u32> 
 */
 pub fn end_of_input<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'a Token<'b>> {
     token(input, TokenKindLess::EndOfInput)
+}
+
+/**
+    Правило "Позиция символа".
+    Возвращает положение первого встречного токена. В случае неудачи, возвращает ошибку типа `UnexpectedEnd`.
+*/
+pub fn symbol_position<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, SymbolPosition> {
+    some_token(input).map(|t: &Token| t.pos)
+}
+
+/**
+    Правило "Позиция элемента".
+    Получает начало положения, затем ищет положение первого встречного токена и возвращает положение элемента. В случае неудачи, возвращает ошибку типа `UnexpectedEnd`.
+*/
+pub fn item_position<'a, 'b>(input: &'a [Token<'b>], begin: SymbolPosition) -> ParserResult<'a, 'b, ItemPosition> {
+    some_token(input).map(|t: &Token| {
+        let end = t.pos;
+        if begin > end {
+            ItemPosition { begin: end, end: begin }
+        } else {
+            ItemPosition { begin, end }
+        }
+    })
 }

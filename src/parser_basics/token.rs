@@ -15,7 +15,7 @@ use super::{
     Правило "Какой-нибудь токен".
     Возвращает ссылку на первый найденный токен.
 
-    В случае, если ввод пустой или содержит только токен типа `EndOfInput` возвращает ошибку типа `UnexpectedEnd`.
+    В случае, если ввод пустой, возвращает ошибку типа `UnexpectedEnd`.
 */
 pub fn some_token<'a, 'b>(input: &'a [Token<'b>]) -> ParserResult<'a, 'b, &'a Token<'b>> {
     if input.is_empty() {

@@ -16,7 +16,7 @@ use std::cmp::{
 };
 
 /// Позиция символа
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SymbolPosition {
     /**
         Означает смещение от первого символа в терминологии массивов.
@@ -135,7 +135,7 @@ impl PartialOrd for SymbolPosition {
 
     Служит для отображения позиции составного элемента текста. Имеет два поля типа `SymbolPosition`: начало и конец.
 */
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
 pub struct ItemPosition {
     pub begin: SymbolPosition,
     pub end: SymbolPosition,

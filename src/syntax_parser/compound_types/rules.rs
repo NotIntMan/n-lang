@@ -4,6 +4,8 @@ use parser_basics::{
     comma_list,
     identifier,
     symbols,
+    item_position,
+    symbol_position,
 };
 
 use syntax_parser::primitive_types::primitive_data_type;
@@ -35,20 +37,24 @@ parser_rule!(pub attributes(i) -> Vec<Attribute<'source>> {
 /// attributes identifier ":" data_type
 parser_rule!(struct_field(i) -> (&'source str, Field<'source>) {
     do_parse!(i,
+        begin: symbol_position >>
         attributes: attributes >>
         name: identifier >>
         apply!(symbols, ":") >>
         field_type: data_type >>
-        ((name, Field { attributes, field_type }))
+        position: apply!(item_position, begin) >>
+        ((name, Field { attributes, field_type, position }))
     )
 });
 
 /// attributes data_type
 parser_rule!(tuple_field(i) -> Field<'source> {
     do_parse!(i,
+        begin: symbol_position >>
         attributes: attributes >>
         field_type: data_type >>
-        (Field { attributes, field_type })
+        position: apply!(item_position, begin) >>
+        (Field { attributes, field_type, position })
     )
 });
 

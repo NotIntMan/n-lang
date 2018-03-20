@@ -18,3 +18,4 @@ pub mod lexeme_scanner;
 #[macro_use]
 pub mod parser_basics;
 pub mod syntax_parser;
+pub mod project_analysis;

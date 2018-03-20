@@ -1,6 +1,14 @@
 use helpers::assertion::Assertion;
-
+use helpers::group::Group;
+use lexeme_scanner::ItemPosition;
 use syntax_parser::primitive_types::PrimitiveDataType;
+use project_analysis::{
+    DependencyReference,
+    SemanticResolve,
+    SemanticContext,
+    SemanticError,
+    SemanticItemType,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Attribute<'source> {
@@ -8,21 +16,11 @@ pub struct Attribute<'source> {
     pub arguments: Option<Vec<&'source str>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SemanticAttribute {
-    pub name: String,
-    pub arguments: Option<Vec<String>>,
-}
-
-derive_convert!(Attribute<'source> => SemanticAttribute {
-    name,
-    arguments is mappable iterable value,
-});
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field<'source> {
     pub attributes: Vec<Attribute<'source>>,
     pub field_type: DataType<'source>,
+    pub position: ItemPosition,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -36,6 +34,7 @@ pub enum DataType<'source> {
     Compound(CompoundDataType<'source>),
     Primitive(PrimitiveDataType),
     Reference(Vec<&'source str>),
+    DependencyReference(DependencyReference),
 }
 
 impl<'source> Assertion<str> for DataType<'source> {
@@ -56,9 +55,29 @@ impl<'a, 'source> Assertion<&'a str> for DataType<'source> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum SemanticDataType {
-//    Compound(CompoundDataType<'source>),
-    Primitive(PrimitiveDataType),
-    Reference(Vec<String>),
+impl<'source> SemanticResolve for DataType<'source> {
+    fn is_resolved(&self) -> bool {
+        unimplemented!()
+    }
+    fn resolve(&mut self, _context: &mut SemanticContext) -> Result<(), Group<SemanticError>> {
+        let mut errors = Group::None;
+        match self {
+            &mut DataType::Compound(CompoundDataType::Structure(ref fields)) => {
+                for (i, &(field_name, ref field)) in fields.iter().enumerate() {
+                    // Поля структуры должны быть уникальными
+                    for &(field_before_name, _) in fields[..i].iter() {
+                        if field_before_name == field_name {
+                            errors.append_group(Group::One(SemanticError::DuplicateDefinition {
+                                name: field_before_name,
+                                pos: field.position,
+                                item_type: SemanticItemType::Field,
+                            }));
+                        }
+                    }
+                }
+                unimplemented!()
+            },
+            _ => unimplemented!(),
+        }
+    }
 }

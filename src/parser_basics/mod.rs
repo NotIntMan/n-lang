@@ -34,6 +34,7 @@ pub use self::basic_rules::{
     end_of_input,
     identifier,
     identifier_raw,
+    item_position,
     keyword,
     not_keyword_identifier,
     number_literal,
@@ -43,6 +44,7 @@ pub use self::basic_rules::{
     string_literal,
     symbols,
     u32_literal,
+    symbol_position,
 };
 
 pub use self::input::ParserInput;
