@@ -1,10 +1,11 @@
+use parser_basics::Identifier;
 use syntax_parser::expressions::Expression;
 use syntax_parser::selections::Selection;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JoinCondition<'source> {
     Expression(Expression<'source>),
-    Using(Vec<Vec<&'source str>>),
+    Using(Vec<Vec<Identifier<'source>>>),
     Natural,
 }
 
@@ -19,8 +20,8 @@ pub enum JoinType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DataSource<'source> {
     Table {
-        name: Vec<&'source str>,
-        alias: Option<&'source str>,
+        name: Vec<Identifier<'source>>,
+        alias: Option<Identifier<'source>>,
     },
     Join {
         join_type: JoinType,
@@ -30,6 +31,6 @@ pub enum DataSource<'source> {
     },
     Selection {
         query: Box<Selection<'source>>,
-        alias: &'source str,
+        alias: Identifier<'source>,
     },
 }

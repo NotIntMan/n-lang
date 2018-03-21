@@ -61,9 +61,9 @@ pub trait ParserInput: Sized {
     fn err<T>(self, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> { self.err_at(0, kind) }
 }
 
-impl<'a, 'b> ParserInput for &'a [Token<'b>] {
-    type Error = ParserError;
-    type ErrorKind = ParserErrorKind;
+impl<'token, 'source> ParserInput for &'token [Token<'source>] {
+    type Error = ParserError<'source>;
+    type ErrorKind = ParserErrorKind<'source>;
     fn ok_at<T>(self, processed: usize, value: T) -> IResult<Self, T, Self::Error> {
         IResult::Done(&self[processed..], value)
     }

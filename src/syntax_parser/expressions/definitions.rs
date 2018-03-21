@@ -1,4 +1,5 @@
 use lexeme_scanner::Token;
+use parser_basics::Identifier;
 use helpers::assertion::Assertion;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,9 +105,9 @@ pub enum Expression<'source> {
     BinaryOperation(Box<Expression<'source>>, BinaryOperator, Box<Expression<'source>>),
     PrefixUnaryOperation(PrefixUnaryOperator, Box<Expression<'source>>),
     PostfixUnaryOperation(PostfixUnaryOperator, Box<Expression<'source>>),
-    PropertyAccess(Box<Expression<'source>>, Vec<&'source str>),
+    PropertyAccess(Box<Expression<'source>>, Vec<Identifier<'source>>),
     Set(Vec<Expression<'source>>),
-    FunctionCall(Vec<&'source str>, Vec<Expression<'source>>),
+    FunctionCall(Vec<Identifier<'source>>, Vec<Expression<'source>>),
 }
 
 impl<'source> Assertion for Expression<'source> {

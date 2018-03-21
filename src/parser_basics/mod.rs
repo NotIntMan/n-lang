@@ -33,6 +33,7 @@ pub use self::basic_rules::{
     braced_expression_literal,
     end_of_input,
     identifier,
+    Identifier,
     identifier_raw,
     item_position,
     keyword,
@@ -49,8 +50,8 @@ pub use self::basic_rules::{
 
 pub use self::input::ParserInput;
 
-pub type Parser<'a, 'b, O> = fn(&'a [Token<'b>]) -> ParserResult<'a, 'b, O>;
-pub type ParserResult<'a, 'b, O> = IResult<&'a [Token<'b>], O, ParserError>;
+pub type Parser<'token, 'source, O> = fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, O>;
+pub type ParserResult<'token, 'source, O> = IResult<&'token [Token<'source>], O, ParserError<'source>>;
 
 pub use self::token::{
     exact_token,
@@ -59,6 +60,7 @@ pub use self::token::{
 };
 
 pub use self::parser_error::{
+    new_error_without_pos,
     ParserError,
     ParserErrorItem,
     ParserErrorKind,
@@ -75,19 +77,19 @@ pub use self::templates::{
 };
 
 /// Запускает разбор переданного среза токенов и преобразует результат в стандартный `Result`
-pub fn parse<'token, 'source, O>(input: &'token [Token<'source>], parser: Parser<'token, 'source, O>) -> Result<O, ParserError> {
+pub fn parse<'token, 'source, O>(input: &'token [Token<'source>], parser: Parser<'token, 'source, O>) -> Result<O, ParserError<'source>> {
     match parser(input) {
         IResult::Done(_, result) => Ok(result),
         IResult::Incomplete(_) => {
             let kind = ParserErrorKind::unexpected_end();
-            Err(ParserError::new_without_pos(kind))
+            Err(new_error_without_pos(kind))
         },
         IResult::Error(e) => match e {
             ErrorKind::Custom(e) => Err(e),
             other => {
                 let msg = other.description();
                 let kind = ParserErrorKind::custom_error(msg);
-                Err(ParserError::new_without_pos(kind))
+                Err(new_error_without_pos(kind))
             },
         },
     }

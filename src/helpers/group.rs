@@ -52,6 +52,22 @@ impl<T> Group<T> {
         };
         target.push(item);
     }
+    /// "Добавляет" новый элемент в группу
+    pub fn append_item(&mut self, item: T)
+        where T: Appendable + Default {
+        let new_value = match self {
+            &mut Group::None => Group::One(item),
+            &mut Group::One(ref mut self_item) => match self_item.append(item) {
+                Some(item) => Group::Many(vec![extract(self_item), item]),
+                None => return,
+            },
+            &mut Group::Many(ref mut self_items) => {
+                Group::append_or_push(self_items, item);
+                return;
+            },
+        };
+        replace(self, new_value);
+    }
     /// Выполняет поглощение другой группы.
     /// После выполнения текущий объект будет содержать как свои элементы, так и элементы из переданного объекта.
     pub fn append_group(&mut self, other: Self)
@@ -81,17 +97,17 @@ impl<T> Group<T> {
                 };
                 Group::Many(new_vec)
             }
-            &mut Group::Many(ref mut self_vec) => {
+            &mut Group::Many(ref mut self_items) => {
                 match other {
                     Group::None => {
                         return;
                     }
                     Group::One(other_item) => {
-                        Group::append_or_push(self_vec, other_item);
+                        Group::append_or_push(self_items, other_item);
                     }
                     Group::Many(mut other_vec) => {
                         for other_item in other_vec {
-                            Group::append_or_push(self_vec, other_item);
+                            Group::append_or_push(self_items, other_item);
                         }
                     }
                 }

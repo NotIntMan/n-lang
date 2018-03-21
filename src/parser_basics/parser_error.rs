@@ -1,7 +1,6 @@
 //! Ошибка синтаксического разбора
 
 use std::fmt::{
-    Debug,
     Display,
     Result as FResult,
     Formatter,
@@ -31,17 +30,17 @@ use lexeme_scanner::{
     на 8 штук только из-за необходимости вариативности отображения объектов.
 */
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ParserErrorTokenInfo {
+pub struct ParserErrorTokenInfo<'source> {
     /// Поле `kind` отображает тип токена
     pub kind: Option<TokenKindLess>,
     /// Поле `desc` отображает описание токена
-    pub desc: Option<String>,
+    pub desc: Option<&'source str>,
 }
 
-impl ParserErrorTokenInfo {
+impl<'source> ParserErrorTokenInfo<'source> {
     /// Создаёт новый объект информации, честно заполняя поля в соответствии переданным аргументам
     #[inline]
-    pub fn new(kind: Option<TokenKindLess>, desc: Option<String>) -> Self {
+    pub fn new(kind: Option<TokenKindLess>, desc: Option<&'source str>) -> Self {
         Self { kind, desc }
     }
     #[inline]
@@ -51,8 +50,13 @@ impl ParserErrorTokenInfo {
     }
     #[inline]
     /// Создаёт новый объект информации, заполняя значением только поле `desc`
-    pub fn from_desc(desc: String) -> Self {
+    pub fn from_desc(desc: &'source str) -> Self {
         ParserErrorTokenInfo::new(None, Some(desc))
+    }
+    #[inline]
+    /// Создаёт новый объект информации, заполняя значением поля `kind` и `desc`
+    pub fn from_kind_and_desc(kind: TokenKindLess, desc: &'source str) -> Self {
+        ParserErrorTokenInfo::new(Some(kind), Some(desc))
     }
     /// Выполняет "групппировку ожиданий" - второй вариант группировки, ожидаемый от этой структуры.
     /// Не вынесен в отдельную структуру из-за ненадобности, т.к. используется только в `ParserErrorKind`.
@@ -78,7 +82,7 @@ impl ParserErrorTokenInfo {
     }
 }
 
-impl Display for ParserErrorTokenInfo {
+impl<'source> Display for ParserErrorTokenInfo<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
             &ParserErrorTokenInfo { kind: Some(ref kind), desc: None } => write!(f, "{}", kind),
@@ -89,7 +93,11 @@ impl Display for ParserErrorTokenInfo {
     }
 }
 
-impl Appendable for ParserErrorTokenInfo {}
+impl<'source> Appendable for ParserErrorTokenInfo<'source> {
+    fn append(&mut self, other: Self) -> Option<Self> {
+        if *self == other { None } else { Some(other) }
+    }
+}
 
 /**
     Тип синтаксической ошибки.
@@ -97,25 +105,20 @@ impl Appendable for ParserErrorTokenInfo {}
     Тип ошибки сообщает о том, что именно произошло в процессе разбора.
 */
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParserErrorKind {
+pub enum ParserErrorKind<'source> {
     /// Неожиданный конец. Сообщает о том, что лексемы закончились, но правила этого не допускают.
-    UnexpectedEnd(Group<String>),
+    UnexpectedEnd(Group<ParserErrorTokenInfo<'source>>),
     /// Неожиданный ввод. Сообщает о том, что ожидалась лексема одного вида, а была получена - другого.
-    ExpectedGot(Group<ParserErrorTokenInfo>, ParserErrorTokenInfo),
+    ExpectedGot(Group<ParserErrorTokenInfo<'source>>, ParserErrorTokenInfo<'source>),
     /// Прочая ошибка. Сообщает о том, что произошло что-то где-то за пределами парсера.
     CustomError(Group<String>),
 }
 
-impl ParserErrorKind {
-    /// Конструирует новый `ParserErrorKind::UnexpectedEnd` с сообщением о том, что ожидался символ
-    #[inline]
-    pub fn unexpected_end_expected_debug<D: Debug>(c: D) -> Self {
-        ParserErrorKind::UnexpectedEnd(Group::One(format!("{:?}", c)))
-    }
+impl<'source> ParserErrorKind<'source> {
     /// Конструирует новый `ParserErrorKind::UnexpectedEnd` с данным сообщением об ожидании
     #[inline]
-    pub fn unexpected_end_expected<S: ToString>(msg: S) -> Self {
-        ParserErrorKind::UnexpectedEnd(Group::One(msg.to_string()))
+    pub fn unexpected_end_expected(idem: ParserErrorTokenInfo<'source>) -> Self {
+        ParserErrorKind::UnexpectedEnd(Group::One(idem))
     }
     /// Конструирует новый `ParserErrorKind::UnexpectedEnd` без сообщения
     #[inline]
@@ -124,31 +127,8 @@ impl ParserErrorKind {
     }
     /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе ожидаемого и полученного токенов
     #[inline]
-    pub fn expected_got_kind(expected: TokenKindLess, got: TokenKindLess) -> Self {
-        let a = Group::One(ParserErrorTokenInfo::from_kind(expected));
-        let b = ParserErrorTokenInfo::from_kind(got);
-        ParserErrorKind::ExpectedGot(a, b)
-    }
-    /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе и тексте ожидаемого и полученного токенов
-    #[inline]
-    pub fn expected_got_kind_text<A: ToString, B: ToString>(expected_kind: TokenKindLess, expected_text: A, got_kind: TokenKindLess, got_text: B) -> Self {
-        let a = Group::One(ParserErrorTokenInfo::new(Some(expected_kind), Some(expected_text.to_string())));
-        let b = ParserErrorTokenInfo::new(Some(got_kind), Some(got_text.to_string()));
-        ParserErrorKind::ExpectedGot(a, b)
-    }
-    /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий инофрмацию о типе ожидаемого и о типе и тексте полученного токенов
-    #[inline]
-    pub fn expected_got_kind_kind_text<A: ToString>(expected_kind: TokenKindLess, got_kind: TokenKindLess, got_text: A) -> Self {
-        let a = Group::One(ParserErrorTokenInfo::new(Some(expected_kind), None));
-        let b = ParserErrorTokenInfo::new(Some(got_kind), Some(got_text.to_string()));
-        ParserErrorKind::ExpectedGot(a, b)
-    }
-    /// Конструирует новый `ParserErrorKind::ExpectedGot`, содержащий описание ожидаемого токена и инофрмацию о типе и тексте полученного токена
-    #[inline]
-    pub fn expected_got_description<A: ToString, B: ToString>(expected: A, got_kind: TokenKindLess, got_text: B) -> Self {
-        let a = Group::One(ParserErrorTokenInfo::from_desc(expected.to_string()));
-        let b = ParserErrorTokenInfo::new(Some(got_kind), Some(got_text.to_string()));
-        ParserErrorKind::ExpectedGot(a, b)
+    pub fn expected_got(expected: ParserErrorTokenInfo<'source>, got: ParserErrorTokenInfo<'source>) -> Self {
+        ParserErrorKind::ExpectedGot(Group::One(expected), got)
     }
     /// Конструирует новый `ParserErrorKind::NomError`, содержащий сообщение об ошибке комбинатора парсеров
     #[inline]
@@ -157,7 +137,7 @@ impl ParserErrorKind {
     }
 }
 
-impl Appendable for ParserErrorKind {
+impl<'source> Appendable for ParserErrorKind<'source> {
     fn append(&mut self, other: Self) -> Option<Self> {
         if *self == other {
             return None;
@@ -206,7 +186,7 @@ impl Appendable for ParserErrorKind {
 }
 
 /// Типаж Display у `ParserErrorKind` служит для отображения типа ошибки в человекочитаемом виде
-impl Display for ParserErrorKind {
+impl<'source> Display for ParserErrorKind<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
             &ParserErrorKind::UnexpectedEnd(ref s) => {
@@ -229,7 +209,7 @@ impl Display for ParserErrorKind {
     }
 }
 
-impl Default for ParserErrorKind {
+impl<'source> Default for ParserErrorKind<'source> {
     /// Нейтральным значением `ParserErrorKind` является `ParserErrorKind::CustomError(Group::None)`
     fn default() -> Self {
         ParserErrorKind::CustomError(Group::None)
@@ -238,12 +218,12 @@ impl Default for ParserErrorKind {
 
 /// Одиночная ошибка разбора. Применяется как элемент `ParserError`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ParserErrorItem {
-    pub kind: ParserErrorKind,
+pub struct ParserErrorItem<'source> {
+    pub kind: ParserErrorKind<'source>,
     pub pos: Option<SymbolPosition>,
 }
 
-impl ParserErrorItem {
+impl<'source> ParserErrorItem<'source> {
     /// Конструирует новую единицу ошибки из типа и позиции
     #[inline]
     fn new(kind: ParserErrorKind, pos: SymbolPosition) -> Self {
@@ -262,7 +242,7 @@ impl ParserErrorItem {
     }
 }
 
-impl Appendable for ParserErrorItem {
+impl<'source> Appendable for ParserErrorItem<'source> {
     fn append(&mut self, other: Self) -> Option<Self> {
         if *self == other {
             return None;
@@ -289,7 +269,7 @@ impl Appendable for ParserErrorItem {
 }
 
 /// Типаж Display у `ParserErrorItem` служит для отображения ошибки в человекочитаемом виде
-impl Display for ParserErrorItem {
+impl<'source> Display for ParserErrorItem<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         write!(f, "{}", self.kind)?;
         if let &Some(ref pos) = &self.pos {
@@ -299,40 +279,37 @@ impl Display for ParserErrorItem {
     }
 }
 
-impl PartialOrd for ParserErrorItem {
+impl<'source> PartialOrd for ParserErrorItem<'source> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.pos.partial_cmp(&other.pos)
     }
 }
 
-impl Ord for ParserErrorItem {
+impl<'source> Ord for ParserErrorItem<'source> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).expect("Trying to sort error from different modules")
     }
 }
 
 /// Ошибка разбора. Может содержать несколько `ParserErrorItem`.
-pub type ParserError = Group<ParserErrorItem>;
+pub type ParserError<'source> = Group<ParserErrorItem<'source>>;
 
-impl Group<ParserErrorItem> {
-    /// Конструирует единичную ошибку из типа и позиции
-    #[inline]
-    pub fn new(kind: ParserErrorKind, pos: SymbolPosition) -> ParserError {
-        Group::One(
-            ParserErrorItem::new(kind, pos)
-        )
-    }
-    /// Конструирует единичную ошибку из типа, но без позиции
-    #[inline]
-    pub fn new_without_pos(kind: ParserErrorKind) -> ParserError {
-        Group::One(
-            ParserErrorItem::new_without_pos(kind)
-        )
-    }
+/// Конструирует единичную ошибку из типа и позиции
+pub fn new_error<'source>(kind: ParserErrorKind<'source>, pos: SymbolPosition) -> ParserError<'source> {
+    Group::One(
+        ParserErrorItem::new(kind, pos)
+    )
+}
+
+/// Конструирует единичную ошибку из типа, но без позиции
+pub fn new_error_without_pos<'source>(kind: ParserErrorKind<'source>) -> ParserError<'source> {
+    Group::One(
+        ParserErrorItem::new_without_pos(kind)
+    )
 }
 
 /// Типаж Display у `ParserError` служит для отображения группы ошибок в человекочитаемом виде
-impl Display for Group<ParserErrorItem> {
+impl<'source> Display for ParserError<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
             &Group::None => write!(f, "There are no errors detected."),
@@ -345,7 +322,7 @@ impl Display for Group<ParserErrorItem> {
                     writeln!(f, "  {}. {}", i + 1, error)?;
                 }
                 writeln!(f, "Solution of one of them may solve the problem.")
-            },
+            }
         }
     }
 }

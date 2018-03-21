@@ -1,3 +1,4 @@
+use parser_basics::Identifier;
 use syntax_parser::expressions::Expression;
 use syntax_parser::data_sources::DataSource;
 
@@ -12,7 +13,7 @@ pub enum SelectionResultSize {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionExpression<'source> {
     pub expr: Expression<'source>,
-    pub alias: Option<&'source str>,
+    pub alias: Option<Identifier<'source>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 use parser_basics::{
     comma_list,
     identifier,
+    Identifier,
     keyword,
     symbols,
 };
@@ -22,7 +23,7 @@ parser_rule!(type_of(i) -> DataType<'source> {
     )
 });
 
-parser_rule!(argument(i) -> (&'source str, DataType<'source>) {
+parser_rule!(argument(i) -> (Identifier<'source>, DataType<'source>) {
     do_parse!(i,
         name: identifier >>
         data_type: type_of >>
@@ -30,7 +31,7 @@ parser_rule!(argument(i) -> (&'source str, DataType<'source>) {
     )
 });
 
-parser_rule!(arguments(i) -> IndexMap<&'source str, DataType<'source>> {
+parser_rule!(arguments(i) -> IndexMap<Identifier<'source>, DataType<'source>> {
     do_parse!(i,
         apply!(symbols, "(") >>
         argument_list: apply!(comma_list, argument) >>

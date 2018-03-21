@@ -1,3 +1,4 @@
+use parser_basics::Identifier;
 use syntax_parser::compound_types::DataType;
 use syntax_parser::expressions::Expression;
 use syntax_parser::selections::Selection;
@@ -30,12 +31,12 @@ pub enum StatementSource<'source> {
 pub enum Statement<'source> {
     Nothing,
     VariableDefinition {
-        name: &'source str,
+        name: Identifier<'source>,
         data_type: Option<DataType<'source>>,
         default_value: Option<StatementSource<'source>>,
     },
     VariableAssignment {
-        name: &'source str,
+        name: Identifier<'source>,
         source: StatementSource<'source>,
     },
     Condition {
@@ -49,7 +50,7 @@ pub enum Statement<'source> {
     },
     CycleControl {
         operator: CycleControlOperator,
-        name: Option<&'source str>,
+        name: Option<Identifier<'source>>,
     },
     Return {
         value: Option<StatementSource<'source>>,

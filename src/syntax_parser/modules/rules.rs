@@ -51,12 +51,6 @@ parser_rule!(module_definitions(i) -> ModuleDefinitionValue<'source> {
     )
 });
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ExternalItemTail<'source> {
-    None,
-    Asterisk,
-    Alias(&'source str),
-}
 
 parser_rule!(external_item_definition(i) -> ModuleDefinitionValue<'source> {
     do_parse!(i,
@@ -76,15 +70,7 @@ parser_rule!(external_item_definition(i) -> ModuleDefinitionValue<'source> {
             | none => { |_| ExternalItemTail::None }
         ) >>
         apply!(symbols, ";") >>
-        (match tail {
-            ExternalItemTail::None => ModuleDefinitionValue::Import(ExternalItemImport { path, alias: None }),
-            ExternalItemTail::Asterisk => {
-                let mut path = path;
-                path.push("*");
-                ModuleDefinitionValue::Import(ExternalItemImport { path, alias: None })
-            },
-            ExternalItemTail::Alias(alias) => ModuleDefinitionValue::Import(ExternalItemImport { path, alias: Some(alias) }),
-        })
+        (ModuleDefinitionValue::Import(ExternalItemImport { path, tail }))
     )
 });
 

@@ -10,7 +10,9 @@ extern crate nom;
 extern crate log;
 extern crate env_logger;
 
+use std::borrow::Cow;
 use n_lang::helpers::assertion::Assertion;
+use n_lang::lexeme_scanner::ItemPosition;
 use n_lang::parser_basics::end_of_input;
 use n_lang::syntax_parser::primitive_types::*;
 use n_lang::syntax_parser::compound_types::*;
@@ -119,26 +121,30 @@ fn struct_and_tuple_bodies_parses_correctly() {
             Field {
                 attributes: vec![],
                 field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean)),
+                position: ItemPosition::new("(", "boolean"),
             },
             Field {
                 attributes: vec![],
                 field_type: DataType::Compound(CompoundDataType::Structure(vec![
-                    ("a", Field {
+                    (Cow::Borrowed("a"), Field {
                         attributes: vec![],
                         field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
                             integer_type: IntegerType::Normal,
                             unsigned: false,
                             zerofill: false,
                         })),
+                        position: ItemPosition::new("(boolean, {", "a: integer"),
                     }),
-                    ("b", Field {
+                    (Cow::Borrowed("b"), Field {
                         attributes: vec![],
                         field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Float {
                             size: None,
                             double: true,
                         })),
+                        position: ItemPosition::new("(boolean, {a: integer, ", "b: double"),
                     }),
                 ])),
+                position: ItemPosition::new("(boolean, ", "{a: integer, b: double}"),
             },
         ],
     )));
@@ -263,17 +269,17 @@ fn module_of_two_usage_parses_correctly() {
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].public, false);
     assert_eq!(result[0].attributes.len(), 0);
-    match_it!(&result[0].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
-        assert_eq!(*path, ["foo", "bar"]);
-        assert_eq!(alias, Some("Bar"));
+    match_it!(&result[0].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
+        assert_eq!(*path, [Cow::Borrowed("foo"), Cow::Borrowed("bar")]);
+        assert_eq!(*tail, ExternalItemTail::Alias(Cow::Borrowed("Bar")));
     });
     assert_eq!(result[1].public, true);
     assert_eq!(result[1].attributes.len(), 1);
     assert_eq!(result[1].attributes[0].name, "no_mandle");
     assert_eq!(result[1].attributes[0].arguments, None);
-    match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
+    match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
         assert_eq!(*path, ["foo", "TakeAll"]);
-        assert_eq!(alias, None);
+        assert_eq!(*tail, ExternalItemTail::None);
     });
 }
 
@@ -282,7 +288,7 @@ fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<Mo
     assert_eq!(module[0].public, true);
     assert_eq!(module[0].attributes.len(), 1);
     assert_eq!(module[0].attributes[0].name, "derive");
-    assert_eq!(module[0].attributes[0].arguments, Some(vec!["Hash"]));
+    assert_eq!(module[0].attributes[0].arguments, Some(vec![Cow::Borrowed("Hash")]));
     match_it!(&module[0].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { name, ref body }) => {
         assert_eq!(name, "Complex");
         body.assert("{ real: double, imag: float }");
@@ -292,7 +298,7 @@ fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<Mo
     match_it!(&module[1].value, &ModuleDefinitionValue::Table(TableDefinition { name, ref body }) => {
         assert_eq!(name, "Signals");
         let mut body_iter = body.iter();
-        match_it!(body_iter.next(), Some(&("id", ref field)) => {
+        match_it!(body_iter.next(), Some(&(Cow::Borrowed("id"), ref field)) => {
             assert_eq!(field.attributes.len(), 2);
             assert_eq!(field.attributes[0].name, "primary_key");
             assert_eq!(field.attributes[0].arguments, None);
@@ -300,7 +306,7 @@ fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<Mo
             assert_eq!(field.attributes[1].arguments, None);
             field.field_type.assert("unsigned integer");
         });
-        match_it!(body_iter.next(), Some(&("value", ref field)) => {
+        match_it!(body_iter.next(), Some(&(Cow::Borrowed("value"), ref field)) => {
             assert_eq!(field.attributes.len(), 2);
             assert_eq!(field.attributes[0].name, "check");
             assert_eq!(field.attributes[0].arguments, Some(vec!["A", "B"]));

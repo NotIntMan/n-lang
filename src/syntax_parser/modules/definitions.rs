@@ -1,3 +1,4 @@
+use parser_basics::Identifier;
 use syntax_parser::compound_types::{
     Attribute,
     DataType,
@@ -7,20 +8,27 @@ use syntax_parser::functions::FunctionDefinition;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinition<'source> {
-    pub name: &'source str,
+    pub name: Identifier<'source>,
     pub body: DataType<'source>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableDefinition<'source> {
-    pub name: &'source str,
-    pub body: Vec<(&'source str, Field<'source>)>,
+    pub name: Identifier<'source>,
+    pub body: Vec<(Identifier<'source>, Field<'source>)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExternalItemTail<'source> {
+    None,
+    Asterisk,
+    Alias(Identifier<'source>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalItemImport<'source> {
-    pub path: Vec<&'source str>,
-    pub alias: Option<&'source str>,
+    pub path: Vec<Identifier<'source>>,
+    pub tail: ExternalItemTail<'source>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +49,6 @@ pub struct ModuleDefinitionItem<'source> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleDefinition<'source> {
-    pub name: &'source str,
+    pub name: Identifier<'source>,
     pub items: Vec<ModuleDefinitionItem<'source>>,
 }

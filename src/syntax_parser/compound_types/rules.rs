@@ -3,6 +3,7 @@ use parser_basics::ParserResult;
 use parser_basics::{
     comma_list,
     identifier,
+    Identifier,
     symbols,
     item_position,
     symbol_position,
@@ -35,7 +36,7 @@ parser_rule!(pub attributes(i) -> Vec<Attribute<'source>> {
 });
 
 /// attributes identifier ":" data_type
-parser_rule!(struct_field(i) -> (&'source str, Field<'source>) {
+parser_rule!(struct_field(i) -> (Identifier<'source>, Field<'source>) {
     do_parse!(i,
         begin: symbol_position >>
         attributes: attributes >>
@@ -59,7 +60,7 @@ parser_rule!(tuple_field(i) -> Field<'source> {
 });
 
 /// attributes "{" ...struct_field "}"
-parser_rule!(pub struct_body(i) -> Vec<(&'source str, Field<'source>)> {
+parser_rule!(pub struct_body(i) -> Vec<(Identifier<'source>, Field<'source>)> {
     do_parse!(i,
         apply!(symbols, "{") >>
         fields: apply!(comma_list, struct_field) >>
