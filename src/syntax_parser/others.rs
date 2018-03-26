@@ -3,10 +3,12 @@ use parser_basics::{
     identifier,
     Identifier,
     ParserResult,
+    StaticIdentifier,
     symbols,
 };
 
 pub type Path<'source> = Vec<Identifier<'source>>;
+pub type StaticPath = Vec<StaticIdentifier>;
 
 /// Реализует разбор "пути" элементов, разделённых делителем. Отличается от списка тем, что не позволяет "замыкающий делитель".
 pub fn path<'token, 'source>(input: &'token [Token<'source>], delimiter: &'source str) -> ParserResult<'token, 'source, Path<'source>> {

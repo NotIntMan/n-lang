@@ -3,7 +3,7 @@
 use std::ops::Range;
 use std::borrow::Cow;
 use nom::IResult;
-
+use helpers::into_static::IntoStatic;
 use lexeme_scanner::{
     ItemPosition,
     Token,
@@ -32,6 +32,7 @@ pub fn none<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'t
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier<'source>(pub Cow<'source, str>);
+
 pub type StaticIdentifier = Identifier<'static>;
 
 impl<'source> Identifier<'source> {
@@ -42,6 +43,16 @@ impl<'source> Identifier<'source> {
         match &self.0 {
             &Cow::Borrowed(borrow) => Some(borrow),
             &Cow::Owned(_) => None,
+        }
+    }
+}
+
+impl<'source> IntoStatic for Identifier<'source> {
+    type Result = StaticIdentifier;
+    fn into_static(self) -> Self::Result {
+        match self {
+            Identifier(Cow::Borrowed(borrow)) => Identifier(Cow::Owned(borrow.to_string())),
+            Identifier(Cow::Owned(own)) => Identifier(Cow::Owned(own)),
         }
     }
 }

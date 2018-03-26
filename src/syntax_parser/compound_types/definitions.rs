@@ -1,5 +1,6 @@
 use std::mem::replace;
 use helpers::assertion::Assertion;
+use helpers::into_static::IntoStatic;
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use syntax_parser::primitive_types::PrimitiveDataType;
@@ -17,6 +18,17 @@ pub struct Attribute<'source> {
     pub arguments: Option<Vec<Identifier<'source>>>,
 }
 
+impl<'source> IntoStatic for Attribute<'source> {
+    type Result = Attribute<'static>;
+    fn into_static(self) -> Self::Result {
+        let Attribute { name, arguments } = self;
+        Attribute {
+            name: name.into_static(),
+            arguments: arguments.into_static(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field<'source> {
     pub attributes: Vec<Attribute<'source>>,
@@ -28,6 +40,22 @@ impl<'source> Assertion for Field<'source> {
     fn assert(&self, other: &Field) {
         assert_eq!(self.attributes, other.attributes);
         self.field_type.assert(&other.field_type);
+    }
+}
+
+impl<'source> IntoStatic for Field<'source> {
+    type Result = Field<'static>;
+    fn into_static(self) -> Self::Result {
+        let Field {
+            attributes,
+            field_type,
+            position,
+        } = self;
+        Field {
+            attributes: attributes.into_static(),
+            field_type: field_type.into_static(),
+            position,
+        }
     }
 }
 
@@ -63,6 +91,16 @@ impl<'source> Assertion for CompoundDataType<'source> {
                 }
                 assert_eq!(other_fields_iter.next(), None);
             }
+        }
+    }
+}
+
+impl<'source> IntoStatic for CompoundDataType<'source> {
+    type Result = CompoundDataType<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            CompoundDataType::Structure(fields) => CompoundDataType::Structure(fields.into_static()),
+            CompoundDataType::Tuple(fields) => CompoundDataType::Tuple(fields.into_static()),
         }
     }
 }
@@ -158,6 +196,18 @@ impl SemanticResolve for DataType<'static> {
         }
         if let Some(new_value) = new_value {
             replace(self, new_value);
+        }
+    }
+}
+
+impl<'source> IntoStatic for DataType<'source> {
+    type Result = DataType<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            DataType::Compound(data_type) => DataType::Compound(data_type.into_static()),
+            DataType::Primitive(data_type) => DataType::Primitive(data_type),
+            DataType::Reference(path) => DataType::Reference(path.into_static()),
+            DataType::DependencyReference(refer) => DataType::DependencyReference(refer),
         }
     }
 }
