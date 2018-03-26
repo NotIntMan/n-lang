@@ -251,7 +251,7 @@ fn simple_join_parses_correctly() {
 fn assert_table(source: &DataSource, table_name: &str, table_alias: Option<&str>) {
     match_it!(source, &DataSource::Table { ref name, ref alias } => {
             assert_eq!(*name, vec![table_name]);
-            assert_eq!(*alias, table_alias.map(|text| Identifier::new(text)));
+            assert_eq!(*alias, table_alias.map(Identifier::new));
         });
 }
 
@@ -328,7 +328,7 @@ fn assert_selection_result(items: &SelectionResult, pattern: Vec<(&str, Option<&
                 let &(expression_text, alias) = pattern_iter.next()
                     .expect("Pattern should have same length as the items vector");
                 item.expr.assert(expression_text);
-                assert_eq!(item.alias, alias.map(|text| Identifier::new(text)));
+                assert_eq!(item.alias, alias.map(Identifier::new));
             }
         });
 }
