@@ -1,4 +1,4 @@
-image: "rust:nightly"
+image: rustdocker/rust:nightly
 
 test:cargo:
   script:
