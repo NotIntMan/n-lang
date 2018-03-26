@@ -30,8 +30,9 @@ pub fn none<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'t
     input.ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier<'source>(pub Cow<'source, str>);
+pub type StaticIdentifier = Identifier<'static>;
 
 impl<'source> Identifier<'source> {
     pub fn new(text: &'source str) -> Self {

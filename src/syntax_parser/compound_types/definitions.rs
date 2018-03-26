@@ -1,15 +1,15 @@
-//use std::mem::replace;
+use std::mem::replace;
 use helpers::assertion::Assertion;
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use syntax_parser::primitive_types::PrimitiveDataType;
-use project_analysis::{
+use project_analysis::context::{
     DependencyReference,
-//    SemanticResolve,
-//    SemanticContext,
-//    SemanticError,
-//    SemanticItemType,
+    SemanticContext,
+    SemanticItemType,
 };
+use project_analysis::error::SemanticError;
+use project_analysis::resolve::SemanticResolve;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Attribute<'source> {
@@ -106,56 +106,58 @@ impl<'a, 'source> Assertion<&'a str> for DataType<'source> {
     }
 }
 
-//impl<'source> SemanticResolve for DataType<'source> {
-//    fn is_resolved(&self) -> bool {
-//        match self {
-//            &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
-//                fields.iter()
-//                    .all(|item| item.1.field_type.is_resolved())
-//            }
-//            &DataType::Compound(CompoundDataType::Tuple(ref fields)) => {
-//                fields.iter()
-//                    .all(|item| item.field_type.is_resolved())
-//            }
-//            &DataType::Primitive(_) => true,
-//            &DataType::Reference(_) => false,
-//            &DataType::DependencyReference(_) => true,
-//        }
-//    }
-//    fn try_resolve(&mut self, context: &mut SemanticContext) {
-//        let mut new_value = None;
-//        match self {
-//            &mut DataType::Compound(CompoundDataType::Structure(ref mut fields)) => {
-//                for (i, &mut (field_name, ref mut field)) in fields.iter_mut().enumerate() {
-//                    // Имена полей структуры должны быть уникальными
-//                    for &(field_before_name, _) in fields[..i].iter() {
-//                        if field_before_name == field_name {
-//                            context.error(SemanticError::DuplicateDefinition {
-//                                name: field_before_name,
-//                                pos: field.position,
-//                                item_type: SemanticItemType::Field,
-//                            });
-//                        }
-//                    }
-//                    field.field_type.try_resolve(context);
-//                }
-//            }
-//            &mut DataType::Compound(CompoundDataType::Tuple(ref mut fields)) => {
-//                for field in fields.iter_mut() {
-//                    field.field_type.try_resolve(context);
-//                }
-//            }
-//            &mut DataType::Primitive(_) => {}
-//            &mut DataType::Reference(ref path) => {
-//                match context.resolve(SemanticItemType::DataType, path.as_slice()) {
-//                    Ok(dep_ref) => new_value = Some(DataType::DependencyReference(dep_ref)),
-//                    Err(error) => context.error(error),
-//                }
-//            },
-//            &mut DataType::DependencyReference(_) => {},
-//        }
-//        if let Some(new_value) = new_value {
-//            replace(self, new_value);
-//        }
-//    }
-//}
+impl SemanticResolve for DataType<'static> {
+    fn is_resolved(&self, context: &SemanticContext) -> bool {
+        match self {
+            &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
+                fields.iter()
+                    .all(|item| item.1.field_type.is_resolved(context))
+            }
+            &DataType::Compound(CompoundDataType::Tuple(ref fields)) => {
+                fields.iter()
+                    .all(|item| item.field_type.is_resolved(context))
+            }
+            &DataType::Primitive(_) => true,
+            &DataType::Reference(_) => false,
+            &DataType::DependencyReference(refer) => context.is_reference_resolved(refer),
+        }
+    }
+    fn try_resolve(&mut self, context: &mut SemanticContext) {
+        let mut new_value = None;
+        match self {
+            &mut DataType::Compound(CompoundDataType::Structure(ref mut fields)) => {
+                // Имена полей структуры должны быть уникальными
+                for (i, &(ref field_name, ref field)) in fields.iter().enumerate() {
+                    for &(ref field_before_name, _) in fields[..i].iter() {
+                        if field_before_name == field_name {
+                            context.error(SemanticError::DuplicateDefinition {
+                                name: (*field_before_name).clone(),
+                                pos: field.position,
+                                item_type: SemanticItemType::Field,
+                            });
+                        }
+                    }
+                }
+                for &mut (_, ref mut field) in fields.iter_mut() {
+                    field.field_type.try_resolve(context);
+                }
+            }
+            &mut DataType::Compound(CompoundDataType::Tuple(ref mut fields)) => {
+                for field in fields.iter_mut() {
+                    field.field_type.try_resolve(context);
+                }
+            }
+            &mut DataType::Primitive(_) => {}
+            &mut DataType::Reference(ref path) => {
+                match context.resolve(SemanticItemType::DataType, path.as_slice()) {
+                    Ok(dep_ref) => new_value = Some(DataType::DependencyReference(dep_ref)),
+                    Err(error) => context.error(error),
+                }
+            }
+            &mut DataType::DependencyReference(_) => {}
+        }
+        if let Some(new_value) = new_value {
+            replace(self, new_value);
+        }
+    }
+}
