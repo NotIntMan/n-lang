@@ -1,5 +1,6 @@
 use parser_basics::StaticIdentifier;
 use super::error::SemanticError;
+use super::project::ProjectRef;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SemanticItemType {
@@ -10,12 +11,14 @@ pub enum SemanticItemType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DependencyReference {
     pub item_type: SemanticItemType,
-    pub dependency_id: usize,
     pub type_id: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SemanticContext;
+#[derive(Debug, Clone)]
+pub struct SemanticContext {
+    module_path: Vec<StaticIdentifier>,
+    project: ProjectRef,
+}
 
 impl SemanticContext {
     pub fn resolve(&mut self, _item_type: SemanticItemType, path: &[StaticIdentifier]) -> Result<DependencyReference, SemanticError> {
