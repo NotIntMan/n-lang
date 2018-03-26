@@ -5,6 +5,7 @@ extern crate indexmap;
 extern crate pretty_assertions;
 
 use n_lang::helpers::assertion::Assertion;
+use n_lang::parser_basics::*;
 use n_lang::syntax_parser::expressions::*;
 use n_lang::syntax_parser::data_sources::*;
 use n_lang::syntax_parser::selections::*;
@@ -239,18 +240,18 @@ fn simple_join_parses_correctly() {
     });
     match_it!(left, DataSource::Table { name, alias } => {
         assert_eq!(name, vec!["foo"]);
-        assert_eq!(alias, Some("f"));
+        assert_eq!(alias, Some(Identifier::new("f")));
     });
     match_it!(right, DataSource::Table { name, alias } => {
         assert_eq!(name, vec!["bar"]);
-        assert_eq!(alias, Some("b"));
+        assert_eq!(alias, Some(Identifier::new("b")));
     });
 }
 
 fn assert_table(source: &DataSource, table_name: &str, table_alias: Option<&str>) {
-    match_it!(source, &DataSource::Table { ref name, alias } => {
+    match_it!(source, &DataSource::Table { ref name, ref alias } => {
             assert_eq!(*name, vec![table_name]);
-            assert_eq!(alias, table_alias);
+            assert_eq!(*alias, table_alias.map(|text| Identifier::new(text)));
         });
 }
 
@@ -327,7 +328,7 @@ fn assert_selection_result(items: &SelectionResult, pattern: Vec<(&str, Option<&
                 let &(expression_text, alias) = pattern_iter.next()
                     .expect("Pattern should have same length as the items vector");
                 item.expr.assert(expression_text);
-                assert_eq!(item.alias, alias);
+                assert_eq!(item.alias, alias.map(|text| Identifier::new(text)));
             }
         });
 }
@@ -468,8 +469,8 @@ fn simple_inserting_values_query_parses_correctly() {
     assert_table(&insert.target, "foo", None);
     match_it!(&insert.source, &InsertingSource::ValueLists { ref properties, ref lists } => {
         assert_eq!(*properties, Some(vec![
-            vec!["start", "x"],
-            vec!["end", "z"],
+            vec![Identifier::new("start"), Identifier::new("x")],
+            vec![Identifier::new("end"), Identifier::new("z")],
         ]));
         let mut list_iterator = lists.iter();
         let list = list_iterator.next()
@@ -515,8 +516,8 @@ fn simple_inserting_from_selection_query_parses_correctly() {
     assert_table(&insert.target, "foo", None);
     match_it!(&insert.source, &InsertingSource::Selection { ref properties, ref query } => {
         assert_eq!(*properties, Some(vec![
-            vec!["start", "x"],
-            vec!["end", "z"],
+            vec![Identifier::new("start"), Identifier::new("x")],
+            vec![Identifier::new("end"), Identifier::new("z")],
         ]));
         assert_eq!(query.distinct, false);
         assert_eq!(query.high_priority, false);
@@ -549,8 +550,8 @@ fn simple_deleting_query_parses_correctly() {
 #[test]
 fn simple_definition_parses_correctly() {
     let result = parse!("let my_first_variable: boolean := false", statement);
-    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-        assert_eq!(name, "my_first_variable");
+    match_it!(result, Statement::VariableDefinition { ref name, ref data_type, ref default_value } => {
+        assert_eq!(*name, "my_first_variable");
         data_type.assert(&Some("boolean"));
         match_it!(default_value, &Some(StatementSource::Expression(ref expr)) => {
             expr.assert("false");
@@ -561,16 +562,16 @@ fn simple_definition_parses_correctly() {
 #[test]
 fn simple_not_perfect_definition_parses_correctly() {
     let result = parse!("let my_first_variable := false", statement);
-    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-        assert_eq!(name, "my_first_variable");
+    match_it!(result, Statement::VariableDefinition { ref name, ref data_type, ref default_value } => {
+        assert_eq!(*name, "my_first_variable");
         assert_eq!(*data_type, None);
         match_it!(default_value, &Some(StatementSource::Expression(ref expr)) => {
             expr.assert("false");
         });
     });
     let result = parse!("let my_first_variable: boolean", statement);
-    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-        assert_eq!(name, "my_first_variable");
+    match_it!(result, Statement::VariableDefinition { ref name, ref data_type, ref default_value } => {
+        assert_eq!(*name, "my_first_variable");
         data_type.assert(&Some("boolean"));
         assert_eq!(*default_value, None);
     });
@@ -579,8 +580,8 @@ fn simple_not_perfect_definition_parses_correctly() {
 #[test]
 fn simple_assignment_parses_correctly() {
     let result = parse!("super_variable := 2 + 2", statement);
-    match_it!(result, Statement::VariableAssignment { name, ref source } => {
-        assert_eq!(name, "super_variable");
+    match_it!(result, Statement::VariableAssignment { ref name, ref source } => {
+        assert_eq!(*name, "super_variable");
         match_it!(source, &StatementSource::Expression(ref expr) => {
             expr.assert("2+2");
         });
@@ -665,7 +666,7 @@ fn cycle_control_operators_parses_correctly() {
     let result = parse!("break cycle_name", statement);
     match_it!(result, Statement::CycleControl { ref operator, ref name } => {
         assert_eq!(*operator, CycleControlOperator::Break);
-        assert_eq!(*name, Some("cycle_name"));
+        assert_eq!(*name, Some(Identifier::new("cycle_name")));
     });
     let result = parse!("continue", statement);
     match_it!(result, Statement::CycleControl { ref operator, ref name } => {
@@ -675,7 +676,7 @@ fn cycle_control_operators_parses_correctly() {
     let result = parse!("continue cycle_name", statement);
     match_it!(result, Statement::CycleControl { ref operator, ref name } => {
         assert_eq!(*operator, CycleControlOperator::Continue);
-        assert_eq!(*name, Some("cycle_name"));
+        assert_eq!(*name, Some(Identifier::new("cycle_name")));
     });
 }
 
@@ -697,8 +698,8 @@ fn return_operator_parses_correctly() {
 fn simple_block_of_statements_parses_correctly() {
     let result = parse!("{ a := 2; return a }", statement);
     match_it!(result, Statement::Block { ref statements } => {
-        match_it!(&statements[0], &Statement::VariableAssignment { name, ref source } => {
-            assert_eq!(name, "a");
+        match_it!(&statements[0], &Statement::VariableAssignment { ref name, ref source } => {
+            assert_eq!(*name, "a");
             match_it!(source, &StatementSource::Expression(ref expr) => {
                 expr.assert("2");
             });
@@ -735,8 +736,8 @@ fn simple_expression_as_statement_parses_correctly() {
 #[test]
 fn simple_select_query_as_source_for_variable_parses_correctly() {
     let result = parse!("x := select * from foo", statement);
-    match_it!(result, Statement::VariableAssignment { name, ref source } => {
-        assert_eq!(name, "x");
+    match_it!(result, Statement::VariableAssignment { ref name, ref source } => {
+        assert_eq!(*name, "x");
         match_it!(source, &StatementSource::Selection(ref query) => {
             assert_eq!(query.distinct, false);
             assert_eq!(query.high_priority, false);

@@ -24,10 +24,47 @@ pub struct Field<'source> {
     pub position: ItemPosition,
 }
 
+impl<'source> Assertion for Field<'source> {
+    fn assert(&self, other: &Field) {
+        assert_eq!(self.attributes, other.attributes);
+        self.field_type.assert(&other.field_type);
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CompoundDataType<'source> {
     Structure(Vec<(Identifier<'source>, Field<'source>)>),
     Tuple(Vec<Field<'source>>),
+}
+
+impl<'source> Assertion for CompoundDataType<'source> {
+    fn assert(&self, other: &CompoundDataType) {
+        match self {
+            &CompoundDataType::Structure(ref fields) => {
+                let mut other_fields_iter = match_it!(other,
+                    &CompoundDataType::Structure(ref fields) => { fields.iter() }
+                );
+                for &(ref field_name, ref field) in fields.iter() {
+                    let &(ref other_field_name, ref other_field) = other_fields_iter.next()
+                        .expect("Field lists should have equal sizes");
+                    assert_eq!(field_name, other_field_name);
+                    field.assert(other_field);
+                }
+                assert_eq!(other_fields_iter.next(), None);
+            }
+            &CompoundDataType::Tuple(ref fields) => {
+                let mut other_fields_iter = match_it!(other,
+                    &CompoundDataType::Tuple(ref fields) => { fields.iter() }
+                );
+                for field in fields.iter() {
+                    let other_field = other_fields_iter.next()
+                        .expect("Field lists should have equal sizes");
+                    field.assert(other_field);
+                }
+                assert_eq!(other_fields_iter.next(), None);
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -38,6 +75,19 @@ pub enum DataType<'source> {
     DependencyReference(DependencyReference),
 }
 
+impl<'source> Assertion for DataType<'source> {
+    fn assert(&self, other_data_type: &DataType) {
+        match self {
+            &DataType::Compound(ref compound_type) => {
+                match_it!(other_data_type, &DataType::Compound(ref other_compound_type) => {
+                    compound_type.assert(other_compound_type);
+                });
+            }
+            other => assert_eq!(other, other_data_type),
+        }
+    }
+}
+
 impl<'source> Assertion<str> for DataType<'source> {
     fn assert(&self, other: &str) {
         let tokens = ::lexeme_scanner::Scanner::scan(other)
@@ -46,7 +96,7 @@ impl<'source> Assertion<str> for DataType<'source> {
             tokens.as_slice(),
             ::syntax_parser::compound_types::data_type,
         ).expect("Parser result must be ok");
-        assert_eq!(*self, other_data_type);
+        self.assert(&other_data_type);
     }
 }
 

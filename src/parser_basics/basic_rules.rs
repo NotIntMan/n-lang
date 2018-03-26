@@ -33,9 +33,15 @@ pub fn none<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'t
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier<'source>(pub Cow<'source, str>);
 
-impl<'token> Identifier<'token> {
-    fn new(text: &'token str) -> Self {
+impl<'source> Identifier<'source> {
+    pub fn new(text: &'source str) -> Self {
         Identifier(Cow::Borrowed(text))
+    }
+    pub fn get_borrowed_text(&self) -> Option<&'source str> {
+        match &self.0 {
+            &Cow::Borrowed(borrow) => Some(borrow),
+            &Cow::Owned(_) => None,
+        }
     }
 }
 
@@ -46,6 +52,16 @@ impl<'token> PartialEq<str> for Identifier<'token> {
 
     fn ne(&self, other: &str) -> bool {
         &*self.0 != other
+    }
+}
+
+impl<'token, 'source> PartialEq<&'source str> for Identifier<'token> {
+    fn eq(&self, other: &&'source str) -> bool {
+        &*self.0 == *other
+    }
+
+    fn ne(&self, other: &&'source str) -> bool {
+        &*self.0 != *other
     }
 }
 
@@ -95,15 +111,17 @@ array!(pub const KEYWORD_LIST: &'static str =
 pub fn not_keyword_identifier<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Identifier<'source>> {
     match identifier(input) {
         IResult::Done(new_input, result) => {
-            if KEYWORD_LIST.contains(&&*result.0) {
+            let text = result.get_borrowed_text()
+                .expect("Rule \"identifier\" should not return owned text as result");
+            if KEYWORD_LIST.contains(&text) {
                 input.err(ParserErrorKind::expected_got(
                     ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, "not keyword identifier"),
-                    ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, &*result.0),
+                    ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, text),
                 ))
             } else {
                 new_input.ok(result)
             }
-        },
+        }
         IResult::Incomplete(n) => IResult::Incomplete(n),
         IResult::Error(e) => IResult::Error(e),
     }
@@ -132,7 +150,7 @@ pub fn keyword<'token, 'source>(input: &'token [Token<'source>], expected_text: 
                 ));
             }
             i.ok(output)
-        },
+        }
         IResult::Incomplete(n) => IResult::Incomplete(n),
         IResult::Error(e) => IResult::Error(e),
     }
@@ -167,7 +185,7 @@ pub fn braced_expression_literal<'token, 'source>(input: &'token [Token<'source>
     Ищет токен типа `SymbolGroup` с текстом, эквивалентным данному.
     Ничего не возвращает в случае успеха.
 */
-pub fn symbols<'token, 'source>(input: &'token [Token<'source>], text: &str) -> ParserResult<'token, 'source, ()> {
+pub fn symbols<'token, 'source>(input: &'token [Token<'source>], text: &'source str) -> ParserResult<'token, 'source, ()> {
     exact_token(input, TokenKindLess::SymbolGroup, text)
         .map(|_| ())
 }
@@ -186,33 +204,51 @@ impl NumberLiteralSpec {
     pub fn new() -> Self { NumberLiteralSpec::default() }
     /// Устанавливает значение "negative" в спецификации в `Some(value)`
     #[inline]
-    pub fn set_negative(mut self, value: bool) -> Self { self.negative = Some(value); self }
+    pub fn set_negative(mut self, value: bool) -> Self {
+        self.negative = Some(value);
+        self
+    }
     /// Устанавливает значение "negative" в спецификации в `None`
     #[inline]
-    pub fn clear_negative(mut self) -> Self { self.negative = None; self }
+    pub fn clear_negative(mut self) -> Self {
+        self.negative = None;
+        self
+    }
     /// Устанавливает значение "fractional" в спецификации в `Some(value)`
     #[inline]
-    pub fn set_fractional(mut self, value: bool) -> Self { self.fractional = Some(value); self }
+    pub fn set_fractional(mut self, value: bool) -> Self {
+        self.fractional = Some(value);
+        self
+    }
     /// Устанавливает значение "fractional" в спецификации в `None`
     #[inline]
-    pub fn clear_fractional(mut self) -> Self { self.fractional = None; self }
+    pub fn clear_fractional(mut self) -> Self {
+        self.fractional = None;
+        self
+    }
     /// Устанавливает значение "radix" в спецификации в `Some(value)`
     #[inline]
-    pub fn set_radix(mut self, value: Range<u32>) -> Self { self.radix = Some(value); self }
+    pub fn set_radix(mut self, value: Range<u32>) -> Self {
+        self.radix = Some(value);
+        self
+    }
     /// Устанавливает значение "radix" в спецификации в `None`
     #[inline]
-    pub fn clear_radix(mut self) -> Self { self.radix = None; self }
+    pub fn clear_radix(mut self) -> Self {
+        self.radix = None;
+        self
+    }
 }
 
- /**
-    Правило "Специальный числовой литерал".
-    Ищет токен типа `NumberLiteral` и тестирует его в соответствии с данной спецификацией.
+/**
+   Правило "Специальный числовой литерал".
+   Ищет токен типа `NumberLiteral` и тестирует его в соответствии с данной спецификацией.
 
-    *   Если свойство спецификации `negative` содержит значение - значение свойства `negative` числа должно совпадать с ним.
+   *   Если свойство спецификации `negative` содержит значение - значение свойства `negative` числа должно совпадать с ним.
 
-    *   Если свойство спецификации `fractional` содержит значение - значение свойства `fractional` числа должно совпадать с ним.
+   *   Если свойство спецификации `fractional` содержит значение - значение свойства `fractional` числа должно совпадать с ним.
 
-    *   Если свойство спецификации `radix` содержит значение - значение свойства `radix` числа должно входить в его диапазон.
+   *   Если свойство спецификации `radix` содержит значение - значение свойства `radix` числа должно входить в его диапазон.
 */
 pub fn special_number_literal<'token, 'source>(input: &'token [Token<'source>], spec: NumberLiteralSpec) -> ParserResult<'token, 'source, &'token Token<'source>> {
     match token(input, TokenKindLess::NumberLiteral) {
@@ -221,38 +257,48 @@ pub fn special_number_literal<'token, 'source>(input: &'token [Token<'source>], 
                 TokenKind::NumberLiteral {
                     negative, fractional, radix
                 } => {
-                    if let Some(v) = spec.negative { if v != negative {
-                        let desc = if v {
-                            "negative number literal"
-                        } else {
-                            "positive number literal"
-                        };
-                        return input.err(ParserErrorKind::expected_got(
-                            ParserErrorTokenInfo::from_desc(desc),
-                            ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, output.text),
-                        ));
-                    } }
-                    if let Some(v) = spec.fractional { if v != fractional {
-                        let desc = if v {
-                            "fractional number literal"
-                        } else {
-                            "integer number literal"
-                        };
-                        return input.err(ParserErrorKind::expected_got_description(
-                            desc, TokenKindLess::NumberLiteral, output.text
-                        ));
-                    } }
-                    if let Some(v) = spec.radix { if !v.contains(radix) {
-                        let desc = format!("number literal with radix between {}..{}", v.start, v.end);
-                        return input.err(ParserErrorKind::expected_got_description(
-                            desc, TokenKindLess::NumberLiteral, output.text
-                        ));
-                    } }
+                    if let Some(v) = spec.negative {
+                        if v != negative {
+                            let desc = if v {
+                                "negative number literal"
+                            } else {
+                                "positive number literal"
+                            };
+                            return input.err(ParserErrorKind::expected_got(
+                                ParserErrorTokenInfo::from_desc(desc),
+                                ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, output.text),
+                            ));
+                        }
+                    }
+                    if let Some(v) = spec.fractional {
+                        if v != fractional {
+                            let desc = if v {
+                                "fractional number literal"
+                            } else {
+                                "integer number literal"
+                            };
+                            return input.err(ParserErrorKind::expected_got(
+                                ParserErrorTokenInfo::from_desc(desc),
+                                ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, output.text),
+                            ));
+                        }
+                    }
+                    if let Some(v) = spec.radix {
+                        if !v.contains(radix) {
+                            return input.err(ParserErrorKind::expected_got(
+                                ParserErrorTokenInfo::from_desc("number literal with a specific radix"),
+                                ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, output.text),
+                            ));
+                        }
+                    }
                     i.ok(output)
-                },
-                other => input.err(ParserErrorKind::expected_got_kind(TokenKindLess::NumberLiteral, other.less())),
+                }
+                other => input.err(ParserErrorKind::expected_got(
+                    ParserErrorTokenInfo::from_kind(TokenKindLess::NumberLiteral),
+                    ParserErrorTokenInfo::from_kind(other.less()),
+                )),
             }
-        },
+        }
         other => other,
     }
 }
@@ -268,7 +314,10 @@ pub const UNSIGNED_INTEGER_SPEC: NumberLiteralSpec = NumberLiteralSpec {
 
 /// Генерирует ошибку, которая "ожидала" целочисленный неотрицательный числовой литерал, а получила другой числовой литерал.
 fn make_parse_error(input: &str) -> ParserErrorKind {
-    ParserErrorKind::expected_got_description("integer literal", TokenKindLess::NumberLiteral,input)
+    ParserErrorKind::expected_got(
+        ParserErrorTokenInfo::from_desc("integer literal"),
+        ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, input),
+    )
 }
 
 /// Совершает попытку разбора целочисленного неотрицательного литерала.
@@ -298,7 +347,7 @@ pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
                     None => return Err(make_parse_error(input)),
                 },
             }
-        },
+        }
         c => match c.to_digit(10) {
             Some(v) => (v, 10),
             None => return Err(make_parse_error(input)),
@@ -309,7 +358,7 @@ pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
             Some(v) => {
                 result *= 10;
                 result += v;
-            },
+            }
             None => return Err(make_parse_error(input)),
         }
     }

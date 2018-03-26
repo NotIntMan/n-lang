@@ -8,6 +8,7 @@ use parser_basics::{
     token,
     ParserInput,
     ParserErrorKind,
+    ParserErrorTokenInfo,
     ParserResult,
 };
 use super::*;
@@ -21,7 +22,10 @@ parser_rule!(number_literal(i) -> Literal<'source> {
                 TokenKind::NumberLiteral { negative, fractional, radix } => {
                     LiteralType::NumberLiteral { negative, fractional, radix }
                 },
-                _ => return i.err(ParserErrorKind::expected_got_kind(TokenKindLess::NumberLiteral, token.kind.less())),
+                other => return i.err(ParserErrorKind::expected_got(
+                    ParserErrorTokenInfo::from_kind(TokenKindLess::NumberLiteral),
+                    ParserErrorTokenInfo::from_kind(other.less()),
+                )),
             };
             Literal { literal_type, token: *token }
         })
@@ -37,7 +41,10 @@ parser_rule!(string_literal(i) -> Literal<'source> {
                 TokenKind::StringLiteral { length } => {
                     LiteralType::StringLiteral { length }
                 },
-                _ => return i.err(ParserErrorKind::expected_got_kind(TokenKindLess::StringLiteral, token.kind.less())),
+                other => return i.err(ParserErrorKind::expected_got(
+                    ParserErrorTokenInfo::from_kind(TokenKindLess::StringLiteral),
+                    ParserErrorTokenInfo::from_kind(other.less()),
+                )),
             };
             Literal { literal_type, token: *token }
         })
@@ -53,7 +60,10 @@ parser_rule!(braced_literal(i) -> Literal<'source> {
                 TokenKind::BracedExpressionLiteral { length } => {
                     LiteralType::BracedExpressionLiteral { length }
                 },
-                _ => return i.err(ParserErrorKind::expected_got_kind(TokenKindLess::BracedExpressionLiteral, token.kind.less())),
+                other => return i.err(ParserErrorKind::expected_got(
+                    ParserErrorTokenInfo::from_kind(TokenKindLess::BracedExpressionLiteral),
+                    ParserErrorTokenInfo::from_kind(other.less()),
+                )),
             };
             Literal { literal_type, token: *token }
         })

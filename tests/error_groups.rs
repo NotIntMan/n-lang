@@ -6,7 +6,7 @@ use n_lang::helpers::group::{
 };
 use n_lang::lexeme_scanner::TokenKindLess;
 use n_lang::parser_basics::{
-    ParserError,
+    new_error_without_pos,
     ParserErrorItem,
     ParserErrorKind,
     ParserErrorTokenInfo,
@@ -14,11 +14,17 @@ use n_lang::parser_basics::{
 
 #[test]
 fn simple_errors_groups_correctly() {
-    let mut group = ParserError::new_without_pos(
-        ParserErrorKind::expected_got_kind(TokenKindLess::NumberLiteral, TokenKindLess::Word)
+    let mut group = new_error_without_pos(
+        ParserErrorKind::expected_got(
+            ParserErrorTokenInfo::from_kind(TokenKindLess::NumberLiteral),
+            ParserErrorTokenInfo::from_kind(TokenKindLess::Word),
+        )
     );
-    group.append(ParserError::new_without_pos(
-        ParserErrorKind::expected_got_kind(TokenKindLess::StringLiteral, TokenKindLess::Word)
+    group.append(new_error_without_pos(
+        ParserErrorKind::expected_got(
+            ParserErrorTokenInfo::from_kind(TokenKindLess::StringLiteral),
+            ParserErrorTokenInfo::from_kind(TokenKindLess::Word),
+        )
     ));
     assert_eq!(group, Group::One(ParserErrorItem {
         kind: ParserErrorKind::ExpectedGot(
@@ -34,25 +40,25 @@ fn simple_errors_groups_correctly() {
 
 #[test]
 fn simple_errors_with_dif_level_of_knowledge_groups_correctly() {
-    let mut group = ParserError::new_without_pos(
-        ParserErrorKind::expected_got_kind(TokenKindLess::NumberLiteral, TokenKindLess::Word)
+    let mut group = new_error_without_pos(
+        ParserErrorKind::expected_got(
+            ParserErrorTokenInfo::from_kind(TokenKindLess::NumberLiteral),
+            ParserErrorTokenInfo::from_kind(TokenKindLess::Word),
+        )
     );
-    group.append(ParserError::new_without_pos(
-        ParserErrorKind::expected_got_kind_text(TokenKindLess::Word, "final", TokenKindLess::Word, "end")
+    group.append(new_error_without_pos(
+        ParserErrorKind::expected_got(
+            ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, "final"),
+            ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, "end"),
+        )
     ));
     assert_eq!(group, Group::One(ParserErrorItem {
         kind: ParserErrorKind::ExpectedGot(
             Group::Many(vec![
                 ParserErrorTokenInfo::from_kind(TokenKindLess::NumberLiteral),
-                ParserErrorTokenInfo {
-                    kind: Some(TokenKindLess::Word),
-                    desc: Some("final".to_string()),
-                }
+                ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, "final"),
             ]),
-            ParserErrorTokenInfo {
-                kind: Some(TokenKindLess::Word),
-                desc: Some("end".to_string()),
-            }
+            ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, "end"),
         ),
         pos: None,
     }));

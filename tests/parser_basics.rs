@@ -11,6 +11,7 @@ use n_lang::lexeme_scanner::{
 };
 use n_lang::parser_basics::{
     ParserErrorKind,
+    ParserErrorTokenInfo,
     token,
 };
 
@@ -73,7 +74,10 @@ fn simple_rule_makes_correctly_2() {
     };
     assert_eq!(
         err.kind,
-        ParserErrorKind::expected_got_kind(NumberLiteral, SymbolGroup)
+        ParserErrorKind::expected_got(
+            ParserErrorTokenInfo::from_kind(NumberLiteral),
+            ParserErrorTokenInfo::from_kind(SymbolGroup),
+        )
     );
     assert_eq!(
         err.pos

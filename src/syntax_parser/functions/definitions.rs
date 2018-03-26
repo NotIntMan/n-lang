@@ -1,4 +1,3 @@
-use indexmap::IndexMap;
 use parser_basics::Identifier;
 use syntax_parser::compound_types::DataType;
 use syntax_parser::statements::Statement;
@@ -12,7 +11,7 @@ pub enum FunctionBody<'source> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionDefinition<'source> {
     pub name: Identifier<'source>,
-    pub arguments: IndexMap<Identifier<'source>, DataType<'source>>,
+    pub arguments: Vec<(Identifier<'source>, DataType<'source>)>,
     pub result: Option<DataType<'source>>,
     pub body: FunctionBody<'source>,
 }

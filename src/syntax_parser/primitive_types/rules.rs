@@ -117,7 +117,7 @@ parser_rule!(number_type(i) -> NumberType {
 });
 
 /// $word single_size
-parser_rule!(datetime_precision(i, word: &str) -> Option<u32> {
+parser_rule!(datetime_precision(i, word: &'source str) -> Option<u32> {
     do_parse!(i,
         apply!(keyword, word) >>
         s: single_size >>

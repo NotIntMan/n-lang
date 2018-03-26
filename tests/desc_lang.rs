@@ -10,10 +10,9 @@ extern crate nom;
 extern crate log;
 extern crate env_logger;
 
-use std::borrow::Cow;
 use n_lang::helpers::assertion::Assertion;
 use n_lang::lexeme_scanner::ItemPosition;
-use n_lang::parser_basics::end_of_input;
+use n_lang::parser_basics::*;
 use n_lang::syntax_parser::primitive_types::*;
 use n_lang::syntax_parser::compound_types::*;
 use n_lang::syntax_parser::functions::*;
@@ -31,6 +30,15 @@ fn simple_type_parses_correctly() {
             unsigned: false,
             integer_type: IntegerType::Big,
         })
+    )
+}
+
+#[test]
+fn simple_boolean_type_parses_correctly() {
+    let result = parse!("boolean", primitive_data_type);
+    assert_eq!(
+        result,
+        PrimitiveDataType::Number(NumberType::Boolean)
     )
 }
 
@@ -126,7 +134,7 @@ fn struct_and_tuple_bodies_parses_correctly() {
             Field {
                 attributes: vec![],
                 field_type: DataType::Compound(CompoundDataType::Structure(vec![
-                    (Cow::Borrowed("a"), Field {
+                    (Identifier::new("a"), Field {
                         attributes: vec![],
                         field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
                             integer_type: IntegerType::Normal,
@@ -135,7 +143,7 @@ fn struct_and_tuple_bodies_parses_correctly() {
                         })),
                         position: ItemPosition::new("(boolean, {", "a: integer"),
                     }),
-                    (Cow::Borrowed("b"), Field {
+                    (Identifier::new("b"), Field {
                         attributes: vec![],
                         field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Float {
                             size: None,
@@ -154,15 +162,15 @@ fn struct_and_tuple_bodies_parses_correctly() {
 fn simple_external_function_parses_correctly() {
     let result: FunctionDefinition = parse!("extern fn sum(a: integer, b: integer): big integer", function_definition);
     assert_eq!(result.name, "sum");
-    let (arg_name, arg_type) = result.arguments.get_index(0)
+    let &(ref arg_name, ref arg_type) = result.arguments.get(0)
         .expect("Function's arguments must have the first item");
     assert_eq!(*arg_name, "a");
     arg_type.assert("integer");
-    let (arg_name, arg_type) = result.arguments.get_index(1)
+    let &(ref arg_name, ref arg_type) = result.arguments.get(1)
         .expect("Function's arguments must have the second item");
     assert_eq!(*arg_name, "b");
     arg_type.assert("integer");
-    assert_eq!(result.arguments.get_index(2), None);
+    assert_eq!(result.arguments.get(2), None);
     result.result.assert(&Some("big integer"));
     assert_eq!(result.body, FunctionBody::External);
 }
@@ -178,7 +186,7 @@ fn simple_const_time_function_parses_correctly() {
             }
         ", function_definition);
     assert_eq!(result.name, "sum_of_k_series_of_n");
-    let (arg_name, arg_type) = result.arguments.get_index(0)
+    let &(ref arg_name, ref arg_type) = result.arguments.get(0)
         .expect("Function's arguments must have the first item");
     assert_eq!(*arg_name, "k");
     assert_eq!(*arg_type, DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
@@ -186,7 +194,7 @@ fn simple_const_time_function_parses_correctly() {
         unsigned: true,
         zerofill: false,
     })));
-    assert_eq!(result.arguments.get_index(1), None);
+    assert_eq!(result.arguments.get(1), None);
     assert_eq!(result.result, Some(DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
         integer_type: IntegerType::Big,
         unsigned: true,
@@ -270,8 +278,8 @@ fn module_of_two_usage_parses_correctly() {
     assert_eq!(result[0].public, false);
     assert_eq!(result[0].attributes.len(), 0);
     match_it!(&result[0].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
-        assert_eq!(*path, [Cow::Borrowed("foo"), Cow::Borrowed("bar")]);
-        assert_eq!(*tail, ExternalItemTail::Alias(Cow::Borrowed("Bar")));
+        assert_eq!(*path, [Identifier::new("foo"), Identifier::new("bar")]);
+        assert_eq!(*tail, ExternalItemTail::Alias(Identifier::new("Bar")));
     });
     assert_eq!(result[1].public, true);
     assert_eq!(result[1].attributes.len(), 1);
@@ -288,17 +296,18 @@ fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<Mo
     assert_eq!(module[0].public, true);
     assert_eq!(module[0].attributes.len(), 1);
     assert_eq!(module[0].attributes[0].name, "derive");
-    assert_eq!(module[0].attributes[0].arguments, Some(vec![Cow::Borrowed("Hash")]));
-    match_it!(&module[0].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { name, ref body }) => {
+    assert_eq!(module[0].attributes[0].arguments, Some(vec![Identifier::new("Hash")]));
+    match_it!(&module[0].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { ref name, ref body }) => {
         assert_eq!(name, "Complex");
         body.assert("{ real: double, imag: float }");
     });
     assert_eq!(module[1].public, true);
     assert_eq!(module[1].attributes.len(), 0);
-    match_it!(&module[1].value, &ModuleDefinitionValue::Table(TableDefinition { name, ref body }) => {
+    match_it!(&module[1].value, &ModuleDefinitionValue::Table(TableDefinition { ref name, ref body }) => {
         assert_eq!(name, "Signals");
         let mut body_iter = body.iter();
-        match_it!(body_iter.next(), Some(&(Cow::Borrowed("id"), ref field)) => {
+        match_it!(body_iter.next(), Some(&(ref name, ref field)) => {
+            assert_eq!(name, "id");
             assert_eq!(field.attributes.len(), 2);
             assert_eq!(field.attributes[0].name, "primary_key");
             assert_eq!(field.attributes[0].arguments, None);
@@ -306,12 +315,13 @@ fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<Mo
             assert_eq!(field.attributes[1].arguments, None);
             field.field_type.assert("unsigned integer");
         });
-        match_it!(body_iter.next(), Some(&(Cow::Borrowed("value"), ref field)) => {
+        match_it!(body_iter.next(), Some(&(ref name, ref field)) => {
+            assert_eq!(name, "value");
             assert_eq!(field.attributes.len(), 2);
             assert_eq!(field.attributes[0].name, "check");
-            assert_eq!(field.attributes[0].arguments, Some(vec!["A", "B"]));
+            assert_eq!(field.attributes[0].arguments, Some(vec![Identifier::new("A"), Identifier::new("B")]));
             assert_eq!(field.attributes[1].name, "check_fn");
-            assert_eq!(field.attributes[1].arguments, Some(vec!["X", "YY"]));
+            assert_eq!(field.attributes[1].arguments, Some(vec![Identifier::new("X"), Identifier::new("YY")]));
             field.field_type.assert("Complex");
         });
         assert_eq!(body_iter.next(), None);
@@ -368,25 +378,25 @@ fn simple_submodule_parses_correctly() {
     assert_eq!(result.len(), 4);
     assert_eq!(result[0].public, false);
     assert_eq!(result[0].attributes.len(), 0);
-    match_it!(&result[0].value, &ModuleDefinitionValue::Module(ModuleDefinition { name, ref items }) => {
+    match_it!(&result[0].value, &ModuleDefinitionValue::Module(ModuleDefinition { ref name, ref items }) => {
         assert_eq!(name, "wave");
         assert_module_of_complex_number_struct_and_wave_signals_table(items);
     });
     assert_eq!(result[1].public, true);
     assert_eq!(result[1].attributes.len(), 0);
-    match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
-        assert_eq!(*path, ["wave", "*"]);
-        assert_eq!(alias, None);
+    match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
+        assert_eq!(*path, ["wave"]);
+        assert_eq!(*tail, ExternalItemTail::Asterisk);
     });
     assert_eq!(result[2].public, true);
     assert_eq!(result[2].attributes.len(), 0);
-    match_it!(&result[2].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, alias }) => {
+    match_it!(&result[2].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
         assert_eq!(*path, ["wave", "Complex"]);
-        assert_eq!(alias, Some("ComplexNumber"));
+        assert_eq!(*tail, ExternalItemTail::Alias(Identifier::new("ComplexNumber")));
     });
     assert_eq!(result[3].public, true);
     assert_eq!(result[3].attributes.len(), 0);
-    match_it!(&result[3].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { name, ref body }) => {
+    match_it!(&result[3].value, &ModuleDefinitionValue::DataType(DataTypeDefinition { ref name, ref body }) => {
         assert_eq!(name, "CachedSignal");
         body.assert("(Signals, Complex)");
     });

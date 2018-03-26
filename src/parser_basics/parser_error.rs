@@ -86,7 +86,13 @@ impl<'source> Display for ParserErrorTokenInfo<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
             &ParserErrorTokenInfo { kind: Some(ref kind), desc: None } => write!(f, "{}", kind),
-            &ParserErrorTokenInfo { kind: Some(ref kind), desc: Some(ref msg) } => write!(f, "{} {:?}", kind, msg),
+            &ParserErrorTokenInfo { kind: Some(ref kind), desc: Some(ref msg) } => {
+                write!(f, "{}", kind)?;
+                if !msg.is_empty() {
+                    write!(f, " {:?}", msg)?;
+                }
+                Ok(())
+            },
             &ParserErrorTokenInfo { kind: None, desc: Some(ref msg) } => write!(f, "{}", msg),
             _ => Ok(()),
         }
@@ -226,7 +232,7 @@ pub struct ParserErrorItem<'source> {
 impl<'source> ParserErrorItem<'source> {
     /// Конструирует новую единицу ошибки из типа и позиции
     #[inline]
-    fn new(kind: ParserErrorKind, pos: SymbolPosition) -> Self {
+    fn new(kind: ParserErrorKind<'source>, pos: SymbolPosition) -> Self {
         Self {
             kind,
             pos: Some(pos),
@@ -234,7 +240,7 @@ impl<'source> ParserErrorItem<'source> {
     }
     /// Конструирует новую единицу ошибки из типа, но без позиции
     #[inline]
-    fn new_without_pos(kind: ParserErrorKind) -> Self {
+    fn new_without_pos(kind: ParserErrorKind<'source>) -> Self {
         Self {
             kind,
             pos: None,

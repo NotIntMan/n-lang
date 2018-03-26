@@ -1,4 +1,3 @@
-use indexmap::IndexMap;
 use parser_basics::{
     comma_list,
     identifier,
@@ -31,18 +30,12 @@ parser_rule!(argument(i) -> (Identifier<'source>, DataType<'source>) {
     )
 });
 
-parser_rule!(arguments(i) -> IndexMap<Identifier<'source>, DataType<'source>> {
+parser_rule!(arguments(i) -> Vec<(Identifier<'source>, DataType<'source>)> {
     do_parse!(i,
         apply!(symbols, "(") >>
         argument_list: apply!(comma_list, argument) >>
         apply!(symbols, ")") >>
-        ({
-            let mut result = IndexMap::new();
-            for (name, data_type) in argument_list {
-                result.insert(name, data_type);
-            }
-            result
-        })
+        (argument_list)
     )
 });
 

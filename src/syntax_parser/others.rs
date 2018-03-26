@@ -9,7 +9,7 @@ use parser_basics::{
 pub type Path<'source> = Vec<Identifier<'source>>;
 
 /// Реализует разбор "пути" элементов, разделённых делителем. Отличается от списка тем, что не позволяет "замыкающий делитель".
-pub fn path<'token, 'source>(input: &'token [Token<'source>], delimiter: &str) -> ParserResult<'token, 'source, Path<'source>> {
+pub fn path<'token, 'source>(input: &'token [Token<'source>], delimiter: &'source str) -> ParserResult<'token, 'source, Path<'source>> {
     do_parse!(input,
         first: identifier >>
         others: many0!(do_parse!(

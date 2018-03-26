@@ -60,6 +60,7 @@ pub use self::token::{
 };
 
 pub use self::parser_error::{
+    new_error,
     new_error_without_pos,
     ParserError,
     ParserErrorItem,
