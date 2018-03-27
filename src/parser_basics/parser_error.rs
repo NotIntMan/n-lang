@@ -5,19 +5,18 @@ use std::fmt::{
     Result as FResult,
     Formatter,
 };
-
 use std::cmp::{
     Ord,
     Ordering,
     PartialOrd,
 };
-
+use std::borrow::Cow;
 use helpers::group::{
     Appendable,
     Group,
 };
 use helpers::display_list::display_list;
-
+use helpers::into_static::IntoStatic;
 use lexeme_scanner::{
     TokenKindLess,
     SymbolPosition,
@@ -29,19 +28,19 @@ use lexeme_scanner::{
     Существует только для того, чтобы помочь варианту `ParserErrorKind::ExpectedGot` не размножиться
     на 8 штук только из-за необходимости вариативности отображения объектов.
 */
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct ParserErrorTokenInfo<'source> {
     /// Поле `kind` отображает тип токена
     pub kind: Option<TokenKindLess>,
     /// Поле `desc` отображает описание токена
-    pub desc: Option<&'source str>,
+    pub desc: Option<Cow<'source, str>>,
 }
 
 impl<'source> ParserErrorTokenInfo<'source> {
     /// Создаёт новый объект информации, честно заполняя поля в соответствии переданным аргументам
     #[inline]
     pub fn new(kind: Option<TokenKindLess>, desc: Option<&'source str>) -> Self {
-        Self { kind, desc }
+        Self { kind, desc: desc.map(Cow::Borrowed) }
     }
     #[inline]
     /// Создаёт новый объект информации, заполняя значением только поле `kind`
@@ -105,12 +104,23 @@ impl<'source> Appendable for ParserErrorTokenInfo<'source> {
     }
 }
 
+impl<'source> IntoStatic for ParserErrorTokenInfo<'source> {
+    type Result = ParserErrorTokenInfo<'static>;
+    fn into_static(self) -> Self::Result {
+        let ParserErrorTokenInfo { kind, desc } = self;
+        ParserErrorTokenInfo {
+            kind,
+            desc: desc.map(|desc| Cow::Owned(desc.into_owned())),
+        }
+    }
+}
+
 /**
     Тип синтаксической ошибки.
     Самая интересная часть для того, кто собрался написать ещё пару правил.
     Тип ошибки сообщает о том, что именно произошло в процессе разбора.
 */
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParserErrorKind<'source> {
     /// Неожиданный конец. Сообщает о том, что лексемы закончились, но правила этого не допускают.
     UnexpectedEnd(Group<ParserErrorTokenInfo<'source>>),
@@ -222,6 +232,20 @@ impl<'source> Default for ParserErrorKind<'source> {
     }
 }
 
+impl<'source> IntoStatic for ParserErrorKind<'source> {
+    type Result = ParserErrorKind<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            ParserErrorKind::UnexpectedEnd(group) => ParserErrorKind::UnexpectedEnd(group.into_static()),
+            ParserErrorKind::ExpectedGot(group, info) => ParserErrorKind::ExpectedGot(
+                group.into_static(),
+                info.into_static(),
+            ),
+            ParserErrorKind::CustomError(group) => ParserErrorKind::CustomError(group),
+        }
+    }
+}
+
 /// Одиночная ошибка разбора. Применяется как элемент `ParserError`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ParserErrorItem<'source> {
@@ -330,5 +354,13 @@ impl<'source> Display for ParserError<'source> {
                 writeln!(f, "Solution of one of them may solve the problem.")
             }
         }
+    }
+}
+
+impl<'source> IntoStatic for ParserErrorItem<'source> {
+    type Result = ParserErrorItem<'static>;
+    fn into_static(self) -> Self::Result {
+        let ParserErrorItem { pos, kind } = self;
+        ParserErrorItem { pos, kind: kind.into_static() }
     }
 }
