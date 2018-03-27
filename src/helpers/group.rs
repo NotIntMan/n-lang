@@ -1,7 +1,7 @@
 //! Группа элементов
 
 use std::mem::replace;
-
+use helpers::into_static::IntoStatic;
 use super::extract::extract;
 
 /**
@@ -15,7 +15,7 @@ use super::extract::extract;
 
     К тому же, элементы должны реализовывать типаж `Default` для быстрого их извлечения в случае само-модификации группы из `Group::One` в `Group::Many`.
 */
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Group<T> {
     None,
     One(T),
@@ -23,6 +23,16 @@ pub enum Group<T> {
 }
 
 impl<T> Group<T> {
+    /// Конструирует новый Group из вектора элементов
+    #[inline]
+    pub fn new(items: Vec<T>) -> Self
+        where T: Appendable + Default + Clone {
+        let mut result = Group::None;
+        for item in items {
+            result.append_item(item);
+        }
+        return result;
+    }
     /// Выполняет копирование всех хранимых ошибок в вектор и возвращает его
     #[inline]
     pub fn extract_into_vec(&self) -> Vec<T>
@@ -64,7 +74,7 @@ impl<T> Group<T> {
             &mut Group::Many(ref mut self_items) => {
                 Group::append_or_push(self_items, item);
                 return;
-            },
+            }
         };
         replace(self, new_value);
     }
@@ -115,6 +125,16 @@ impl<T> Group<T> {
             }
         };
         replace(self, result);
+    }
+}
+
+impl<T: IntoStatic + Clone> IntoStatic for Group<T>
+    where T::Result: Clone + Appendable + Default {
+    type Result = Group<T::Result>;
+    fn into_static(self) -> Self::Result {
+        Group::new(
+            self.extract_into_vec().into_static()
+        )
     }
 }
 
