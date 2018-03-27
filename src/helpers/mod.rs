@@ -13,3 +13,4 @@ pub mod display_list;
 #[macro_use]
 pub mod match_it_macro;
 pub mod into_static;
+pub mod find_index;

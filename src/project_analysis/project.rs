@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::fmt::Debug;
 use indexmap::IndexMap;
+use helpers::find_index::find_index;
 use parser_basics::StaticIdentifier;
 use syntax_parser::others::StaticPath;
 use syntax_parser::compound_types::DataType;
@@ -36,12 +37,11 @@ impl Project {
     pub fn resolve_item(&self, item_type: SemanticItemType, path: &[StaticIdentifier]) -> Option<DependencyReference> {
         match item_type {
             SemanticItemType::DataType => {
-                self.types.iter().enumerate()
-                    .find(|&(_, (data_type_path, _))| data_type_path.as_slice() == path)
-                    .map(|(type_id, _)| DependencyReference {
-                        item_type,
-                        type_id,
-                    })
+                let type_id = find_index(
+                    &self.types,
+                    |&(data_type_path, _)| data_type_path.as_slice() == path,
+                )?;
+                Some(DependencyReference { item_type, type_id })
             }
             _ => None,
         }
