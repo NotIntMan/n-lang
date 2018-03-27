@@ -1,11 +1,12 @@
 use parser_basics::Identifier;
 use syntax_parser::expressions::Expression;
 use syntax_parser::selections::Selection;
+use syntax_parser::others::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum JoinCondition<'source> {
     Expression(Expression<'source>),
-    Using(Vec<Vec<Identifier<'source>>>),
+    Using(Vec<Path<'source>>),
     Natural,
 }
 
@@ -20,7 +21,7 @@ pub enum JoinType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DataSource<'source> {
     Table {
-        name: Vec<Identifier<'source>>,
+        name: Path<'source>,
         alias: Option<Identifier<'source>>,
     },
     Join {

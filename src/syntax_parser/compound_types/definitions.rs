@@ -3,6 +3,7 @@ use helpers::assertion::Assertion;
 use helpers::into_static::IntoStatic;
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
+use syntax_parser::others::Path;
 use syntax_parser::primitive_types::PrimitiveDataType;
 use project_analysis::context::{
     DependencyReference,
@@ -11,6 +12,7 @@ use project_analysis::context::{
 };
 use project_analysis::error::SemanticError;
 use project_analysis::resolve::SemanticResolve;
+use project_analysis::project::DependenceType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Attribute<'source> {
@@ -109,7 +111,7 @@ impl<'source> IntoStatic for CompoundDataType<'source> {
 pub enum DataType<'source> {
     Compound(CompoundDataType<'source>),
     Primitive(PrimitiveDataType),
-    Reference(Vec<Identifier<'source>>),
+    Reference(Path<'source>),
     DependencyReference(DependencyReference),
 }
 
@@ -157,7 +159,7 @@ impl SemanticResolve for DataType<'static> {
             }
             &DataType::Primitive(_) => true,
             &DataType::Reference(_) => false,
-            &DataType::DependencyReference(refer) => context.is_reference_resolved(refer),
+            &DataType::DependencyReference(refer) => context.is_dependence_resolved(refer),
         }
     }
     fn try_resolve(&mut self, context: &mut SemanticContext) {
@@ -168,11 +170,11 @@ impl SemanticResolve for DataType<'static> {
                 for (i, &(ref field_name, ref field)) in fields.iter().enumerate() {
                     for &(ref field_before_name, _) in fields[..i].iter() {
                         if field_before_name == field_name {
-                            context.error(SemanticError::DuplicateDefinition {
-                                name: (*field_before_name).clone(),
-                                pos: field.position,
-                                item_type: SemanticItemType::Field,
-                            });
+                            context.error(SemanticError::duplicate_definition(
+                                field.position,
+                                (*field_before_name).clone(),
+                                SemanticItemType::Field,
+                            ));
                         }
                     }
                 }
@@ -187,7 +189,7 @@ impl SemanticResolve for DataType<'static> {
             }
             &mut DataType::Primitive(_) => {}
             &mut DataType::Reference(ref path) => {
-                match context.resolve(SemanticItemType::DataType, path.as_slice()) {
+                match context.resolve_dependence(DependenceType::DataType, &path) {
                     Ok(dep_ref) => new_value = Some(DataType::DependencyReference(dep_ref)),
                     Err(error) => context.error(error),
                 }

@@ -45,6 +45,12 @@ impl<'source> Identifier<'source> {
             &Cow::Owned(_) => None,
         }
     }
+    pub fn get_text(&self) -> &str {
+        match &self.0 {
+            &Cow::Borrowed(borrow) => borrow,
+            &Cow::Owned(ref own) => &own[..],
+        }
+    }
 }
 
 impl<'source> IntoStatic for Identifier<'source> {

@@ -51,7 +51,7 @@ pub enum TokenKind {
 }
 
 /// Урезанное отображение типа токена в его тип без прочей информации
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKindLess {
     EndOfInput,
     Whitespace,
