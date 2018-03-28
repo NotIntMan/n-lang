@@ -135,7 +135,7 @@ pub struct ProjectRef {
 
 impl ProjectRef {
     pub fn try_load_dependence(&self, path: &[StaticIdentifier]) -> Result<(), Group<SemanticError>> {
-        let mut project = self.write();
+        let mut project = self.refer.write();
         let items = project.try_load_dependence(path)?.into_static();
         for item in items {
             let ModuleDefinitionItem {
