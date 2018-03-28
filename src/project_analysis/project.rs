@@ -114,16 +114,16 @@ pub enum ResolutionStatus {
 
 #[derive(Debug, Clone)]
 pub struct ProjectItem<Data> {
-//    context: SemanticContext,
+    context: SemanticContext,
     resolution_status: ResolutionStatus,
     data: Data,
 }
 
 impl<Data> ProjectItem<Data> {
     #[inline]
-    fn new(_module_path: Vec<StaticIdentifier>, _project: ProjectRef, data: Data) -> Self {
+    fn new(module_path: Vec<StaticIdentifier>, project: ProjectRef, data: Data) -> Self {
         ProjectItem {
-//            context: SemanticContext::new(module_path, project),
+            context: SemanticContext::new(module_path, project),
             resolution_status: ResolutionStatus::Pending,
             data,
         }
