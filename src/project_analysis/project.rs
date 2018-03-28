@@ -4,14 +4,9 @@ use helpers::find_index::find_index;
 use helpers::group::Group;
 use helpers::into_static::IntoStatic;
 use helpers::loud_rw_lock::LoudRwLock;
-use lexeme_scanner::Scanner;
-use parser_basics::{
-    parse,
-    StaticIdentifier,
-};
+use parser_basics::StaticIdentifier;
 use syntax_parser::modules::{
     DataTypeDefinition,
-    module,
     ModuleDefinitionItem,
     ModuleDefinitionValue,
 };
@@ -81,27 +76,6 @@ impl Project {
             }
         }
     }
-    fn try_load_dependence(&mut self, path: &[StaticIdentifier]) -> Result<Vec<ModuleDefinitionItem>, Group<SemanticError>> {
-        let text = match self.source_of_source.get_text(path) {
-            Some(text) => text,
-            None => return Err(Group::One(SemanticError::unresolved_dependency(
-                Default::default(),
-                path.to_vec(),
-            ))),
-        };
-        let tokens = match Scanner::scan(&text) {
-            Ok(tokens) => tokens,
-            Err(error) => return Err(Group::One(SemanticError::scanner_error(error))),
-        };
-        match parse(&tokens, module) {
-            Ok(items) => Ok(items.into_static()),
-            Err(error_group) => Err(Group::new(
-                error_group.extract_into_vec().into_iter()
-                    .map(|item| SemanticError::parser_error(item))
-                    .collect()
-            )),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -145,7 +119,7 @@ pub enum ResolveResult {
 impl ProjectRef {
     pub fn try_load_dependence(&self, path: &[StaticIdentifier]) -> Result<(), Group<SemanticError>> {
         let mut project = self.refer.write();
-        let items = project.try_load_dependence(path)?.into_static();
+        let items = project.source_of_source.try_load_module(path)?.into_static();
         for item in items {
             let ModuleDefinitionItem {
                 public: _, // TODO Учесть экспорты
