@@ -128,12 +128,16 @@ impl ProjectRef {
             } = item;
             match value {
                 ModuleDefinitionValue::DataType(DataTypeDefinition { name, body }) => {
+                    // Складываем путь в вектор
                     let mut path = path.to_vec();
-                    path.push(name);
+                    // Конструируем ProjectItem и передаём ему ПУТЬ МОДУЛЯ.
                     let item = LoudRwLock::new(
                         ProjectItem::new(path.clone(), self.clone(), body),
                         "Item's object was poisoned!",
                     );
+                    // Добавляем в путь имя элемента.
+                    path.push(name);
+                    // И под этим путём-именем записываем в регистр.
                     project.types.insert(path, item);
                 }
                 _ => unimplemented!(),
