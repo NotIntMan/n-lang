@@ -24,6 +24,7 @@ use super::context::{
     SemanticContext,
 };
 use super::path_resolver::PathResolver;
+use super::resolve::SemanticResolve;
 
 #[derive(Debug)]
 pub struct Project {
@@ -110,14 +111,14 @@ pub enum ResolutionStatus {
     Resolved,
 }
 
-#[derive(Debug, Clone)]
-pub struct ProjectItem<Data> {
+#[derive(Debug)]
+pub struct ProjectItem<Data: SemanticResolve> {
     context: SemanticContext,
     resolution_status: ResolutionStatus,
     data: Data,
 }
 
-impl<Data> ProjectItem<Data> {
+impl<Data: SemanticResolve> ProjectItem<Data> {
     #[inline]
     fn new(module_path: Vec<StaticIdentifier>, project: ProjectRef, data: Data) -> Self {
         ProjectItem {
@@ -131,6 +132,14 @@ impl<Data> ProjectItem<Data> {
 #[derive(Debug, Clone)]
 pub struct ProjectRef {
     pub refer: Arc<LoudRwLock<Project>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ResolveResult {
+    WrongId,
+    Errors(Vec<SemanticError>),
+    Stuck,
+    Resolved,
 }
 
 impl ProjectRef {
@@ -158,6 +167,42 @@ impl ProjectRef {
         }
         Ok(())
     }
+    pub fn try_resolve_module(&self, item_type: DependenceType, id: usize) -> ResolveResult {
+        let project = self.refer.read();
+        match item_type {
+            DependenceType::DataType => {
+                let mut item = match project.types.get_index(id) {
+                    Some((_, item)) => item.write(),
+                    None => return ResolveResult::WrongId,
+                };
+                match item.resolution_status {
+                    ResolutionStatus::Pending | ResolutionStatus::InProgress
+                    => {
+                        let item = &mut *item;
+                        if item.data.is_resolved(&item.context) {
+                            item.resolution_status = ResolutionStatus::Resolved;
+                            return ResolveResult::Resolved;
+                        }
+                        if item.resolution_status == ResolutionStatus::InProgress {
+                            item.context.stash_errors();
+                        }
+                        item.data.try_resolve(&mut item.context);
+                        let errors = item.context.get_errors();
+                        if errors.len() == 0 {
+                            item.resolution_status = ResolutionStatus::Resolved;
+                            return ResolveResult::Resolved;
+                        }
+                        if item.resolution_status == ResolutionStatus::InProgress
+                            && item.context.is_errors_equal_to_stashed() {
+                            return ResolveResult::Stuck;
+                        }
+                        ResolveResult::Errors(errors)
+                    }
+                    ResolutionStatus::Resolved => ResolveResult::Resolved,
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -173,5 +218,6 @@ fn do_it() {
     );
     let project = Project::from_source(sources);
     println!("{:#?}", project.try_load_dependence(&vec![]));
+    println!("{:#?}", project.try_resolve_module(DependenceType::DataType, 0));
     println!("{:#?}", project);
 }
