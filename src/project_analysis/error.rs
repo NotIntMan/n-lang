@@ -31,6 +31,9 @@ pub enum SemanticErrorKind {
     ParserError {
         kind: ParserErrorKind<'static>,
     },
+//    SemanticPanic {
+//        message: String,
+//    },
 }
 
 impl Default for SemanticErrorKind {
@@ -102,6 +105,15 @@ impl SemanticError {
             kind: SemanticErrorKind::ParserError { kind: kind.into_static() },
         }
     }
+//    #[inline]
+//    pub fn semantic_panic<S: ToString>(message: S) -> Self {
+//        SemanticError {
+//            pos: ItemPosition::default(),
+//            kind: SemanticErrorKind::SemanticPanic {
+//                message: message.to_string(),
+//            }
+//        }
+//    }
 }
 
 impl Appendable for SemanticError {
