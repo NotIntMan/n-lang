@@ -42,6 +42,7 @@ impl SemanticContext {
             module_path,
             project,
             errors: Group::None,
+            stashed_errors: Vec::new(),
         }
     }
     #[inline]
