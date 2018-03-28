@@ -23,6 +23,7 @@ pub struct SemanticContext {
     module_path: Vec<StaticIdentifier>,
     project: ProjectRef,
     errors: Group<SemanticError>,
+    stashed_errors: Vec<SemanticError>,
 }
 
 impl fmt::Debug for SemanticContext {
@@ -59,7 +60,19 @@ impl SemanticContext {
         self.errors.extract_into_vec()
     }
     #[inline]
-    pub fn clear_errors(&mut self) {
+    pub fn stash_errors(&mut self) {
+        self.stashed_errors = self.errors.extract_into_vec();
         self.errors = Group::None;
+    }
+    pub fn is_errors_equal_to_stashed(&self) -> bool {
+        'main_cycle: for error in self.errors.extract_into_vec() {
+            for stashed_error in self.stashed_errors.iter() {
+                if error == *stashed_error {
+                    continue 'main_cycle;
+                }
+            }
+            return false;
+        }
+        return true;
     }
 }
