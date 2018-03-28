@@ -46,7 +46,7 @@ impl SemanticContext {
     }
     #[inline]
     pub fn resolve_dependence(&mut self, item_type: DependenceType, path: &StaticPath) -> Result<DependencyReference, SemanticError> {
-        let project = self.project.read();
+        let project = self.project.refer.read();
         project.resolve_dependence(item_type, self.module_path.as_slice(), path)
     }
     #[inline]

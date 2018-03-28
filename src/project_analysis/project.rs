@@ -1,14 +1,9 @@
-use std::sync::{
-    Arc,
-    RwLock,
-    RwLockReadGuard,
-    RwLockWriteGuard,
-    TryLockError,
-};
+use std::sync::Arc;
 use indexmap::IndexMap;
 use helpers::find_index::find_index;
 use helpers::group::Group;
 use helpers::into_static::IntoStatic;
+use helpers::loud_rw_lock::LoudRwLock;
 use lexeme_scanner::Scanner;
 use parser_basics::{
     parse,
@@ -33,7 +28,7 @@ use super::path_resolver::PathResolver;
 #[derive(Debug)]
 pub struct Project {
     source_of_source: Box<TextSourceWithDebug>,
-    types: IndexMap<Vec<StaticIdentifier>, ProjectItem<DataType<'static>>>,
+    types: IndexMap<Vec<StaticIdentifier>, LoudRwLock<ProjectItem<DataType<'static>>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -45,10 +40,10 @@ impl Project {
     #[inline]
     pub fn from_boxed_source(source_of_source: Box<TextSourceWithDebug>) -> ProjectRef {
         ProjectRef {
-            refer: Arc::new(RwLock::new(Project {
+            refer: Arc::new(LoudRwLock::new(Project {
                 source_of_source,
                 types: IndexMap::new(),
-            }))
+            }, "Project's object was poisoned!"))
         }
     }
     #[inline]
@@ -76,7 +71,10 @@ impl Project {
         match refer.item_type {
             DependenceType::DataType => {
                 match self.types.get_index(refer.item_id) {
-                    Some((_, ref item)) => item.resolution_status == ResolutionStatus::Resolved,
+                    Some((_, item)) => match item.try_read_safe() {
+                        Some(ref item) => item.resolution_status == ResolutionStatus::Resolved,
+                        None => false,
+                    }
                     None => false,
                 }
             }
@@ -132,36 +130,10 @@ impl<Data> ProjectItem<Data> {
 
 #[derive(Debug, Clone)]
 pub struct ProjectRef {
-    refer: Arc<RwLock<Project>>,
+    pub refer: Arc<LoudRwLock<Project>>,
 }
 
 impl ProjectRef {
-    pub fn try_read(&self) -> Option<RwLockReadGuard<Project>> {
-        match self.refer.try_read() {
-            Ok(guard) => Some(guard),
-            Err(TryLockError::Poisoned(_)) => panic!("Project's object was poisoned!"),
-            Err(TryLockError::WouldBlock) => None,
-        }
-    }
-    pub fn read(&self) -> RwLockReadGuard<Project> {
-        match self.refer.read() {
-            Ok(guard) => guard,
-            Err(_) => panic!("Project's object was poisoned!"),
-        }
-    }
-    pub fn try_write(&self) -> Option<RwLockWriteGuard<Project>> {
-        match self.refer.try_write() {
-            Ok(guard) => Some(guard),
-            Err(TryLockError::Poisoned(_)) => panic!("Project's object was poisoned!"),
-            Err(TryLockError::WouldBlock) => None,
-        }
-    }
-    pub fn write(&self) -> RwLockWriteGuard<Project> {
-        match self.refer.write() {
-            Ok(guard) => guard,
-            Err(_) => panic!("Project's object was poisoned!"),
-        }
-    }
     pub fn try_load_dependence(&self, path: &[StaticIdentifier]) -> Result<(), Group<SemanticError>> {
         let mut project = self.write();
         let items = project.try_load_dependence(path)?.into_static();
@@ -175,7 +147,10 @@ impl ProjectRef {
                 ModuleDefinitionValue::DataType(DataTypeDefinition { name, body }) => {
                     let mut path = path.to_vec();
                     path.push(name);
-                    let item = ProjectItem::new(path.clone(), self.clone(), body);
+                    let item = LoudRwLock::new(
+                        ProjectItem::new(path.clone(), self.clone(), body),
+                        "Item's object was poisoned!",
+                    );
                     project.types.insert(path, item);
                 }
                 _ => unimplemented!(),
