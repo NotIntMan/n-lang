@@ -1,3 +1,4 @@
+use std::fmt;
 use helpers::group::Group;
 use parser_basics::StaticIdentifier;
 use syntax_parser::others::StaticPath;
@@ -17,11 +18,20 @@ pub struct DependencyReference {
     pub item_id: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SemanticContext {
     module_path: Vec<StaticIdentifier>,
     project: ProjectRef,
     errors: Group<SemanticError>,
+}
+
+impl fmt::Debug for SemanticContext {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("SemanticContext")
+            .field("module_path", &self.module_path)
+            .field("errors", &self.errors)
+            .finish()
+    }
 }
 
 impl SemanticContext {
