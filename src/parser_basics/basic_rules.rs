@@ -2,6 +2,7 @@
 
 use std::ops::Range;
 use std::borrow::Cow;
+use std::fmt;
 use nom::IResult;
 use helpers::into_static::IntoStatic;
 use lexeme_scanner::{
@@ -30,7 +31,7 @@ pub fn none<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'t
     input.ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Identifier<'source>(pub Cow<'source, str>);
 
 pub type StaticIdentifier = Identifier<'static>;
@@ -63,7 +64,7 @@ impl<'source> IntoStatic for Identifier<'source> {
     }
 }
 
-impl<'token> PartialEq<str> for Identifier<'token> {
+impl<'source> PartialEq<str> for Identifier<'source> {
     fn eq(&self, other: &str) -> bool {
         &*self.0 == other
     }
@@ -73,13 +74,24 @@ impl<'token> PartialEq<str> for Identifier<'token> {
     }
 }
 
-impl<'token, 'source> PartialEq<&'source str> for Identifier<'token> {
-    fn eq(&self, other: &&'source str) -> bool {
+impl<'source, 'target> PartialEq<&'target str> for Identifier<'source> {
+    fn eq(&self, other: &&'target str) -> bool {
         &*self.0 == *other
     }
 
-    fn ne(&self, other: &&'source str) -> bool {
+    fn ne(&self, other: &&'target str) -> bool {
         &*self.0 != *other
+    }
+}
+
+impl<'source> fmt::Debug for Identifier<'source> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let item = self.get_text();
+        if f.alternate() {
+            write!(f, "Identifier: {:#?}", &*item)
+        } else {
+            write!(f, "Identifier: {:?}", &*item)
+        }
     }
 }
 

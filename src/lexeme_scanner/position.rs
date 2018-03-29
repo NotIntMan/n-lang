@@ -1,6 +1,7 @@
 //! Набор структур для отображения позиции элемента в тексте
 
 use std::fmt::{
+    Debug,
     Display,
     Result,
     Formatter,
@@ -16,7 +17,7 @@ use std::cmp::{
 };
 
 /// Позиция символа
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SymbolPosition {
     /**
         Означает смещение от первого символа в терминологии массивов.
@@ -127,6 +128,12 @@ impl PartialOrd for SymbolPosition {
         } else {
             None
         }
+    }
+}
+
+impl Debug for SymbolPosition {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "{}[{}:{}]", self.offset, self.line, self.column)
     }
 }
 
