@@ -6,8 +6,8 @@ use helpers::group::Appendable;
 use helpers::into_static::IntoStatic;
 use helpers::write_pad::{
     decimal_unsigned_length,
-    write_pad_left,
     write_pointer_line,
+    write_line_numbers_columns_row,
 };
 use lexeme_scanner::{
     ItemPosition,
@@ -142,11 +142,11 @@ impl SemanticError {
 //        }
 //    }
     pub fn write_display<W: fmt::Write>(&self, w: &mut W, text: Option<Arc<Text>>) -> fmt::Result {
-        writeln!(w, "error: {}", self.kind)?;
         match &text {
-            &Some(ref arc) => writeln!(w, "in {} on {}", &arc.name, self.pos.begin)?,
-            &None => writeln!(w, "on {}", self.pos.begin)?,
+            &Some(ref arc) => writeln!(w, "  in {} on {}", &arc.name, self.pos.begin)?,
+            &None => writeln!(w, "  on {}", self.pos.begin)?,
         }
+        writeln!(w, "  error: {}", self.kind)?;
         let text = match text {
             Some(arc) => arc,
             None => return write!(w, "Text is unspecified"),
@@ -161,15 +161,15 @@ impl SemanticError {
         let mut no_lines = true;
         let max_line_num_length = max(3, decimal_unsigned_length(self.pos.end.line));
         for (i, line) in lines {
-            let line_number = self.pos.begin.line + i;
-            no_lines = false;
-            write!(w, " ")?;
-            write_pad_left(w, line_number, max_line_num_length)?;
-            writeln!(w, " | {}", line)?;
-            for _ in 0..(max_line_num_length + 1) {
-                write!(w, " ")?;
+            if no_lines {
+                no_lines = false;
+                write_line_numbers_columns_row(w, max_line_num_length, None)?;
+                writeln!(w, "")?;
             }
-            write!(w, " | ")?;
+            let line_number = self.pos.begin.line + i;
+            write_line_numbers_columns_row(w, max_line_num_length, Some(line_number))?;
+            writeln!(w, "{}", line)?;
+            write_line_numbers_columns_row(w, max_line_num_length, None)?;
             if i == 0 {
                 if self.pos.begin.line != self.pos.end.line {
                     write_pointer_line(w, self.pos.begin.column, line.len())?;
