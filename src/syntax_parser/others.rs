@@ -1,3 +1,4 @@
+use std::fmt;
 use helpers::into_static::IntoStatic;
 use lexeme_scanner::{
     ItemPosition,
@@ -60,4 +61,15 @@ pub fn property_path<'token, 'source>(input: &'token [Token<'source>]) -> Parser
 /// Реализует разбор "пути модуля" (напр., "foo::bar::baz")
 pub fn module_path<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Path<'source>> {
     path(input, "::")
+}
+
+pub fn write_path<W: fmt::Write>(w: &mut W, path: &[Identifier], delimiter: &str) -> fmt::Result {
+    let mut path_iter = path.iter();
+    if let Some(path_item) = path_iter.next() {
+        write!(w, "{}", path_item.get_text())?;
+    }
+    for path_item in path_iter {
+        write!(w, "{}{}", delimiter, path_item.get_text())?;
+    }
+    Ok(())
 }
