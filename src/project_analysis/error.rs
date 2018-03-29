@@ -1,4 +1,5 @@
 use std::mem::replace;
+use std::fmt;
 use helpers::group::Appendable;
 use helpers::into_static::IntoStatic;
 use lexeme_scanner::{
@@ -11,6 +12,7 @@ use parser_basics::{
     ParserErrorItem,
     ParserErrorKind,
 };
+use syntax_parser::others::write_path;
 use super::context::SemanticItemType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -52,6 +54,23 @@ impl Appendable for SemanticErrorKind {
             return None;
         }
         Some(other)
+    }
+}
+
+impl fmt::Display for SemanticErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &SemanticErrorKind::Empty => write!(f, "empty error"),
+            &SemanticErrorKind::UnresolvedItem { ref path } => {
+                write!(f, "unresolved item")?;
+                write_path(f, path.as_slice(), "::")
+            }
+            &SemanticErrorKind::SuperOfRoot => write!(f, "cannot get 'super' of root module"),
+            &SemanticErrorKind::ItemNameNotSpecified => write!(f, "name of using item should be specified"),
+            &SemanticErrorKind::DuplicateDefinition { ref name, item_type } => write!(f, "there is already declared {} name {}", item_type, name.get_text()),
+            &SemanticErrorKind::ScannerError { ref kind } => write!(f, "{}", kind),
+            &SemanticErrorKind::ParserError { ref kind } => write!(f, "{}", kind),
+        }
     }
 }
 
