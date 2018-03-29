@@ -62,7 +62,7 @@ impl fmt::Display for SemanticErrorKind {
         match self {
             &SemanticErrorKind::Empty => write!(f, "empty error"),
             &SemanticErrorKind::UnresolvedItem { ref path } => {
-                write!(f, "unresolved item")?;
+                write!(f, "unresolved item ")?;
                 write_path(f, path.as_slice(), "::")
             }
             &SemanticErrorKind::SuperOfRoot => write!(f, "cannot get 'super' of root module"),
