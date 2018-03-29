@@ -231,17 +231,34 @@ impl ProjectRef {
 
 #[test]
 fn do_it() {
-    use std::collections::HashMap;
-//    use parser_basics::Identifier;
-    let mut sources = HashMap::new();
-    sources.insert(
+    use helpers::write_pad::display;
+    use project_analysis::text_source::HashMapSource;
+    let mut sources = HashMapSource::new();
+    sources.simple_insert(
         vec![],
-        "\
-            struct A ( boolean, X )\
-        ".to_string(),
+        "index.n",
+        "struct A ( boolean, X )",
     );
     let project = Project::from_source(sources);
     println!("{:#?}", project.try_load_dependence(&vec![]));
-    println!("{:#?}", project.try_resolve_module(DependenceType::DataType, 0));
+    for &item_type in ItemType::all().iter() {
+        for item_id in 0..project.items_count(item_type) {
+            println!("Resolving {} #{}", item_type, item_id);
+            match project.try_resolve_module(item_type, 0) {
+                ResolveResult::WrongId => println!("There is no {} with id {}", item_type, item_id),
+                ResolveResult::Errors(errors) => {
+                    println!("Got errors:");
+                    for error in errors {
+                        println!("{}", display(|w|
+                            error.write_display(w, project.get_text(item_type, item_id))
+                        ));
+                    }
+                }
+                ResolveResult::Stuck => println!("It seems to resolving is stuck"),
+                ResolveResult::Resolved => println!("Resolving succeed!"),
+            }
+        }
+    }
+    println!("{:#?}", project.try_resolve_module(ItemType::DataType, 0));
     println!("{:#?}", project);
 }
