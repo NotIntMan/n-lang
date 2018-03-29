@@ -15,3 +15,4 @@ pub mod match_it_macro;
 pub mod into_static;
 pub mod find_index;
 pub mod loud_rw_lock;
+pub mod write_pad;
