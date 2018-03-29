@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::fmt;
 use helpers::group::Group;
 use helpers::into_static::IntoStatic;
+use helpers::write_pad::display;
 use lexeme_scanner::Scanner;
 use parser_basics::{
     parse,
@@ -12,6 +13,7 @@ use syntax_parser::modules::{
     module,
     ModuleDefinitionItem,
 };
+use syntax_parser::others::write_path;
 use super::error::SemanticError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -57,10 +59,50 @@ pub trait TextSourceWithDebug: TextSource + Debug {}
 impl<T: TextSource + Debug> TextSourceWithDebug for T {}
 
 use std::collections::HashMap;
-use std::hash::BuildHasher;
 
-impl<S: BuildHasher> TextSource for HashMap<Vec<StaticIdentifier>, String, S> {
-    fn get_text(&mut self, path: &[StaticIdentifier]) -> Option<String> {
-        self.get(path).map(String::clone)
+#[derive(Clone)]
+pub struct HashMapSource {
+    map: HashMap<Vec<StaticIdentifier>, Arc<Text>>,
+}
+
+impl HashMapSource {
+    pub fn new() -> Self {
+        HashMapSource {
+            map: HashMap::new(),
+        }
+    }
+    pub fn simple_insert(&mut self, path: Vec<&str>, name: &str, text: &str) {
+        self.map.insert(
+            path.into_iter()
+                .map(|name|
+                    StaticIdentifier::new(name).into_static()
+                )
+                .collect(),
+            Arc::new(Text {
+                name: name.to_string(),
+                text: text.to_string(),
+            }),
+        );
+    }
+}
+
+impl fmt::Debug for HashMapSource {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut map = f.debug_map();
+        for (path, text) in self.map.iter() {
+            map.entry(
+                &display(|s|
+                    write_path(s, path.as_slice(), "::")
+                ),
+                &*text,
+            );
+        }
+        map.finish()
+    }
+}
+
+impl TextSource for HashMapSource {
+    fn get_text(&mut self, path: &[StaticIdentifier]) -> Option<Arc<Text>> {
+        self.map.get(path).map(Clone::clone)
     }
 }
