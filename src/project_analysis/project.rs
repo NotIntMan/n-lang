@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::fmt;
 use indexmap::IndexMap;
 use helpers::find_index::find_index;
 use helpers::group::Group;
@@ -30,6 +31,23 @@ pub struct Project {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ItemType {
     DataType,
+}
+
+impl fmt::Display for ItemType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &ItemType::DataType => write!(f, "data type"),
+        }
+    }
+}
+
+impl ItemType {
+    #[inline]
+    fn all() -> [Self; 1] {
+        [
+            ItemType::DataType,
+        ]
+    }
 }
 
 impl Project {
