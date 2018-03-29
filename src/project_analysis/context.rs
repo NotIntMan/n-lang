@@ -12,6 +12,15 @@ pub enum SemanticItemType {
     DataType,
 }
 
+impl fmt::Display for SemanticItemType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &SemanticItemType::Field => write!(f, "field"),
+            &SemanticItemType::DataType => write!(f, "data type"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ItemReference {
     pub item_type: ItemType,
