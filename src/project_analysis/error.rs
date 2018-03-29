@@ -19,7 +19,7 @@ pub enum SemanticErrorKind {
     UnresolvedItem {
         path: Vec<StaticIdentifier>,
     },
-    SuperOfGlobal,
+    SuperOfRoot,
     ItemNameNotSpecified,
     DuplicateDefinition {
         name: StaticIdentifier,
@@ -75,8 +75,8 @@ impl SemanticError {
         SemanticError { pos, kind: SemanticErrorKind::UnresolvedItem { path } }
     }
     #[inline]
-    pub fn super_of_global(pos: ItemPosition) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::SuperOfGlobal }
+    pub fn super_of_root(pos: ItemPosition) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::SuperOfRoot }
     }
     #[inline]
     pub fn item_name_not_specified(pos: ItemPosition) -> Self {

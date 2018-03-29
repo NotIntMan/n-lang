@@ -24,7 +24,7 @@ impl<'a> PathResolver<'a> {
                 'super_loop: loop {
                     dep_path = &dep_path[1..];
                     match base.len() {
-                        0 => return Err(SemanticError::super_of_global(path.pos)),
+                        0 => return Err(SemanticError::super_of_root(path.pos)),
                         length => base = &base[..(length - 1)],
                     }
                     if dep_path.len() == 0 {
