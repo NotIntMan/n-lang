@@ -16,7 +16,7 @@ use super::context::SemanticItemType;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SemanticErrorKind {
     Empty,
-    UnresolvedDependency {
+    UnresolvedItem {
         path: Vec<StaticIdentifier>,
     },
     SuperOfGlobal,
@@ -71,8 +71,8 @@ impl SemanticError {
         SemanticError { pos, kind: SemanticErrorKind::Empty }
     }
     #[inline]
-    pub fn unresolved_dependency(pos: ItemPosition, path: Vec<StaticIdentifier>) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::UnresolvedDependency { path } }
+    pub fn unresolved_item(pos: ItemPosition, path: Vec<StaticIdentifier>) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::UnresolvedItem { path } }
     }
     #[inline]
     pub fn super_of_global(pos: ItemPosition) -> Self {

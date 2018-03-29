@@ -18,7 +18,7 @@ pub trait TextSource {
     fn try_load_module(&mut self, path: &[StaticIdentifier]) -> Result<Vec<ModuleDefinitionItem<'static>>, Group<SemanticError>> {
         let text = match self.get_text(path) {
             Some(text) => text,
-            None => return Err(Group::One(SemanticError::unresolved_dependency(
+            None => return Err(Group::One(SemanticError::unresolved_item(
                 Default::default(),
                 path.to_vec(),
             ))),

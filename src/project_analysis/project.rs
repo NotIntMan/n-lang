@@ -15,7 +15,7 @@ use syntax_parser::compound_types::DataType;
 use super::error::SemanticError;
 use super::text_source::TextSourceWithDebug;
 use super::context::{
-    DependencyReference,
+    ItemReference,
     SemanticContext,
 };
 use super::path_resolver::PathResolver;
@@ -28,7 +28,7 @@ pub struct Project {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DependenceType {
+pub enum ItemType {
     DataType,
 }
 
@@ -46,26 +46,26 @@ impl Project {
     pub fn from_source<S: 'static + TextSourceWithDebug>(source: S) -> ProjectRef {
         Project::from_boxed_source(Box::new(source))
     }
-    pub fn resolve_dependence(&self, item_type: DependenceType, base: &[StaticIdentifier], path: &StaticPath) -> Result<DependencyReference, SemanticError> {
+    pub fn resolve_item(&self, item_type: ItemType, base: &[StaticIdentifier], path: &StaticPath) -> Result<ItemReference, SemanticError> {
         let absolute_path: Vec<_> = PathResolver::new(base, path)?
             .map(|item| (*item).clone())
             .collect();
         match item_type {
-            DependenceType::DataType => {
+            ItemType::DataType => {
                 let item_id = match find_index(
                     &self.types,
                     |&(data_type_path, _)| absolute_path.iter().eq(data_type_path.iter()),
                 ) {
                     Some(index) => index,
-                    None => return Err(SemanticError::unresolved_dependency(path.pos, absolute_path)),
+                    None => return Err(SemanticError::unresolved_item(path.pos, absolute_path)),
                 };
-                Ok(DependencyReference { item_type, item_id })
+                Ok(ItemReference { item_type, item_id })
             }
         }
     }
-    pub fn is_dependence_resolved(&self, refer: DependencyReference) -> bool {
+    pub fn is_item_resolved(&self, refer: ItemReference) -> bool {
         match refer.item_type {
-            DependenceType::DataType => {
+            ItemType::DataType => {
                 match self.types.get_index(refer.item_id) {
                     Some((_, item)) => match item.try_read_safe() {
                         Some(ref item) => item.resolution_status == ResolutionStatus::Resolved,
@@ -145,10 +145,10 @@ impl ProjectRef {
         }
         Ok(())
     }
-    pub fn try_resolve_module(&self, item_type: DependenceType, id: usize) -> ResolveResult {
+    pub fn try_resolve_module(&self, item_type: ItemType, id: usize) -> ResolveResult {
         let project = self.refer.read();
         match item_type {
-            DependenceType::DataType => {
+            ItemType::DataType => {
                 let mut item = match project.types.get_index(id) {
                     Some((_, item)) => item.write(),
                     None => return ResolveResult::WrongId,

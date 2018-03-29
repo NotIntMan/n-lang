@@ -6,13 +6,13 @@ use parser_basics::Identifier;
 use syntax_parser::others::Path;
 use syntax_parser::primitive_types::PrimitiveDataType;
 use project_analysis::context::{
-    DependencyReference,
+    ItemReference,
     SemanticContext,
     SemanticItemType,
 };
 use project_analysis::error::SemanticError;
 use project_analysis::resolve::SemanticResolve;
-use project_analysis::project::DependenceType;
+use project_analysis::project::ItemType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Attribute<'source> {
@@ -112,7 +112,7 @@ pub enum DataType<'source> {
     Compound(CompoundDataType<'source>),
     Primitive(PrimitiveDataType),
     Reference(Path<'source>),
-    DependencyReference(DependencyReference),
+    ItemReference(ItemReference),
 }
 
 impl<'source> Assertion for DataType<'source> {
@@ -159,7 +159,7 @@ impl SemanticResolve for DataType<'static> {
             }
             &DataType::Primitive(_) => true,
             &DataType::Reference(_) => false,
-            &DataType::DependencyReference(refer) => context.is_dependence_resolved(refer),
+            &DataType::ItemReference(refer) => context.is_item_resolved(refer),
         }
     }
     fn try_resolve(&mut self, context: &mut SemanticContext) {
@@ -189,12 +189,12 @@ impl SemanticResolve for DataType<'static> {
             }
             &mut DataType::Primitive(_) => {}
             &mut DataType::Reference(ref path) => {
-                match context.resolve_dependence(DependenceType::DataType, &path) {
-                    Ok(dep_ref) => new_value = Some(DataType::DependencyReference(dep_ref)),
+                match context.resolve_item(ItemType::DataType, &path) {
+                    Ok(dep_ref) => new_value = Some(DataType::ItemReference(dep_ref)),
                     Err(error) => context.error(error),
                 }
             }
-            &mut DataType::DependencyReference(_) => {}
+            &mut DataType::ItemReference(_) => {}
         }
         if let Some(new_value) = new_value {
             replace(self, new_value);
@@ -209,7 +209,7 @@ impl<'source> IntoStatic for DataType<'source> {
             DataType::Compound(data_type) => DataType::Compound(data_type.into_static()),
             DataType::Primitive(data_type) => DataType::Primitive(data_type),
             DataType::Reference(path) => DataType::Reference(path.into_static()),
-            DataType::DependencyReference(refer) => DataType::DependencyReference(refer),
+            DataType::ItemReference(refer) => DataType::ItemReference(refer),
         }
     }
 }

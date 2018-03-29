@@ -4,7 +4,7 @@ use parser_basics::StaticIdentifier;
 use syntax_parser::others::StaticPath;
 use super::error::SemanticError;
 use super::project::ProjectRef;
-use super::project::DependenceType;
+use super::project::ItemType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SemanticItemType {
@@ -13,8 +13,8 @@ pub enum SemanticItemType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DependencyReference {
-    pub item_type: DependenceType,
+pub struct ItemReference {
+    pub item_type: ItemType,
     pub item_id: usize,
 }
 
@@ -46,12 +46,12 @@ impl SemanticContext {
         }
     }
     #[inline]
-    pub fn resolve_dependence(&mut self, item_type: DependenceType, path: &StaticPath) -> Result<DependencyReference, SemanticError> {
+    pub fn resolve_item(&mut self, item_type: ItemType, path: &StaticPath) -> Result<ItemReference, SemanticError> {
         let project = self.project.refer.read();
-        project.resolve_dependence(item_type, self.module_path.as_slice(), path)
+        project.resolve_item(item_type, self.module_path.as_slice(), path)
     }
     #[inline]
-    pub fn is_dependence_resolved(&self, _refer: DependencyReference) -> bool { false }
+    pub fn is_item_resolved(&self, _refer: ItemReference) -> bool { false }
     #[inline]
     pub fn error(&mut self, error: SemanticError) {
         self.errors.append_item(error)
