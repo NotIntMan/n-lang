@@ -11,10 +11,10 @@ use std::ops::{
 
 pub fn write_pad_left<W: Write, D: Display>(w: &mut W, value: D, length: usize) -> Result {
     let value_string = format!("{}", value);
-    write!(w, "{}", value_string)?;
     for _ in value_string.len()..length {
         write!(w, " ")?;
     }
+    write!(w, "{}", value_string)?;
     Ok(())
 }
 
@@ -51,7 +51,7 @@ pub fn decimal_unsigned_length<T>(value: T) -> usize
 
 pub fn write_pointer_line<W: Write>(w: &mut W, begin: usize, end: usize) -> Result {
     if begin < end {
-        for _ in 0..begin {
+        for _ in 1..begin {
             write!(w, " ")?;
         }
         for _ in begin..end {
