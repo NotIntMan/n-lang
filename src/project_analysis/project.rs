@@ -22,12 +22,6 @@ use super::context::{
 use super::path_resolver::PathResolver;
 use super::resolve::SemanticResolve;
 
-#[derive(Debug)]
-pub struct Project {
-    source_of_source: Box<TextSourceWithDebug>,
-    types: IndexMap<Vec<StaticIdentifier>, LoudRwLock<ProjectItem<DataType<'static>>>>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ItemType {
     DataType,
@@ -48,6 +42,12 @@ impl ItemType {
             ItemType::DataType,
         ]
     }
+}
+
+#[derive(Debug)]
+pub struct Project {
+    source_of_source: Box<TextSourceWithDebug>,
+    types: IndexMap<Vec<StaticIdentifier>, LoudRwLock<ProjectItem<DataType<'static>>>>,
 }
 
 impl Project {
