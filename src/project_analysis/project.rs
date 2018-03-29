@@ -14,7 +14,10 @@ use syntax_parser::modules::{
 use syntax_parser::others::StaticPath;
 use syntax_parser::compound_types::DataType;
 use super::error::SemanticError;
-use super::text_source::TextSourceWithDebug;
+use super::text_source::{
+    Text,
+    TextSourceWithDebug,
+};
 use super::context::{
     ItemReference,
     SemanticContext,
@@ -94,6 +97,20 @@ impl Project {
             }
         }
     }
+    pub fn items_count(&self, item_type: ItemType) -> usize {
+        match item_type {
+            ItemType::DataType => self.types.len(),
+        }
+    }
+    pub fn get_text(&self, item_type: ItemType, item_id: usize) -> Option<Arc<Text>> {
+        match item_type {
+            ItemType::DataType => {
+                let (_, item) = self.types.get_index(item_id)?;
+                let item = item.read();
+                Some(item.text.clone())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -105,6 +122,7 @@ pub enum ResolutionStatus {
 
 #[derive(Debug)]
 pub struct ProjectItem<Data: SemanticResolve> {
+    text: Arc<Text>,
     context: SemanticContext,
     resolution_status: ResolutionStatus,
     data: Data,
@@ -112,8 +130,9 @@ pub struct ProjectItem<Data: SemanticResolve> {
 
 impl<Data: SemanticResolve> ProjectItem<Data> {
     #[inline]
-    fn new(module_path: Vec<StaticIdentifier>, project: ProjectRef, data: Data) -> Self {
+    fn new(text: Arc<Text>, module_path: Vec<StaticIdentifier>, project: ProjectRef, data: Data) -> Self {
         ProjectItem {
+            text,
             context: SemanticContext::new(module_path, project),
             resolution_status: ResolutionStatus::Pending,
             data,
@@ -137,7 +156,8 @@ pub enum ResolveResult {
 impl ProjectRef {
     pub fn try_load_dependence(&self, path: &[StaticIdentifier]) -> Result<(), Group<SemanticError>> {
         let mut project = self.refer.write();
-        let items = project.source_of_source.try_load_module(path)?.into_static();
+        let (text, items) = project.source_of_source.try_load_module(path)?;
+        let items = items.into_static();
         for item in items {
             let ModuleDefinitionItem {
                 public: _, // TODO Учесть экспорты
@@ -150,7 +170,7 @@ impl ProjectRef {
                     let mut path = path.to_vec();
                     // Конструируем ProjectItem и передаём ему ПУТЬ МОДУЛЯ.
                     let item = LoudRwLock::new(
-                        ProjectItem::new(path.clone(), self.clone(), body),
+                        ProjectItem::new(text.clone(), path.clone(), self.clone(), body),
                         "Item's object was poisoned!",
                     );
                     // Добавляем в путь имя элемента.
@@ -198,6 +218,14 @@ impl ProjectRef {
                 }
             }
         }
+    }
+    pub fn items_count(&self, item_type: ItemType) -> usize {
+        let project = self.refer.read();
+        project.items_count(item_type)
+    }
+    pub fn get_text(&self, item_type: ItemType, item_id: usize) -> Option<Arc<Text>> {
+        let project = self.refer.read();
+        project.get_text(item_type, item_id)
     }
 }
 
