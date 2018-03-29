@@ -1,7 +1,14 @@
 use std::mem::replace;
 use std::fmt;
+use std::cmp::max;
+use std::sync::Arc;
 use helpers::group::Appendable;
 use helpers::into_static::IntoStatic;
+use helpers::write_pad::{
+    decimal_unsigned_length,
+    write_pad_left,
+    write_pointer_line,
+};
 use lexeme_scanner::{
     ItemPosition,
     ScannerError,
@@ -13,6 +20,7 @@ use parser_basics::{
     ParserErrorKind,
 };
 use syntax_parser::others::write_path;
+use super::text_source::Text;
 use super::context::SemanticItemType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -133,6 +141,54 @@ impl SemanticError {
 //            }
 //        }
 //    }
+    pub fn write_display<W: fmt::Write>(&self, w: &mut W, text: Option<Arc<Text>>) -> fmt::Result {
+        writeln!(w, "error: {}", self.kind)?;
+        match &text {
+            &Some(ref arc) => writeln!(w, "in {} on {}", &arc.name, self.pos.begin)?,
+            &None => writeln!(w, "on {}", self.pos.begin)?,
+        }
+        let text = match text {
+            Some(arc) => arc,
+            None => return write!(w, "Text is unspecified"),
+        };
+        let lines = match self.pos.lines() {
+            0 => return write!(w, "Text is unspecified"),
+            line_count => text.text.lines()
+                .skip(self.pos.begin.line - 1)
+                .take(line_count)
+                .enumerate(),
+        };
+        let mut no_lines = true;
+        let max_line_num_length = max(3, decimal_unsigned_length(self.pos.end.line));
+        for (i, line) in lines {
+            let line_number = self.pos.begin.line + i;
+            no_lines = false;
+            write!(w, " ")?;
+            write_pad_left(w, line_number, max_line_num_length)?;
+            writeln!(w, " | {}", line)?;
+            for _ in 0..(max_line_num_length + 1) {
+                write!(w, " ")?;
+            }
+            write!(w, " | ")?;
+            if i == 0 {
+                if self.pos.begin.line != self.pos.end.line {
+                    write_pointer_line(w, self.pos.begin.column, line.len())?;
+                } else {
+                    write_pointer_line(w, self.pos.begin.column, self.pos.end.column)?;
+                }
+            } else {
+                if line_number == self.pos.end.line {
+                    write_pointer_line(w, 0, self.pos.end.column)?;
+                } else {
+                    write_pointer_line(w, 0, line.len())?;
+                }
+            }
+        }
+        if no_lines {
+            writeln!(w, "Text is unspecified")?;
+        }
+        Ok(())
+    }
 }
 
 impl Appendable for SemanticError {
