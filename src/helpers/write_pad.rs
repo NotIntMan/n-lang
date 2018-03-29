@@ -18,6 +18,19 @@ pub fn write_pad_left<W: Write, D: Display>(w: &mut W, value: D, length: usize) 
     Ok(())
 }
 
+pub fn write_line_numbers_columns_row<W: Write>(w: &mut W, number_length: usize, line_number: Option<usize>) -> Result {
+    write!(w, " ")?;
+    match line_number {
+        Some(line_number) => write_pad_left(w, line_number, number_length)?,
+        None => {
+            for _ in 0..number_length {
+                write!(w, " ")?;
+            }
+        }
+    }
+    write!(w, " | ")
+}
+
 #[inline]
 pub fn generic_unsigned_length<T, Z, B>(mut value: T, zero: Z, basis: B) -> usize
     where T: DivAssign<B>
