@@ -199,7 +199,9 @@ impl SemanticResolve for DataType<'static> {
                     Err(error) => context.error(error),
                 }
             }
-            &mut DataType::ItemReference(_) => {}
+            &mut DataType::ItemReference(_) => {
+                // TODO Item should be DataType
+            }
         }
         if let Some(new_value) = new_value {
             replace(self, new_value);
