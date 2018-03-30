@@ -25,7 +25,7 @@ impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignme
             .expect("Scanner result must be ok");
         let other_property = ::parser_basics::parse(other_property_tokens.as_slice(), ::syntax_parser::others::property_path)
             .expect("Parser result must be ok");
-        assert_eq!(self.property, other_property);
+        assert_eq!(self.property.path, other_property.path);
         match other.1 {
             Some(other_expr) => {
                 if let &UpdatingValue::Expression(ref expr) = &self.value {

@@ -76,11 +76,21 @@ impl<'source> PartialEq<str> for Identifier<'source> {
 
 impl<'source, 'target> PartialEq<&'target str> for Identifier<'source> {
     fn eq(&self, other: &&'target str) -> bool {
-        &*self.0 == *other
+        self.get_text() == *other
     }
 
     fn ne(&self, other: &&'target str) -> bool {
-        &*self.0 != *other
+        self.get_text() != *other
+    }
+}
+
+impl<'source, 'target> PartialEq<Identifier<'source>> for &'target str {
+    fn eq(&self, other: &Identifier<'source>) -> bool {
+        *self == other.get_text()
+    }
+
+    fn ne(&self, other: &Identifier<'source>) -> bool {
+        *self != other.get_text()
     }
 }
 

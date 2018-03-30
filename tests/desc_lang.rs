@@ -278,7 +278,7 @@ fn module_of_two_usage_parses_correctly() {
     assert_eq!(result[0].public, false);
     assert_eq!(result[0].attributes.len(), 0);
     match_it!(&result[0].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
-        assert_eq!(*path, [Identifier::new("foo"), Identifier::new("bar")]);
+        assert_eq!(*path, &[Identifier::new("foo"), Identifier::new("bar")][..]);
         assert_eq!(*tail, ExternalItemTail::Alias(Identifier::new("Bar")));
     });
     assert_eq!(result[1].public, true);
@@ -286,7 +286,7 @@ fn module_of_two_usage_parses_correctly() {
     assert_eq!(result[1].attributes[0].name, "no_mandle");
     assert_eq!(result[1].attributes[0].arguments, None);
     match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
-        assert_eq!(*path, ["foo", "TakeAll"]);
+        assert_eq!(*path, &["foo", "TakeAll"][..]);
         assert_eq!(*tail, ExternalItemTail::None);
     });
 }
@@ -385,13 +385,13 @@ fn simple_submodule_parses_correctly() {
     assert_eq!(result[1].public, true);
     assert_eq!(result[1].attributes.len(), 0);
     match_it!(&result[1].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
-        assert_eq!(*path, ["wave"]);
+        assert_eq!(*path, &["wave"][..]);
         assert_eq!(*tail, ExternalItemTail::Asterisk);
     });
     assert_eq!(result[2].public, true);
     assert_eq!(result[2].attributes.len(), 0);
     match_it!(&result[2].value, &ModuleDefinitionValue::Import(ExternalItemImport { ref path, ref tail }) => {
-        assert_eq!(*path, ["wave", "Complex"]);
+        assert_eq!(*path, &["wave", "Complex"][..]);
         assert_eq!(*tail, ExternalItemTail::Alias(Identifier::new("ComplexNumber")));
     });
     assert_eq!(result[3].public, true);

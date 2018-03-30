@@ -123,6 +123,11 @@ impl<'source> Assertion for DataType<'source> {
                     compound_type.assert(other_compound_type);
                 });
             }
+            &DataType::Reference(ref path) => {
+                match_it!(other_data_type, &DataType::Reference(ref other_path) => {
+                    assert_eq!(path.path, other_path.path);
+                });
+            }
             other => assert_eq!(other, other_data_type),
         }
     }

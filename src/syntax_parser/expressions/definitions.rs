@@ -144,7 +144,7 @@ impl<'source> Assertion for Expression<'source> {
             }
             &Expression::PropertyAccess(ref left, ref left_path) => {
                 if let &Expression::PropertyAccess(ref right, ref right_path) = other {
-                    assert_eq!(left_path, right_path);
+                    assert_eq!(left_path.path, right_path.path);
                     (*left).assert(&**right);
                 } else { assert_eq!(self, other) }
             }
@@ -155,7 +155,7 @@ impl<'source> Assertion for Expression<'source> {
             }
             &Expression::FunctionCall(ref left_name, ref left_args) => {
                 if let &Expression::FunctionCall(ref right_name, ref right_args) = other {
-                    assert_eq!(left_name, right_name);
+                    assert_eq!(left_name.path, right_name.path);
                     left_args.as_slice().assert(&right_args.as_slice());
                 } else { assert_eq!(self, other) }
             }

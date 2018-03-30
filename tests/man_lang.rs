@@ -219,7 +219,7 @@ fn property_access_and_set_and_function_call_expression_parses_correctly() {
     });
     assert_identifier(args.remove(0), "bar");
     let arg1 = match_it!(args.remove(0), Expression::PropertyAccess(expr, prop) => {
-        assert_eq!(prop, ["baz"]);
+        assert_eq!(prop, &["baz"][..]);
         *expr
     });
     assert_identifier(arg1, "bar");
@@ -468,10 +468,12 @@ fn simple_inserting_values_query_parses_correctly() {
     assert_eq!(insert.ignore, false);
     assert_table(&insert.target, "foo", None);
     match_it!(&insert.source, &InsertingSource::ValueLists { ref properties, ref lists } => {
-        assert_eq!(*properties, Some(vec![
-            vec![Identifier::new("start"), Identifier::new("x")],
-            vec![Identifier::new("end"), Identifier::new("z")],
-        ]));
+        match_it!(properties, &Some(ref paths) => {
+            assert_eq!(*paths, [
+                &["start", "x"][..],
+                &["end", "z"][..],
+            ]);
+        });
         let mut list_iterator = lists.iter();
         let list = list_iterator.next()
             .expect("List of lists must contain list");
@@ -515,10 +517,12 @@ fn simple_inserting_from_selection_query_parses_correctly() {
     assert_eq!(insert.ignore, true);
     assert_table(&insert.target, "foo", None);
     match_it!(&insert.source, &InsertingSource::Selection { ref properties, ref query } => {
-        assert_eq!(*properties, Some(vec![
-            vec![Identifier::new("start"), Identifier::new("x")],
-            vec![Identifier::new("end"), Identifier::new("z")],
-        ]));
+        match_it!(properties, &Some(ref paths) => {
+            assert_eq!(*paths, [
+                &["start", "x"][..],
+                &["end", "z"][..],
+            ]);
+        });
         assert_eq!(query.distinct, false);
         assert_eq!(query.high_priority, false);
         assert_eq!(query.straight_join, false);

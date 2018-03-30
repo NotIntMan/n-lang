@@ -13,7 +13,7 @@ use parser_basics::{
     symbols,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct Path<'source> {
     pub pos: ItemPosition,
     pub path: Vec<Identifier<'source>>,
@@ -29,6 +29,46 @@ impl<'source> IntoStatic for Path<'source> {
             pos,
             path: path.into_static(),
         }
+    }
+}
+
+impl<'source> PartialEq for Path<'source> {
+    #[inline]
+    fn eq(&self, other: &Path) -> bool {
+        (self.pos == other.pos) &&
+            (self.path == other.path)
+    }
+
+    #[inline]
+    fn ne(&self, other: &Path) -> bool {
+        (self.pos != other.pos) |
+            (self.path != other.path)
+    }
+}
+
+impl<'source, 'target, T> PartialEq<&'target [T]> for Path<'source>
+    where T: PartialEq<Identifier<'source>> {
+    #[inline]
+    fn eq(&self, other: &&'target [T]) -> bool {
+        (*other).eq(self.path.as_slice())
+    }
+
+    #[inline]
+    fn ne(&self, other: &&'target [T]) -> bool {
+        (*other).ne(self.path.as_slice())
+    }
+}
+
+impl<'source, T> PartialEq<Vec<T>> for Path<'source>
+    where T: PartialEq<Identifier<'source>> {
+    #[inline]
+    fn eq(&self, other: &Vec<T>) -> bool {
+        other.eq(&self.path)
+    }
+
+    #[inline]
+    fn ne(&self, other: &Vec<T>) -> bool {
+        other.ne(&self.path)
     }
 }
 
