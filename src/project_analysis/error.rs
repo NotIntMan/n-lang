@@ -41,9 +41,6 @@ pub enum SemanticErrorKind {
     ParserError {
         kind: ParserErrorKind<'static>,
     },
-//    SemanticPanic {
-//        message: String,
-//    },
 }
 
 impl Default for SemanticErrorKind {
@@ -132,15 +129,6 @@ impl SemanticError {
             kind: SemanticErrorKind::ParserError { kind: kind.into_static() },
         }
     }
-//    #[inline]
-//    pub fn semantic_panic<S: ToString>(message: S) -> Self {
-//        SemanticError {
-//            pos: ItemPosition::default(),
-//            kind: SemanticErrorKind::SemanticPanic {
-//                message: message.to_string(),
-//            }
-//        }
-//    }
     pub fn write_display<W: fmt::Write>(&self, w: &mut W, text: Option<Arc<Text>>) -> fmt::Result {
         match &text {
             &Some(ref arc) => writeln!(w, "  in {} on {}", &arc.name, self.pos.begin)?,
