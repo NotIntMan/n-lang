@@ -10,6 +10,7 @@ use helpers::loud_rw_lock::LoudRwLock;
 use parser_basics::StaticIdentifier;
 use syntax_parser::modules::{
     DataTypeDefinition,
+    ExternalItemImport,
     ModuleDefinitionItem,
     ModuleDefinitionValue,
 };
@@ -177,6 +178,7 @@ impl ProjectRef {
                     // И под этим путём-именем записываем в регистр.
                     project.types.insert(path, item);
                 }
+                ModuleDefinitionValue::Import(ExternalItemImport { path: _, tail: _ }) => {}
                 _ => unimplemented!(),
             }
         }
@@ -236,7 +238,16 @@ fn do_it() {
     sources.simple_insert(
         vec![],
         "index.n",
-        "struct A ( boolean, X )",
+        "\
+        use ext::X;\n \
+        struct A ( boolean, X )",
+    );
+    sources.simple_insert(
+        vec!["ext"],
+        "ext.n",
+        "\
+        use ext::X;\n \
+        struct A ( boolean, X )",
     );
     let project = Project::from_source(sources);
     println!("{:#?}", project.try_load_dependence(&vec![]));
