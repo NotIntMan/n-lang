@@ -38,10 +38,32 @@ pub enum ExternalItemTail<'source> {
     Alias(Identifier<'source>),
 }
 
+impl<'source> IntoStatic for ExternalItemTail<'source> {
+    type Result = ExternalItemTail<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            ExternalItemTail::None => ExternalItemTail::None,
+            ExternalItemTail::Asterisk => ExternalItemTail::Asterisk,
+            ExternalItemTail::Alias(identifier) => ExternalItemTail::Alias(identifier.into_static()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalItemImport<'source> {
     pub path: Path<'source>,
     pub tail: ExternalItemTail<'source>,
+}
+
+impl<'source> IntoStatic for ExternalItemImport<'source> {
+    type Result = ExternalItemImport<'static>;
+    fn into_static(self) -> Self::Result {
+        let ExternalItemImport { path, tail } = self;
+        ExternalItemImport {
+            path: path.into_static(),
+            tail: tail.into_static(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +80,7 @@ impl<'source> IntoStatic for ModuleDefinitionValue<'source> {
     fn into_static(self) -> Self::Result {
         match self {
             ModuleDefinitionValue::DataType(value) => ModuleDefinitionValue::DataType(value.into_static()),
+            ModuleDefinitionValue::Import(value) => ModuleDefinitionValue::Import(value.into_static()),
             _ => unimplemented!(),
         }
     }
