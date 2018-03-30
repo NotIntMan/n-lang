@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::sync::Arc;
 use std::fmt;
 use indexmap::IndexMap;
@@ -39,12 +41,9 @@ impl fmt::Display for ItemType {
 }
 
 impl ItemType {
-    #[inline]
-    fn all() -> [Self; 1] {
-        [
-            ItemType::DataType,
-        ]
-    }
+    const ALL: [Self; 1] = [
+        ItemType::DataType,
+    ];
 }
 
 #[derive(Debug)]
@@ -241,7 +240,7 @@ fn do_it() {
     );
     let project = Project::from_source(sources);
     println!("{:#?}", project.try_load_dependence(&vec![]));
-    for &item_type in ItemType::all().iter() {
+    for &item_type in ItemType::ALL.iter() {
         for item_id in 0..project.items_count(item_type) {
             println!("Resolving {} #{}", item_type, item_id);
             match project.try_resolve_module(item_type, 0) {
