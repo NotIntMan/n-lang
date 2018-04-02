@@ -21,6 +21,16 @@ pub struct Path<'source> {
 
 pub type StaticPath = Path<'static>;
 
+impl<'source> Path<'source> {
+    #[inline]
+    pub fn for_root() -> Self {
+        Path {
+            pos: Default::default(),
+            path: vec![],
+        }
+    }
+}
+
 impl<'source> IntoStatic for Path<'source> {
     type Result = StaticPath;
     fn into_static(self) -> StaticPath {

@@ -5,14 +5,16 @@ use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use syntax_parser::others::Path;
 use syntax_parser::primitive_types::PrimitiveDataType;
-use project_analysis::context::{
-    ItemReference,
-    SemanticContext,
-    SemanticItemType,
+use project_analysis::resolve::{
+    SemanticResolve,
+    ResolveContext,
 };
 use project_analysis::error::SemanticError;
-use project_analysis::resolve::SemanticResolve;
-use project_analysis::project::ItemType;
+use project_analysis::item::{
+    ItemRef,
+    ItemType,
+    SemanticItemType,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Attribute<'source> {
@@ -112,7 +114,7 @@ pub enum DataType<'source> {
     Compound(CompoundDataType<'source>),
     Primitive(PrimitiveDataType),
     Reference(Path<'source>),
-    ItemReference(ItemReference),
+    ItemReference(ItemRef),
 }
 
 impl<'source> Assertion for DataType<'source> {
@@ -152,7 +154,7 @@ impl<'a, 'source> Assertion<&'a str> for DataType<'source> {
 }
 
 impl SemanticResolve for DataType<'static> {
-    fn is_resolved(&self, context: &SemanticContext) -> bool {
+    fn is_resolved(&self, context: &ResolveContext) -> bool {
         match self {
             &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
                 fields.iter()
@@ -164,10 +166,10 @@ impl SemanticResolve for DataType<'static> {
             }
             &DataType::Primitive(_) => true,
             &DataType::Reference(_) => false,
-            &DataType::ItemReference(refer) => context.is_item_resolved(refer),
+            &DataType::ItemReference(ref item) => item.0.read().is_resolved(context),
         }
     }
-    fn try_resolve(&mut self, context: &mut SemanticContext) {
+    fn try_resolve(&mut self, context: &mut ResolveContext) {
         let mut new_value = None;
         match self {
             &mut DataType::Compound(CompoundDataType::Structure(ref mut fields)) => {
@@ -175,7 +177,7 @@ impl SemanticResolve for DataType<'static> {
                 for (i, &(ref field_name, ref field)) in fields.iter().enumerate() {
                     for &(ref field_before_name, _) in fields[..i].iter() {
                         if field_before_name == field_name {
-                            context.error(SemanticError::duplicate_definition(
+                            context.throw_error(SemanticError::duplicate_definition(
                                 field.position,
                                 (*field_before_name).clone(),
                                 SemanticItemType::Field,
@@ -194,9 +196,8 @@ impl SemanticResolve for DataType<'static> {
             }
             &mut DataType::Primitive(_) => {}
             &mut DataType::Reference(ref path) => {
-                match context.resolve_item(ItemType::DataType, &path) {
-                    Ok(dep_ref) => new_value = Some(DataType::ItemReference(dep_ref)),
-                    Err(error) => context.error(error),
+                if let Some(dep_ref) = context.resolve_item(ItemType::DataType, &path) {
+                    new_value = Some(DataType::ItemReference(dep_ref))
                 }
             }
             &mut DataType::ItemReference(_) => {

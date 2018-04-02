@@ -20,8 +20,8 @@ use parser_basics::{
     ParserErrorKind,
 };
 use syntax_parser::others::write_path;
-use super::text_source::Text;
-use super::context::SemanticItemType;
+use super::source::Text;
+use super::item::SemanticItemType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SemanticErrorKind {
