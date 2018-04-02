@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use indexmap::IndexMap;
+use syntax_parser::modules::ModuleDefinitionItem;
 use super::project::Project;
 use super::source::Text;
 use super::item::Item;
@@ -7,8 +7,18 @@ use super::item::Item;
 #[derive(Debug)]
 pub struct Module {
     text: Arc<Text>,
-    items: IndexMap<String, Item>,
-    aliases: Vec<ModuleId>,
+    items: Vec<Item>,
+}
+
+impl Module {
+    pub fn from_def(text: Arc<Text>, items: Vec<ModuleDefinitionItem>) -> Self {
+        Module {
+            text,
+            items: items.into_iter()
+                .map(|def| Item::from_def(def))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
