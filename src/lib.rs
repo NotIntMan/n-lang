@@ -19,3 +19,4 @@ pub mod lexeme_scanner;
 pub mod parser_basics;
 pub mod syntax_parser;
 pub mod project_analysis;
+pub mod new_project_analysis;
