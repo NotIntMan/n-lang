@@ -6,8 +6,6 @@ use helpers::loud_rw_lock::LoudRwLock;
 use helpers::find_index::find_index;
 use lexeme_scanner::ItemPosition;
 use parser_basics::StaticIdentifier;
-use syntax_parser::others::StaticPath;
-//use super::resolve::SemanticResolve;
 use super::text_source::{
     Text,
     TextSource,
