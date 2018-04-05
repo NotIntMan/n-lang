@@ -34,7 +34,7 @@ pub type ModuleRef = Arc<LoudRwLock<Module>>;
 impl Module {
     fn try_load_particular<S: TextSource>(source: &S, path: StaticPath) -> Result<(Arc<Text>, Vec<StaticIdentifier>), Group<SemanticError>> {
         let path_len = path.path.len();
-        for i in 0..path_len {
+        for i in 0..=path_len {
             let module_path_len = path_len - i;
             let module_path = &path.path[..module_path_len];
             if let Some(text) = source.get_text(module_path) {

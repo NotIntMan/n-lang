@@ -76,7 +76,10 @@ impl SemanticResolve for Item {
     }
     fn try_resolve(&mut self, context: &mut ResolveContext) {
         match &mut self.body {
-            &mut ItemBody::DataType(ref mut def) => def.body.try_resolve(context),
+            &mut ItemBody::DataType(ref mut def) => {
+                def.body.try_resolve(context);
+                self.is_resolved = def.body.is_resolved(context);
+            },
             &mut ItemBody::Import(ref mut _def) => unimplemented!(),
         }
     }

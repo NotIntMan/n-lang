@@ -70,7 +70,7 @@ pub trait SemanticResolve {
 pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
     where S: TextSource {
     let project_ref = Project::try_init(&source)?;
-    let mut errors = Group::None;
+    let mut errors = vec![];
     let mut queue = vec![
         (
             Vec::<Identifier<'static>>::new(),
@@ -78,14 +78,15 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
         ),
     ];
     let mut next_queue = vec![];
+    let mut module_errors = vec![];
     while !queue.is_empty() {
         let mut context = ResolveContext::new(project_ref.clone());
         for (module_path, module_ref) in Extractor::new(&mut queue) {
             context.new_module(module_ref.clone());
             let mut module_is_resolved = true;
-            let mut module_errors = Group::None;
             {
                 let module = module_ref.read();
+                module_errors.clear();
                 for item in module.items() {
                     let mut item = item.0.write();
                     if !item.is_resolved(&context) {
@@ -101,26 +102,26 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                                     project_ref.write().insert_module(new_module_path.clone(), new_module_ref.clone());
                                     next_queue.push((new_module_path, new_module_ref));
                                 },
-                                Err(group) => module_errors.append_group(group),
+                                Err(group) => module_errors.append(&mut group.extract_into_vec()),
                             }
                         }
                     }
                 }
             }
             if !module_is_resolved {
-                if module_errors == Group::None {
+                if module_errors.is_empty() {
                     next_queue.push((module_path, module_ref));
                 } else {
-                    errors.append_group(module_errors);
+                    errors.append(&mut module_errors);
                 }
             }
         }
         swap(&mut queue, &mut next_queue);
     }
-    if errors == Group::None {
+    if errors.is_empty() {
         Ok(project_ref)
     } else {
-        Err(errors)
+        Err(Group::Many(errors))
     }
 }
 
@@ -132,6 +133,14 @@ fn do_it() {
 
     source.simple_insert(vec![], "index.n", "\
         struct Complex(double, double)
+        struct Wave {
+            signal: Complex,
+            frequency: unsigned big integer,
+        }
+    ");
+
+    source.simple_insert(vec!["complex"], "complex.n", "\
+        pub struct Complex(double, double)
     ");
 
     match resolve(source) {
