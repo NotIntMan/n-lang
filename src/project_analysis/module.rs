@@ -23,7 +23,7 @@ use super::item::{
 };
 use super::error::SemanticError;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Module {
     text: Arc<Text>,
     items: Vec<ItemRef>,
@@ -73,6 +73,7 @@ impl Module {
         }
     }
     pub fn find_item(&self, item_type: ItemType, name: &[Identifier]) -> Option<ItemRef> {
+        println!("Finding in module item {:?}", name);
         for item in self.items.iter() {
             if let Some(item_ref) = item.find_item(item_type, name) {
                 return Some(item_ref);
@@ -82,6 +83,9 @@ impl Module {
     }
     pub fn items(&self) -> &[ItemRef] {
         &self.items
+    }
+    pub fn text(&self) -> Arc<Text> {
+        self.text.clone()
     }
 }
 

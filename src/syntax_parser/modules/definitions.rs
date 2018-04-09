@@ -6,7 +6,15 @@ use syntax_parser::compound_types::{
     Field,
 };
 use syntax_parser::functions::FunctionDefinition;
-use syntax_parser::others::Path;
+use syntax_parser::others::{
+    Path,
+    StaticPath,
+};
+use project_analysis::resolve::ResolveContext;
+use project_analysis::item::{
+    ItemRef,
+    ItemType,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinition<'source> {
@@ -53,6 +61,24 @@ impl<'source> IntoStatic for ExternalItemTail<'source> {
 pub struct ExternalItemImport<'source> {
     pub path: Path<'source>,
     pub tail: ExternalItemTail<'source>,
+}
+
+impl ExternalItemImport<'static> {
+    pub fn try_semantic_resolve(&mut self, context: &mut ResolveContext) -> Option<(StaticPath, ItemRef)> {
+        match &self.tail {
+            &ExternalItemTail::None => {
+                match context.resolve_item(ItemType::Unknown, &self.path) {
+                    Ok(item) => Some((self.path.clone(), item)),
+                    Err(err) => {
+                        context.throw_error(err);
+                        context.request_dependency(self.path.clone());
+                        None
+                    }
+                }
+            }
+            _ => unimplemented!()
+        }
+    }
 }
 
 impl<'source> IntoStatic for ExternalItemImport<'source> {

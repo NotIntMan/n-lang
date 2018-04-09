@@ -35,7 +35,7 @@ impl ResolveContext {
             thrown_errors: Vec::new(),
         }
     }
-    fn request_dependency(&mut self, path: StaticPath) {
+    pub fn request_dependency(&mut self, path: StaticPath) {
         self.requested_dependencies.push(path)
     }
     pub fn throw_error(&mut self, error: SemanticError) {
@@ -51,12 +51,14 @@ impl ResolveContext {
         let module = arc.read();
         module.find_item(item_type, name)
     }
-    pub fn resolve_item(&mut self, item_type: ItemType, path: &StaticPath) -> Option<ItemRef> {
+    pub fn resolve_item(&mut self, item_type: ItemType, path: &StaticPath) -> Result<ItemRef, SemanticError> {
         match self.get_item(item_type, &path.path) {
-            Some(x) => Some(x),
+            Some(x) => Ok(x),
             None => {
-                self.request_dependency(path.clone());
-                None
+                Err(SemanticError::unresolved_item(
+                    path.pos,
+                    path.path.clone(),
+                ))
             }
         }
     }
@@ -79,41 +81,67 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
     ];
     let mut next_queue = vec![];
     let mut module_errors = vec![];
+    let mut tried_dependencies = vec![];
     while !queue.is_empty() {
         let mut context = ResolveContext::new(project_ref.clone());
         for (module_path, module_ref) in Extractor::new(&mut queue) {
+            println!("Resolving {:?}", module_path);
             context.new_module(module_ref.clone());
-            let mut module_is_resolved = true;
+            let mut module_is_broken = false;
             {
                 let module = module_ref.read();
                 module_errors.clear();
                 for item in module.items() {
                     let mut item = item.0.write();
                     if !item.is_resolved(&context) {
-                        module_is_resolved = false;
+                        println!("Resolving item {:?}", item.clone());
+                        module_is_broken = true;
                         item.try_resolve(&mut context);
-                        for dependence in Extractor::new(&mut context.requested_dependencies) {
+                        module_errors.append(&mut context.thrown_errors);
+                        'dep_load: for dependence in Extractor::new(&mut context.requested_dependencies) {
                             let mut new_module_path = dependence.path.clone();
                             for module_path_item in module_path.iter() {
                                 new_module_path.insert(0, module_path_item.clone());
                             }
+                            if tried_dependencies.contains(&new_module_path) {
+                                continue 'dep_load;
+                            } else {
+                                tried_dependencies.push(new_module_path.clone());
+                            }
+                            println!("Loading dependence {:?}", dependence.path);
                             match Module::try_load(&source, dependence) {
-                                Ok((new_module_ref, _)) => {
+                                Ok((new_module_ref, rest_path)) => {
+                                    for _ in 0..rest_path.len() {
+                                        let _ = new_module_path.pop();
+                                    }
+                                    println!("Loaded {:?}", new_module_path);
                                     project_ref.write().insert_module(new_module_path.clone(), new_module_ref.clone());
                                     next_queue.push((new_module_path, new_module_ref));
+                                    module_is_broken = false;
                                 },
                                 Err(group) => module_errors.append(&mut group.extract_into_vec()),
                             }
                         }
+                        if item.is_resolved(&context) {
+                            println!("Item resolved {:?}", item.clone());
+                        } else {
+                            println!("Item not resolved {:?}", item.clone());
+                        }
                     }
                 }
+                for error in module_errors.iter_mut() {
+                    error.set_text(module.text());
+                }
             }
-            if !module_is_resolved {
+            if module_is_broken {
+                println!("Module is not resolved {:?}", module_path);
                 if module_errors.is_empty() {
                     next_queue.push((module_path, module_ref));
                 } else {
                     errors.append(&mut module_errors);
                 }
+            } else {
+                println!("Module is resolved {:?}", module_path);
             }
         }
         swap(&mut queue, &mut next_queue);
@@ -132,7 +160,7 @@ fn do_it() {
     let mut source = HashMapSource::new();
 
     source.simple_insert(vec![], "index.n", "\
-        struct Complex(double, double)
+        use complex::Complex;
         struct Wave {
             signal: Complex,
             frequency: unsigned big integer,
@@ -148,7 +176,7 @@ fn do_it() {
         Err(errors) => {
             println!("Errors:");
             for error in errors.extract_into_vec() {
-                println!("{:?}", error);
+                println!("{}", error);
             }
         },
     }

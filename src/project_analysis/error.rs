@@ -83,32 +83,33 @@ impl fmt::Display for SemanticErrorKind {
 pub struct SemanticError {
     pub pos: ItemPosition,
     pub kind: SemanticErrorKind,
+    pub text: Option<Arc<Text>>,
 }
 
 impl SemanticError {
     #[inline]
     pub fn new(pos: ItemPosition, kind: SemanticErrorKind) -> Self {
-        SemanticError { pos, kind }
+        SemanticError { pos, kind, text: None }
     }
     #[inline]
     pub fn empty(pos: ItemPosition) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::Empty }
+        SemanticError { pos, kind: SemanticErrorKind::Empty, text: None }
     }
     #[inline]
     pub fn unresolved_item(pos: ItemPosition, path: Vec<StaticIdentifier>) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::UnresolvedItem { path } }
+        SemanticError { pos, kind: SemanticErrorKind::UnresolvedItem { path }, text: None }
     }
     #[inline]
     pub fn super_of_root(pos: ItemPosition) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::SuperOfRoot }
+        SemanticError { pos, kind: SemanticErrorKind::SuperOfRoot, text: None }
     }
     #[inline]
     pub fn item_name_not_specified(pos: ItemPosition) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::ItemNameNotSpecified }
+        SemanticError { pos, kind: SemanticErrorKind::ItemNameNotSpecified, text: None }
     }
     #[inline]
     pub fn duplicate_definition(pos: ItemPosition, name: StaticIdentifier, item_type: SemanticItemType) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::DuplicateDefinition { name, item_type } }
+        SemanticError { pos, kind: SemanticErrorKind::DuplicateDefinition { name, item_type }, text: None }
     }
     #[inline]
     pub fn scanner_error(error: ScannerError) -> Self {
@@ -116,6 +117,7 @@ impl SemanticError {
         SemanticError {
             pos: pos.into_item_pos(" "),
             kind: SemanticErrorKind::ScannerError { kind },
+            text: None,
         }
     }
     #[inline]
@@ -127,20 +129,27 @@ impl SemanticError {
                 |pos| pos.into_item_pos(" "),
             ),
             kind: SemanticErrorKind::ParserError { kind: kind.into_static() },
+            text: None,
         }
     }
-    pub fn write_display<W: fmt::Write>(&self, w: &mut W, text: Option<Arc<Text>>) -> fmt::Result {
-        match &text {
-            &Some(ref arc) => writeln!(w, "  in {} on {}", &arc.name, self.pos.begin)?,
-            &None => writeln!(w, "  on {}", self.pos.begin)?,
+    pub fn set_text(&mut self, text: Arc<Text>) {
+        self.text = Some(text);
+    }
+}
+
+impl fmt::Display for SemanticError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.text {
+            &Some(ref arc) => writeln!(f, "  in {} on {}", &arc.name, self.pos.begin)?,
+            &None => writeln!(f, "  on {}", self.pos.begin)?,
         }
-        writeln!(w, "  error: {}", self.kind)?;
-        let text = match text {
-            Some(arc) => arc,
-            None => return write!(w, "Text is unspecified"),
+        writeln!(f, "  error: {}", self.kind)?;
+        let text = match &self.text {
+            &Some(ref arc) => arc,
+            &None => return writeln!(f, "   | text is unspecified."),
         };
         let lines = match self.pos.lines() {
-            0 => return write!(w, "Text is unspecified"),
+            0 => return writeln!(f, "   | text is unspecified."),
             line_count => text.text.lines()
                 .skip(self.pos.begin.line - 1)
                 .take(line_count)
@@ -151,41 +160,45 @@ impl SemanticError {
         for (i, line) in lines {
             if no_lines {
                 no_lines = false;
-                write_line_numbers_columns_row(w, max_line_num_length, None)?;
-                writeln!(w, "")?;
+                write_line_numbers_columns_row(f, max_line_num_length, None)?;
+                writeln!(f, "")?;
             }
             let line_number = self.pos.begin.line + i;
-            write_line_numbers_columns_row(w, max_line_num_length, Some(line_number))?;
-            writeln!(w, "{}", line)?;
-            write_line_numbers_columns_row(w, max_line_num_length, None)?;
+            write_line_numbers_columns_row(f, max_line_num_length, Some(line_number))?;
+            writeln!(f, "{}", line)?;
+            write_line_numbers_columns_row(f, max_line_num_length, None)?;
             if i == 0 {
                 if self.pos.begin.line != self.pos.end.line {
-                    write_pointer_line(w, self.pos.begin.column, line.len())?;
+                    write_pointer_line(f, self.pos.begin.column, line.len())?;
                 } else {
-                    write_pointer_line(w, self.pos.begin.column, self.pos.end.column)?;
+                    write_pointer_line(f, self.pos.begin.column, self.pos.end.column)?;
                 }
             } else {
                 if line_number == self.pos.end.line {
-                    write_pointer_line(w, 0, self.pos.end.column)?;
+                    write_pointer_line(f, 0, self.pos.end.column)?;
                 } else {
-                    write_pointer_line(w, 0, line.len())?;
+                    write_pointer_line(f, 0, line.len())?;
                 }
             }
         }
         if no_lines {
-            writeln!(w, "Text is unspecified")?;
+            writeln!(f, "   | text is unspecified.")
+        } else {
+            writeln!(f, "")
         }
-        Ok(())
     }
 }
 
 impl Appendable for SemanticError {
     fn append(&mut self, other: Self) -> Option<Self> {
-        let SemanticError { pos, kind } = other;
-        if self.pos != pos {
-            return Some(SemanticError { pos, kind });
-        }
+        let SemanticError { pos, kind, text } = other;
+        if self.pos != pos
+            ||
+            self.text != text
+            {
+                return Some(SemanticError { pos, kind, text });
+            }
         self.kind.append(kind)
-            .map(move |kind| SemanticError { pos, kind })
+            .map(move |kind| SemanticError { pos, kind, text })
     }
 }

@@ -196,8 +196,9 @@ impl SemanticResolve for DataType<'static> {
             }
             &mut DataType::Primitive(_) => {}
             &mut DataType::Reference(ref path) => {
-                if let Some(dep_ref) = context.resolve_item(ItemType::DataType, &path) {
-                    new_value = Some(DataType::ItemReference(dep_ref))
+                match context.resolve_item(ItemType::DataType, &path) {
+                    Ok(dep_ref) => new_value = Some(DataType::ItemReference(dep_ref)),
+                    Err(err) => context.throw_error(err),
                 }
             }
             &mut DataType::ItemReference(_) => {

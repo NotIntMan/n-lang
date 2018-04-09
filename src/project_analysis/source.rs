@@ -48,6 +48,8 @@ impl HashMapSource {
 
 impl TextSource for HashMapSource {
     fn get_text(&self, path: &ModulePathSlice) -> Option<Arc<Text>> {
-        self.map.get(path).map(Clone::clone)
+        let result = self.map.get(path).map(Clone::clone);
+        println!("For {:?} got {:?}", path, result);
+        result
     }
 }
