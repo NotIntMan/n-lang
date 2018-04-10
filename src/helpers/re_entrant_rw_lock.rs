@@ -15,6 +15,7 @@ use std::cmp::{
     Eq,
     PartialEq,
 };
+use std::fmt;
 use helpers::find_index::find_index;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -152,7 +153,6 @@ impl ReEntrantRWHead {
     }
 }
 
-#[derive(Debug)]
 pub struct ReEntrantRWLock<T: ? Sized> {
     head: Mutex<ReEntrantRWHead>,
     data: T,
@@ -240,7 +240,17 @@ impl<T: Clone> Clone for ReEntrantRWLock<T> {
     }
 }
 
-#[derive(Debug)]
+impl<T: fmt::Debug + ? Sized> fmt::Debug for ReEntrantRWLock<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let data = self.read();
+        if f.alternate() {
+            write!(f, "ReEntrantRWLock of {:#?}", &*data)
+        } else {
+            write!(f, "ReEntrantRWLock of {:?}", &*data)
+        }
+    }
+}
+
 pub struct ReEntrantReadGuard<'a, T: ? Sized>
     where ReEntrantRWLock<T>: 'a {
     source: &'a ReEntrantRWLock<T>,
