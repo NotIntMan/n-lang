@@ -9,10 +9,7 @@ use super::project::{
     ProjectRef,
 };
 use super::source::TextSource;
-use super::module::{
-    Module,
-    ModuleRef,
-};
+use super::module::ModuleRef;
 use super::item::{
     ItemRef,
     ItemType,
@@ -51,7 +48,7 @@ impl ResolveContext {
         let module = arc.read();
         module.find_item(item_type, name)
     }
-    pub fn resolve_item(&mut self, item_type: ItemType, path: &StaticPath) -> Result<ItemRef, SemanticError> {
+    pub fn resolve_item(&self, item_type: ItemType, path: &StaticPath) -> Result<ItemRef, SemanticError> {
         match self.get_item(item_type, &path.path) {
             Some(x) => Ok(x),
             None => {
@@ -62,11 +59,24 @@ impl ResolveContext {
             }
         }
     }
+// Отказался т.к. не хочу параметризировать контекст
+//    pub fn resolve_module(&self, path: &StaticPath) -> Result<ModuleRef, SemanticError> {
+//        let project = self.project.write();
+//        project.find_or_load_module()
+//        unimplemented!()
+//    }
 }
 
 pub trait SemanticResolve {
     fn is_resolved(&self, context: &ResolveContext) -> bool;
     fn try_resolve(&mut self, context: &mut ResolveContext);
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct ModuleResolvingStatus {
+    resolved: bool,
+    new_resolved_items: bool,
+    new_dependencies: bool,
 }
 
 pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
@@ -81,13 +91,17 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
     ];
     let mut next_queue = vec![];
     let mut module_errors = vec![];
-    let mut tried_dependencies = vec![];
+//    let mut tried_dependencies = vec![];
     while !queue.is_empty() {
         let mut context = ResolveContext::new(project_ref.clone());
         for (module_path, module_ref) in Extractor::new(&mut queue) {
             println!("Resolving {:?}", module_path);
             context.new_module(module_ref.clone());
-            let mut module_is_broken = false;
+            let mut resolving_status = ModuleResolvingStatus {
+                resolved: true,
+                new_resolved_items: false,
+                new_dependencies: false,
+            };
             {
                 let module = module_ref.read();
                 module_errors.clear();
@@ -95,37 +109,47 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                     let mut item = item.0.write();
                     if !item.is_resolved(&context) {
                         println!("Resolving item {:?}", item.clone());
-                        module_is_broken = true;
                         item.try_resolve(&mut context);
-                        module_errors.append(&mut context.thrown_errors);
-                        'dep_load: for dependence in Extractor::new(&mut context.requested_dependencies) {
-                            let mut new_module_path = dependence.path.clone();
-                            for module_path_item in module_path.iter() {
-                                new_module_path.insert(0, module_path_item.clone());
-                            }
-                            if tried_dependencies.contains(&new_module_path) {
-                                continue 'dep_load;
-                            } else {
-                                tried_dependencies.push(new_module_path.clone());
-                            }
-                            println!("Loading dependence {:?}", dependence.path);
-                            match Module::try_load(&source, dependence) {
-                                Ok((new_module_ref, rest_path)) => {
-                                    for _ in 0..rest_path.len() {
-                                        let _ = new_module_path.pop();
-                                    }
-                                    println!("Loaded {:?}", new_module_path);
-                                    project_ref.write().insert_module(new_module_path.clone(), new_module_ref.clone());
-                                    next_queue.push((new_module_path, new_module_ref));
-                                    module_is_broken = false;
-                                },
-                                Err(group) => module_errors.append(&mut group.extract_into_vec()),
-                            }
+                        if item.is_resolved(&context) {
+                            resolving_status.new_resolved_items = true;
+                        } else {
+                            resolving_status.resolved = false;
                         }
+                        module_errors.append(&mut context.thrown_errors);
                         if item.is_resolved(&context) {
                             println!("Item resolved {:?}", item.clone());
                         } else {
                             println!("Item not resolved {:?}", item.clone());
+                        }
+                    }
+                    // TODO Упростить это
+                    'dep_load: for mut dependence in Extractor::new(&mut context.requested_dependencies) {
+                        let mut new_module_path = dependence.path.clone();
+                        for module_path_item in module_path.iter() {
+                            new_module_path.insert(0, module_path_item.clone());
+                        }
+//                            if tried_dependencies.contains(&new_module_path) {
+//                                continue 'dep_load;
+//                            } else {
+//                                tried_dependencies.push(new_module_path.clone());
+//                            }
+                        println!("Loading dependence {:?}", dependence.path);
+                        // TODO Переделать механизм запроса новых зависимостей
+                        // TODO Учесть ранее загруженные модули
+                        match project_ref.write().find_or_load_module(&source, dependence.clone()) {
+                            Ok((new_module_ref, rest_path, is_new)) => {
+                                for _ in 0..rest_path.len() {
+                                    let _ = new_module_path.pop();
+                                    let _ = dependence.path.pop();
+                                }
+                                println!("Loaded {:?} ({:?})", new_module_path, dependence.path);
+                                module_ref.write().put_dependency(dependence, new_module_ref.clone());
+                                if is_new {
+                                    next_queue.push((new_module_path, new_module_ref));
+                                }
+                                resolving_status.new_dependencies = true;
+                            }
+                            Err(group) => module_errors.append(&mut group.extract_into_vec()),
                         }
                     }
                 }
@@ -133,15 +157,15 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                     error.set_text(module.text());
                 }
             }
-            if module_is_broken {
+            if resolving_status.resolved {
+                println!("Module is resolved {:?}", module_path);
+            } else {
                 println!("Module is not resolved {:?}", module_path);
-                if module_errors.is_empty() {
+                if resolving_status.new_resolved_items || resolving_status.new_dependencies {
                     next_queue.push((module_path, module_ref));
                 } else {
                     errors.append(&mut module_errors);
                 }
-            } else {
-                println!("Module is resolved {:?}", module_path);
             }
         }
         swap(&mut queue, &mut next_queue);
@@ -169,6 +193,7 @@ fn do_it() {
 
     source.simple_insert(vec!["complex"], "complex.n", "\
         pub struct Complex(double, double)
+        pub struct SuperComplex(double, double)
     ");
 
     match resolve(source) {
