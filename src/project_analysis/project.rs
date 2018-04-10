@@ -16,7 +16,8 @@ pub struct Project {
     modules: HashMap<ModulePath, ModuleRef>,
 }
 
-pub type ProjectRef = Arc<LoudRwLock<Project>>;
+// TODO Написать свою структуру ссылок для обеспечения безопасности утечек памяти.
+pub type ProjectRef = Arc<ReEntrantRWLock<Project>>;
 
 pub type ModulePath = Vec<StaticIdentifier>;
 pub type ModulePathSlice = [StaticIdentifier];

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use helpers::group::Group;
-use helpers::loud_rw_lock::LoudRwLock;
+use helpers::re_entrant_rw_lock::ReEntrantRWLock;
 use lexeme_scanner::Scanner;
 use parser_basics::{
     Identifier,
@@ -29,7 +29,7 @@ pub struct Module {
     items: Vec<ItemRef>,
 }
 
-pub type ModuleRef = Arc<LoudRwLock<Module>>;
+pub type ModuleRef = Arc<ReEntrantRWLock<Module>>;
 
 impl Module {
     fn try_load_particular<S: TextSource>(source: &S, path: StaticPath) -> Result<(Arc<Text>, Vec<StaticIdentifier>), Group<SemanticError>> {
@@ -64,13 +64,18 @@ impl Module {
         let module_ref = Arc::new(LoudRwLock::new(module, "Module was poisoned!"));
         Ok((module_ref, rest_path))
     }
-    pub fn from_def(text: Arc<Text>, items: Vec<ModuleDefinitionItem>) -> Self {
-        Module {
+    pub fn from_def(text: Arc<Text>, items: Vec<ModuleDefinitionItem>) -> ModuleRef {
+        let module_ref = Arc::new(ReEntrantRWLock::new(Module {
             text,
-            items: items.into_iter()
-                .map(|def| Item::from_def(def))
-                .collect(),
+            items: Vec::with_capacity(items.len()),
+        }));
+        {
+            let mut module = module_ref.write();
+            for item in items {
+                module.items.push(Item::from_def(item))
+            }
         }
+        module_ref
     }
     pub fn find_item(&self, item_type: ItemType, name: &[Identifier]) -> Option<ItemRef> {
         println!("Finding in module item {:?}", name);
