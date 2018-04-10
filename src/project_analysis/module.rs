@@ -87,6 +87,12 @@ impl Module {
     pub fn text(&self) -> Arc<Text> {
         self.text.clone()
     }
+    pub fn put_dependency(&self, path: StaticPath, module: ModuleRef) {
+        println!("Putting {:?} into module {:?}", path.path, self);
+        for item in self.items.iter() {
+            item.put_dependency(&path, &module);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]

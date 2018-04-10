@@ -9,6 +9,7 @@ use parser_basics::{
 use syntax_parser::modules::{
     DataTypeDefinition,
     ExternalItemImport,
+    ExternalItemTail,
     ModuleDefinitionItem,
     ModuleDefinitionValue,
 };
@@ -17,6 +18,7 @@ use super::resolve::{
     SemanticResolve,
     ResolveContext,
 };
+use super::module::ModuleRef;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
@@ -28,7 +30,7 @@ pub struct Item {
 pub enum ItemBody {
     DataType(DataTypeDefinition<'static>),
     ImportDefinition(ExternalItemImport<'static>),
-    ImportItem(StaticPath, ItemRef),
+    ImportItem(StaticIdentifier, ItemRef),
 //    ImportModule(StaticPath, ModuleRef),
 }
 
@@ -72,19 +74,55 @@ impl ItemRef {
                 }
             }
             &ItemBody::ImportDefinition(_) => None,
-            &ItemBody::ImportItem(ref path, ref item) => {
-                match path.path.last() {
-                    Some(import_name) =>
-                        if (name.len() > 0)
-                            && name[0] == *import_name {
-                            Some((*item).clone())
-                        } else {
-                            None
-                        }
-                    None => None,
+            &ItemBody::ImportItem(ref import_name, ref item) => {
+                if (name.len() > 0)
+                    && name[0] == *import_name {
+                    Some((*item).clone())
+                } else {
+                    None
                 }
             }
-            _ => unimplemented!()
+//            _ => unimplemented!()
+        }
+    }
+    pub fn put_dependency(&self, dependency: &StaticPath, module: &ModuleRef) {
+        println!("Putting {:?} into item {:?}", dependency.path, self.0);
+        let mut new_body = None;
+        {
+            let item = self.0.read();
+            match &item.body {
+                &ItemBody::ImportDefinition(ExternalItemImport { ref path, tail: ExternalItemTail::None }) => {
+                    let dependency_len = dependency.path.len();
+                    println!("Comparing paths (begin of {:?} and {:?}", dependency.path, path.path);
+                    if (path.path.len() >= dependency_len)
+                        &&
+                        (dependency.path.as_slice() == &path.path[..dependency_len]) {
+                        println!("Begin of dependency's path is equal to import's path. Trying to find item in dependency.");
+                        let item_path = &path.path[dependency_len..];
+                        if item_path.is_empty() {
+                            panic!("Module import is not implemented yet");
+                        }
+                        let module = module.read();
+                        match module.find_item(ItemType::Unknown, item_path) {
+                            Some(item) => {
+                                println!("Item found, putting {:?}", item);
+                                let name = path.path.last()
+                                    .expect("Path should not be empty!")
+                                    .clone()
+                                ;
+                                new_body = Some(ItemBody::ImportItem(name, item));
+                            }
+                            None => return,
+                        }
+                    }
+                }
+                &ItemBody::ImportDefinition(ExternalItemImport { path: ref _path, tail: ExternalItemTail::Alias(_) }) => unimplemented!(),
+                &ItemBody::ImportDefinition(ExternalItemImport { path: ref _path, tail: ExternalItemTail::Asterisk }) => unimplemented!(),
+                _ => {}
+            }
+        }
+        if let Some(new_body) = new_body {
+            self.0.write().body = new_body;
         }
     }
 }
@@ -102,11 +140,12 @@ impl SemanticResolve for Item {
                 self.is_resolved = def.body.is_resolved(context);
             }
             &mut ItemBody::ImportDefinition(ref mut def) => {
-                if let Some((path, item)) = def.try_semantic_resolve(context) {
+                if let Some(body) = def.try_semantic_resolve(context) {
                     self.is_resolved = true;
-                    new_body = Some(ItemBody::ImportItem(path, item));
+                    new_body = Some(body);
                 }
             }
+            &mut ItemBody::ImportItem(_, _) => self.is_resolved = true,
             _ => unimplemented!(),
         }
         if let Some(new_body) = new_body {

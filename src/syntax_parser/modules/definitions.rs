@@ -8,12 +8,11 @@ use syntax_parser::compound_types::{
 use syntax_parser::functions::FunctionDefinition;
 use syntax_parser::others::{
     Path,
-    StaticPath,
 };
 use project_analysis::resolve::ResolveContext;
 use project_analysis::item::{
-    ItemRef,
     ItemType,
+    ItemBody,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,11 +63,16 @@ pub struct ExternalItemImport<'source> {
 }
 
 impl ExternalItemImport<'static> {
-    pub fn try_semantic_resolve(&mut self, context: &mut ResolveContext) -> Option<(StaticPath, ItemRef)> {
+    pub fn try_semantic_resolve(&mut self, context: &mut ResolveContext) -> Option<ItemBody> {
         match &self.tail {
             &ExternalItemTail::None => {
                 match context.resolve_item(ItemType::Unknown, &self.path) {
-                    Ok(item) => Some((self.path.clone(), item)),
+                    Ok(item) => Some(ItemBody::ImportItem(
+                        self.path.path.last()
+                            .expect("Path should not be empty")
+                            .clone(),
+                        item,
+                    )),
                     Err(err) => {
                         context.throw_error(err);
                         context.request_dependency(self.path.clone());
