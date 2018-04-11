@@ -3,16 +3,24 @@ use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use syntax_parser::compound_types::{
     Attribute,
+    CompoundDataType,
     DataType,
     Field,
+    find_attribute,
 };
 use syntax_parser::functions::FunctionDefinition;
 use syntax_parser::others::{
     Path,
     StaticPath,
 };
-use project_analysis::resolve::ResolveContext;
-use project_analysis::item::ItemBody;
+use project_analysis::resolve::{
+    ResolveContext,
+    SemanticResolve,
+};
+use project_analysis::item::{
+    ItemBody,
+    ItemRef,
+};
 use project_analysis::error::SemanticError;
 use project_analysis::module::ModuleRef;
 
@@ -215,6 +223,7 @@ impl<'source> IntoStatic for ModuleDefinitionValue<'source> {
         match self {
             ModuleDefinitionValue::DataType(value) => ModuleDefinitionValue::DataType(value.into_static()),
             ModuleDefinitionValue::Import(value) => ModuleDefinitionValue::Import(value.into_static()),
+            ModuleDefinitionValue::Table(value) => ModuleDefinitionValue::Table(value.into_static()),
             _ => unimplemented!(),
         }
     }
