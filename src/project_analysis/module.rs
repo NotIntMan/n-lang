@@ -13,9 +13,8 @@ use syntax_parser::modules::{
 use syntax_parser::others::StaticPath;
 use super::source::Text;
 use super::item::{
-    Item,
+    ItemBody,
     ItemRef,
-    ItemType,
 };
 use super::error::SemanticError;
 
@@ -25,7 +24,8 @@ pub struct Module {
     items: Vec<ItemRef>,
 }
 
-pub type ModuleRef = Arc<ReEntrantRWLock<Module>>;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleRef(pub Arc<ReEntrantRWLock<Module>>);
 
 impl Module {
     pub fn try_parse(text: Arc<Text>) -> Result<ModuleRef, Group<SemanticError>> {
@@ -43,26 +43,17 @@ impl Module {
         }
     }
     pub fn from_def(text: Arc<Text>, items: Vec<ModuleDefinitionItem>) -> ModuleRef {
-        let module_ref = Arc::new(ReEntrantRWLock::new(Module {
+        let module_ref = ModuleRef(Arc::new(ReEntrantRWLock::new(Module {
             text,
             items: Vec::with_capacity(items.len()),
-        }));
+        })));
         {
-            let mut module = module_ref.write();
+            let mut module = module_ref.0.write();
             for item in items {
-                module.items.push(Item::from_def(item))
+                module.items.push(ItemRef::from_def(item))
             }
         }
         module_ref
-    }
-    pub fn find_item(&self, item_type: ItemType, name: &[Identifier]) -> Option<ItemRef> {
-        println!("Finding in module item {:?}", name);
-        for item in self.items.iter() {
-            if let Some(item_ref) = item.find_item(item_type, name) {
-                return Some(item_ref);
-            }
-        }
-        None
     }
     pub fn items(&self) -> &[ItemRef] {
         &self.items
@@ -70,11 +61,31 @@ impl Module {
     pub fn text(&self) -> Arc<Text> {
         self.text.clone()
     }
-    pub fn put_dependency(&self, path: StaticPath, module: ModuleRef) {
-        println!("Putting {:?} into module {:?}", path.path, self);
-        for item in self.items.iter() {
-            item.put_dependency(&path, &module);
+}
+
+impl ModuleRef {
+    pub fn put_dependency(&self, path: StaticPath, dependency: &ModuleRef, errors: &mut Vec<SemanticError>) {
+        let module = self.0.read();
+        println!("Putting {:?} into module {:?}", path.path, module.text.name);
+        for item in module.items.iter() {
+            match item.put_dependency(&path, dependency) {
+                Ok(()) => {}
+                Err(err) => errors.push(err),
+            }
         }
+    }
+    pub fn find_item(&self, name: &[Identifier]) -> Option<ItemRef> {
+        let module = self.0.read();
+        println!("Finding item {:?} in module {:?}", name, module.text.name);
+        if name.is_empty() {
+            return Some(ItemRef::from_body(ItemBody::ModuleReference(self.clone())));
+        }
+        for item in module.items.iter() {
+            if let Some(item_ref) = item.find_item(name) {
+                return Some(item_ref);
+            }
+        }
+        None
     }
 }
 

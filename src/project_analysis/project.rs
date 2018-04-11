@@ -13,10 +13,7 @@ use super::module::{
 };
 use super::source::TextSource;
 use super::error::SemanticError;
-use super::item::{
-    ItemRef,
-    ItemType,
-};
+use super::item::ItemRef;
 
 #[derive(Debug)]
 pub struct Project {
@@ -85,10 +82,9 @@ impl Project {
             path.path,
         )))
     }
-    pub fn find_or_load_item<S: TextSource>(&mut self, source: &S, item_type: ItemType, path: StaticPath) -> Result<ItemRef, Group<SemanticError>> {
+    pub fn find_or_load_item<S: TextSource>(&mut self, source: &S, path: StaticPath) -> Result<ItemRef, Group<SemanticError>> {
         let (module, item_path, _) = self.find_or_load_module(source, path.clone())?;
-        let module = module.read();
-        match module.find_item(item_type, item_path.as_slice()) {
+        match module.find_item(item_path.as_slice()) {
             Some(item) => Ok(item),
             None => Err(Group::One(SemanticError::unresolved_item(
                 path.pos,
