@@ -1,6 +1,7 @@
 use std::thread::{
     current,
     ThreadId,
+    panicking,
     yield_now,
 };
 use std::sync::{
@@ -93,13 +94,6 @@ impl ReEntrantRWHead {
             }
         }
         (true, reader)
-    }
-    #[inline]
-    fn is_free(&self) -> bool {
-        match self.is_readers_from_one_thread() {
-            (true, None) => true,
-            _ => false,
-        }
     }
     fn try_lock_write(&mut self) -> bool {
         if self.is_poisoned { panic!("ReEntrantRWLock was poisoned!"); }
@@ -289,6 +283,16 @@ impl<'a, T: ? Sized> DerefMut for ReEntrantWriteGuard<'a, T>
     fn deref_mut(&mut self) -> &mut T {
         unsafe {
             &mut *(&self.source.data as *const T as *mut T)
+        }
+    }
+}
+
+impl<'a, T: ? Sized> Drop for ReEntrantWriteGuard<'a, T> {
+    fn drop(&mut self) {
+        let mut head = self.source.head();
+        head.try_release_write();
+        if panicking() {
+            head.poison();
         }
     }
 }
