@@ -41,6 +41,10 @@ pub enum SemanticErrorKind {
     ParserError {
         kind: ParserErrorKind<'static>,
     },
+    ExpectedItemOfAnotherType {
+        expected: SemanticItemType,
+        got: SemanticItemType,
+    },
 }
 
 impl Default for SemanticErrorKind {
@@ -75,6 +79,7 @@ impl fmt::Display for SemanticErrorKind {
             &SemanticErrorKind::DuplicateDefinition { ref name, item_type } => write!(f, "there is already declared {} name {}", item_type, name.get_text()),
             &SemanticErrorKind::ScannerError { ref kind } => write!(f, "{}", kind),
             &SemanticErrorKind::ParserError { ref kind } => write!(f, "{}", kind),
+            &SemanticErrorKind::ExpectedItemOfAnotherType { ref expected, ref got } => write!(f, "{} expected here, got {}", expected, got),
         }
     }
 }
@@ -131,6 +136,10 @@ impl SemanticError {
             kind: SemanticErrorKind::ParserError { kind: kind.into_static() },
             text: None,
         }
+    }
+    #[inline]
+    pub fn expected_item_of_another_type(pos: ItemPosition, expected: SemanticItemType, got: SemanticItemType) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::ExpectedItemOfAnotherType { expected, got }, text: None }
     }
     pub fn set_text(&mut self, text: Arc<Text>) {
         self.text = Some(text);
