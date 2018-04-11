@@ -134,18 +134,18 @@ impl ExternalItemImport<'static> {
     pub fn try_semantic_resolve(&mut self, context: &mut ResolveContext) -> Option<ItemBody> {
         match context.resolve_item(&self.path) {
             Ok(item) => match &self.tail {
-                &ExternalItemTail::None => Some(ItemBody::ImportItem(
-                    self.path.path.last()
+                &ExternalItemTail::None => Some(ItemBody::ImportItem {
+                    name: self.path.path.last()
                         .expect("Path should not be empty")
                         .clone(),
                     item,
-                )),
-                &ExternalItemTail::Alias(ref alias) => Some(ItemBody::ImportItem(
-                    alias.clone(),
+                }),
+                &ExternalItemTail::Alias(ref alias) => Some(ItemBody::ImportItem {
+                    name: alias.clone(),
                     item,
-                )),
+                }),
                 &ExternalItemTail::Asterisk => match item.get_module(self.path.pos) {
-                    Ok(module) => Some(ItemBody::ModuleReference(module)),
+                    Ok(module) => Some(ItemBody::ModuleReference { module }),
                     Err(err) => {
                         context.throw_error(err);
                         None
@@ -175,15 +175,15 @@ impl ExternalItemImport<'static> {
                             let name = self.path.path.last()
                                 .expect("Path should not be empty!")
                                 .clone();
-                            Ok(Some(ItemBody::ImportItem(name, item)))
+                            Ok(Some(ItemBody::ImportItem { name, item }))
                         }
                         &ExternalItemTail::Alias(ref alias) => {
                             let name = alias.clone();
-                            Ok(Some(ItemBody::ImportItem(name, item)))
+                            Ok(Some(ItemBody::ImportItem { name, item }))
                         }
                         &ExternalItemTail::Asterisk => {
                             match item.get_module(self.path.pos) {
-                                Ok(module) => Ok(Some(ItemBody::ModuleReference(module))),
+                                Ok(module) => Ok(Some(ItemBody::ModuleReference { module })),
                                 Err(err) => Err(err),
                             }
                         }

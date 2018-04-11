@@ -12,6 +12,7 @@ use syntax_parser::modules::{
     ExternalItemImport,
     ModuleDefinitionItem,
     ModuleDefinitionValue,
+    TableDefinition,
 };
 use syntax_parser::others::StaticPath;
 use super::resolve::{
@@ -29,10 +30,23 @@ pub struct Item {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ItemBody {
-    DataType(DataTypeDefinition<'static>),
-    ImportDefinition(ExternalItemImport<'static>),
-    ImportItem(StaticIdentifier, ItemRef),
-    ModuleReference(ModuleRef),
+    DataType {
+        def: DataTypeDefinition<'static>,
+    },
+    ImportDefinition {
+        def: ExternalItemImport<'static>
+    },
+    ImportItem {
+        name: StaticIdentifier,
+        item: ItemRef,
+    },
+    ModuleReference {
+        module: ModuleRef
+    },
+    Table {
+        def: TableDefinition<'static>,
+        primary_key: Result<ItemRef, SemanticError>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,9 +61,13 @@ impl ItemRef {
         } = def.into_static();
         let body = match value {
             ModuleDefinitionValue::DataType(def) => {
-                ItemBody::DataType(def)
+                ItemBody::DataType { def }
             }
-            ModuleDefinitionValue::Import(def) => ItemBody::ImportDefinition(def),
+            ModuleDefinitionValue::Import(def) => ItemBody::ImportDefinition { def },
+            ModuleDefinitionValue::Table(def) => {
+                let primary_key = def.make_primary_key();
+                ItemBody::Table { def, primary_key }
+            }
             _ => unimplemented!(),
         };
         ItemRef::from_body(body)
@@ -66,14 +84,14 @@ impl ItemRef {
         let item = self.0.read();
         println!("Finding item {:?} in item {:?}", name, *item);
         match &item.body {
-            &ItemBody::DataType(ref def) => {
+            &ItemBody::DataType { ref def } => {
                 if name.len() == 1
                     && name[0] == def.name {
                     return Some(self.clone());
                 }
             }
-            &ItemBody::ImportDefinition(_) => {}
-            &ItemBody::ImportItem(ref import_name, ref item) => {
+            &ItemBody::ImportDefinition { def: _ } => {}
+            &ItemBody::ImportItem { name: ref import_name, ref item } => {
                 if (name.len() > 0)
                     && name[0] == *import_name {
                     return match item.get_module(ItemPosition::default()) {
@@ -82,8 +100,22 @@ impl ItemRef {
                     };
                 }
             }
-            &ItemBody::ModuleReference(ref module) => {
+            &ItemBody::ModuleReference { ref module } => {
                 return module.find_item(name);
+            }
+            &ItemBody::Table { ref def, ref primary_key } => {
+                match name.len() {
+                    1 => if name[0] == def.name {
+                        return Some(self.clone());
+                    }
+                    2 => if name[0] == def.name
+                        && name[1].get_text() == "primary_key" {
+                        if let &Ok(ref item) = primary_key {
+                            return Some(item.clone());
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
         None
@@ -91,10 +123,11 @@ impl ItemRef {
     pub fn get_type(&self) -> SemanticItemType {
         let item = self.0.read();
         match &item.body {
-            &ItemBody::DataType(_) => SemanticItemType::DataType,
-            &ItemBody::ImportDefinition(_) => SemanticItemType::UnresolvedImport,
-            &ItemBody::ImportItem(_, ref item) => item.get_type(),
-            &ItemBody::ModuleReference(_) => SemanticItemType::Module,
+            &ItemBody::DataType { def: _ } => SemanticItemType::DataType,
+            &ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
+            &ItemBody::ImportItem { name: _, ref item } => item.get_type(),
+            &ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
+            &ItemBody::Table { def: _, primary_key: _ } => SemanticItemType::Table,
         }
     }
     pub fn assert_type(&self, item_type: ItemType, pos: ItemPosition) -> Result<(), SemanticError> {
@@ -118,7 +151,7 @@ impl ItemRef {
     pub fn get_module(&self, pos: ItemPosition) -> Result<ModuleRef, SemanticError> {
         let item = self.0.read();
         match &item.body {
-            &ItemBody::ModuleReference(ref module) => Ok(module.clone()),
+            &ItemBody::ModuleReference { ref module } => Ok(module.clone()),
             _ => Err(SemanticError::expected_item_of_another_type(pos, SemanticItemType::Module, self.get_type())),
         }
     }
@@ -128,7 +161,7 @@ impl ItemRef {
         {
             let item = self.0.read();
             match &item.body {
-                &ItemBody::ImportDefinition(ref def) =>
+                &ItemBody::ImportDefinition { ref def } =>
                     if let Some(body) = def.try_put_dependency(dependency, module)? {
                         new_body = Some(body);
                     }
@@ -150,19 +183,36 @@ impl SemanticResolve for Item {
     fn try_resolve(&mut self, context: &mut ResolveContext) {
         let mut new_body = None;
         match &mut self.body {
-            &mut ItemBody::DataType(ref mut def) => {
+            &mut ItemBody::DataType { ref mut def } => {
                 def.body.try_resolve(context);
                 self.is_resolved = def.body.is_resolved(context);
             }
-            &mut ItemBody::ImportDefinition(ref mut def) => {
+            &mut ItemBody::ImportDefinition { ref mut def } => {
                 if let Some(body) = def.try_semantic_resolve(context) {
                     self.is_resolved = true;
                     new_body = Some(body);
                 }
             }
-            &mut ItemBody::ImportItem(_, _) => self.is_resolved = true,
-            &mut ItemBody::ModuleReference(_) => self.is_resolved = true,
-//            _ => unimplemented!(),
+            &mut ItemBody::ImportItem { name: _, item: _ } => self.is_resolved = true,
+            &mut ItemBody::ModuleReference { module: _ } => self.is_resolved = true,
+            &mut ItemBody::Table { ref mut def, ref mut primary_key } => {
+                def.try_resolve(context);
+                self.is_resolved = if def.is_resolved(context) {
+                    match primary_key {
+                        &mut Ok(ref item) => {
+                            let mut item = item.0.write();
+                            item.try_resolve(context);
+                            item.is_resolved(context)
+                        }
+                        &mut Err(ref err) => {
+                            context.throw_error(err.clone());
+                            false
+                        }
+                    }
+                } else {
+                    false
+                };
+            }
         }
         if let Some(new_body) = new_body {
             self.body = new_body;
@@ -174,6 +224,7 @@ impl SemanticResolve for Item {
 pub enum ItemType {
     DataType,
     Module,
+    Table,
 }
 
 impl ItemType {
@@ -181,6 +232,7 @@ impl ItemType {
         match self {
             ItemType::DataType => SemanticItemType::DataType,
             ItemType::Module => SemanticItemType::Module,
+            ItemType::Table => SemanticItemType::Table,
         }
     }
 }
@@ -199,6 +251,7 @@ pub enum SemanticItemType {
     DataType,
     Module,
     UnresolvedImport,
+    Table,
 }
 
 impl fmt::Display for SemanticItemType {
@@ -208,6 +261,7 @@ impl fmt::Display for SemanticItemType {
             &SemanticItemType::DataType => write!(f, "data type"),
             &SemanticItemType::Module => write!(f, "module"),
             &SemanticItemType::UnresolvedImport => write!(f, "unresolved import"),
+            &SemanticItemType::Table => write!(f, "table"),
         }
     }
 }

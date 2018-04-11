@@ -78,7 +78,7 @@ impl ModuleRef {
         let module = self.0.read();
         println!("Finding item {:?} in module {:?}", name, module.text.name);
         if name.is_empty() {
-            return Some(ItemRef::from_body(ItemBody::ModuleReference(self.clone())));
+            return Some(ItemRef::from_body(ItemBody::ModuleReference { module: self.clone() }));
         }
         for item in module.items.iter() {
             if let Some(item_ref) = item.find_item(name) {
