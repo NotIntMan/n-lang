@@ -45,6 +45,7 @@ pub enum SemanticErrorKind {
         expected: SemanticItemType,
         got: SemanticItemType,
     },
+    EmptyPrimaryKey,
 }
 
 impl Default for SemanticErrorKind {
@@ -80,6 +81,7 @@ impl fmt::Display for SemanticErrorKind {
             &SemanticErrorKind::ScannerError { ref kind } => write!(f, "{}", kind),
             &SemanticErrorKind::ParserError { ref kind } => write!(f, "{}", kind),
             &SemanticErrorKind::ExpectedItemOfAnotherType { ref expected, ref got } => write!(f, "{} expected here, got {}", expected, got),
+            &SemanticErrorKind::EmptyPrimaryKey => write!(f, "empty primary key"),
         }
     }
 }
@@ -140,6 +142,10 @@ impl SemanticError {
     #[inline]
     pub fn expected_item_of_another_type(pos: ItemPosition, expected: SemanticItemType, got: SemanticItemType) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::ExpectedItemOfAnotherType { expected, got }, text: None }
+    }
+    #[inline]
+    pub fn empty_primary_key(pos: ItemPosition) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::EmptyPrimaryKey, text: None }
     }
     pub fn set_text(&mut self, text: Arc<Text>) {
         self.text = Some(text);
