@@ -40,6 +40,64 @@ pub struct TableDefinition<'source> {
     pub body: Vec<(Identifier<'source>, Field<'source>)>,
 }
 
+impl<'source> TableDefinition<'source> {
+    pub fn make_primary_key(&self) -> Result<ItemRef, SemanticError> {
+        let fields = {
+            let mut fields = Vec::new();
+            for body_item in self.body.iter() {
+                let (ref name, ref field) = *body_item;
+                if let Some(_) = find_attribute(&field.attributes, "primary_key") {
+                    // TODO Сделать подсказку о том, что аргументы для primary_key не нужны
+                    fields.push((name.clone(), field.clone()));
+                }
+            }
+            fields
+        };
+        if fields.is_empty() {
+            return Err(SemanticError::empty_primary_key(self.pos));
+        }
+        let name = {
+            let mut name = self.name.clone();
+            {
+                let string = name.get_mut_text();
+                string.push_str("::primary_key");
+            }
+            name
+        };
+        let data_type = DataTypeDefinition {
+            name,
+            body: DataType::Compound(CompoundDataType::Structure(fields)),
+        };
+        let def_item = ModuleDefinitionItem {
+            public: true,
+            attributes: Vec::new(),
+            value: ModuleDefinitionValue::DataType(data_type),
+        };
+        Ok(ItemRef::from_def(def_item))
+    }
+}
+
+impl<'source> IntoStatic for TableDefinition<'source> {
+    type Result = TableDefinition<'static>;
+    fn into_static(self) -> Self::Result {
+        let TableDefinition { name, pos, body } = self;
+        TableDefinition {
+            name: name.into_static(),
+            pos,
+            body: body.into_static(),
+        }
+    }
+}
+
+impl SemanticResolve for TableDefinition<'static> {
+    fn is_resolved(&self, context: &ResolveContext) -> bool {
+        self.body.is_resolved(context)
+    }
+    fn try_resolve(&mut self, context: &mut ResolveContext) {
+        self.body.try_resolve(context)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExternalItemTail<'source> {
     None,
