@@ -175,18 +175,17 @@ impl fmt::Display for SemanticError {
             let line_number = self.pos.begin.line + i;
             write_line_numbers_columns_row(f, max_line_num_length, Some(line_number))?;
             writeln!(f, "{}", line)?;
-            write_line_numbers_columns_row(f, max_line_num_length, None)?;
             if i == 0 {
                 if self.pos.begin.line != self.pos.end.line {
-                    write_pointer_line(f, self.pos.begin.column, line.len())?;
+                    write_pointer_line(f, line, max_line_num_length, self.pos.begin.column, line.len())?;
                 } else {
-                    write_pointer_line(f, self.pos.begin.column, self.pos.end.column)?;
+                    write_pointer_line(f, line, max_line_num_length, self.pos.begin.column, self.pos.end.column)?;
                 }
             } else {
                 if line_number == self.pos.end.line {
-                    write_pointer_line(f, 0, self.pos.end.column)?;
+                    write_pointer_line(f, line, max_line_num_length, 0, self.pos.end.column)?;
                 } else {
-                    write_pointer_line(f, 0, line.len())?;
+                    write_pointer_line(f, line, max_line_num_length, 0, line.len())?;
                 }
             }
         }

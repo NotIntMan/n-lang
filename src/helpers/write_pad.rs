@@ -62,14 +62,32 @@ pub fn decimal_unsigned_length<T>(value: T) -> usize
     generic_unsigned_length(value, T::from(0), T::from(10))
 }
 
-pub fn write_pointer_line<W: Write>(w: &mut W, begin: usize, end: usize) -> Result {
-    if begin < end {
+pub fn left_padding_size(line: &str) -> Option<usize> {
+    let mut result = 1;
+    for c in line.chars() {
+        if c.is_whitespace() {
+            result += 1;
+        } else {
+            return Some(result);
+        }
+    }
+    None
+}
+
+pub fn write_pointer_line<W: Write>(w: &mut W, line: &str, number_length: usize, begin: usize, end: usize) -> Result {
+    let begin = match left_padding_size(line) {
+        Some(padding) => padding.max(begin),
+        None => return Ok(()),
+    };
+    if begin <= end {
+        write_line_numbers_columns_row(w, number_length, None)?;
         for _ in 1..begin {
             write!(w, " ")?;
         }
-        for _ in begin..end {
+        for _ in begin..=end {
             write!(w, "^")?;
         }
+        writeln!(w, "")?;
     }
     Ok(())
 }
