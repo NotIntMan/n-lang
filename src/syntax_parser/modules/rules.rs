@@ -1,9 +1,11 @@
 use lexeme_scanner::Token;
 use parser_basics::{
     identifier,
+    item_position,
     keyword,
     none,
     symbols,
+    symbol_position,
     ParserResult,
 };
 use syntax_parser::compound_types::{
@@ -26,10 +28,12 @@ parser_rule!(data_type_definition(i) -> ModuleDefinitionValue<'source> {
 
 parser_rule!(table_definition(i) -> ModuleDefinitionValue<'source> {
     do_parse!(i,
+        begin: symbol_position >>
         apply!(keyword, "table") >>
         name: identifier >>
         body: struct_body >>
-        (ModuleDefinitionValue::Table(TableDefinition { name, body }))
+        pos: apply!(item_position, begin) >>
+        (ModuleDefinitionValue::Table(TableDefinition { name, pos, body }))
     )
 });
 

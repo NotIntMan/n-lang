@@ -1,4 +1,5 @@
 use helpers::into_static::IntoStatic;
+use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use syntax_parser::compound_types::{
     Attribute,
@@ -35,6 +36,7 @@ impl<'source> IntoStatic for DataTypeDefinition<'source> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TableDefinition<'source> {
     pub name: Identifier<'source>,
+    pub pos: ItemPosition,
     pub body: Vec<(Identifier<'source>, Field<'source>)>,
 }
 
