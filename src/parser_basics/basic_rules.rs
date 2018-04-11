@@ -105,6 +105,12 @@ impl<'source> fmt::Debug for Identifier<'source> {
     }
 }
 
+impl<T: ToString> From<T> for Identifier<'static> {
+    fn from(text: T) -> Self {
+        Identifier(Cow::Owned(text.to_string()))
+    }
+}
+
 /**
     Правило "Идентификатор".
     Ищет токен типа `Word` и возвращает его текст в случае успеха.
