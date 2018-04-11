@@ -22,6 +22,15 @@ pub struct Attribute<'source> {
     pub arguments: Option<Vec<Identifier<'source>>>,
 }
 
+pub fn find_attribute<'a, 'source>(attributes: &'a [Attribute<'source>], name: &str) -> Option<&'a Attribute<'source>> {
+    for attribute in attributes.iter() {
+        if attribute.name.get_text() == name {
+            return Some(attribute)
+        }
+    }
+    None
+}
+
 impl<'source> IntoStatic for Attribute<'source> {
     type Result = Attribute<'static>;
     fn into_static(self) -> Self::Result {
