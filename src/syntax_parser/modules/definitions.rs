@@ -10,10 +10,7 @@ use syntax_parser::others::{
     Path,
 };
 use project_analysis::resolve::ResolveContext;
-use project_analysis::item::{
-    ItemType,
-    ItemBody,
-};
+use project_analysis::item::ItemBody;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinition<'source> {
@@ -64,23 +61,31 @@ pub struct ExternalItemImport<'source> {
 
 impl ExternalItemImport<'static> {
     pub fn try_semantic_resolve(&mut self, context: &mut ResolveContext) -> Option<ItemBody> {
-        match &self.tail {
-            &ExternalItemTail::None => {
-                match context.resolve_item(ItemType::Unknown, &self.path) {
-                    Ok(item) => Some(ItemBody::ImportItem(
-                        self.path.path.last()
-                            .expect("Path should not be empty")
-                            .clone(),
-                        item,
-                    )),
+        match context.resolve_item(&self.path) {
+            Ok(item) => match &self.tail {
+                &ExternalItemTail::None => Some(ItemBody::ImportItem(
+                    self.path.path.last()
+                        .expect("Path should not be empty")
+                        .clone(),
+                    item,
+                )),
+                &ExternalItemTail::Alias(ref alias) => Some(ItemBody::ImportItem(
+                    alias.clone(),
+                    item,
+                )),
+                &ExternalItemTail::Asterisk => match item.get_module(self.path.pos) {
+                    Ok(module) => Some(ItemBody::ModuleReference(module)),
                     Err(err) => {
                         context.throw_error(err);
-                        context.request_dependency(self.path.clone());
                         None
                     }
-                }
+                },
+            },
+            Err(err) => {
+                context.throw_error(err);
+                context.request_dependency(self.path.clone());
+                None
             }
-            _ => unimplemented!()
         }
     }
 }
