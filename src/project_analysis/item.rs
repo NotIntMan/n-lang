@@ -2,6 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 use helpers::into_static::IntoStatic;
 use helpers::re_entrant_rw_lock::ReEntrantRWLock;
+use lexeme_scanner::ItemPosition;
 use parser_basics::{
     Identifier,
     StaticIdentifier,
@@ -19,6 +20,7 @@ use super::resolve::{
     ResolveContext,
 };
 use super::module::ModuleRef;
+use super::error::SemanticError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
@@ -31,14 +33,14 @@ pub enum ItemBody {
     DataType(DataTypeDefinition<'static>),
     ImportDefinition(ExternalItemImport<'static>),
     ImportItem(StaticIdentifier, ItemRef),
-//    ImportModule(StaticPath, ModuleRef),
+    ModuleReference(ModuleRef),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemRef(pub Arc<ReEntrantRWLock<Item>>);
 
-impl Item {
-    pub fn from_def(def: ModuleDefinitionItem) -> ItemRef {
+impl ItemRef {
+    pub fn from_def(def: ModuleDefinitionItem) -> Self {
         let ModuleDefinitionItem {
             public: _,
             attributes: _,
@@ -51,47 +53,83 @@ impl Item {
             ModuleDefinitionValue::Import(def) => ItemBody::ImportDefinition(def),
             _ => unimplemented!(),
         };
+        ItemRef::from_body(body)
+    }
+    #[inline]
+    pub fn from_body(body: ItemBody) -> Self {
         let item = Item {
             is_resolved: false,
             body,
         };
         ItemRef(Arc::new(ReEntrantRWLock::new(item)))
     }
-}
-
-impl ItemRef {
-    pub fn find_item(&self, item_type: ItemType, name: &[Identifier]) -> Option<ItemRef> {
-        println!("Finding in item reference item {:?}", name);
+    pub fn find_item(&self, name: &[Identifier]) -> Option<ItemRef> {
         let item = self.0.read();
+        println!("Finding item {:?} in item {:?}", name, *item);
         match &item.body {
             &ItemBody::DataType(ref def) => {
-                if ((item_type == ItemType::Unknown) || (item_type == ItemType::DataType))
-                    && name.len() == 1
+                if name.len() == 1
                     && name[0] == def.name {
-                    Some(self.clone())
-                } else {
-                    None
+                    return Some(self.clone());
                 }
             }
-            &ItemBody::ImportDefinition(_) => None,
+            &ItemBody::ImportDefinition(_) => {}
             &ItemBody::ImportItem(ref import_name, ref item) => {
                 if (name.len() > 0)
                     && name[0] == *import_name {
-                    Some((*item).clone())
-                } else {
-                    None
+                    return match item.get_module(ItemPosition::default()) {
+                        Ok(module) => module.find_item(&name[1..]),
+                        Err(_) => Some((*item).clone())
+                    }
                 }
             }
-//            _ => unimplemented!()
+            &ItemBody::ModuleReference(ref module) => {
+                return module.find_item(name)
+            }
+        }
+        None
+    }
+    pub fn get_type(&self) -> SemanticItemType {
+        let item = self.0.read();
+        match &item.body {
+            &ItemBody::DataType(_) => SemanticItemType::DataType,
+            &ItemBody::ImportDefinition(_) => SemanticItemType::UnresolvedImport,
+            &ItemBody::ImportItem(_, ref item) => item.get_type(),
+            &ItemBody::ModuleReference(_) => SemanticItemType::Module,
         }
     }
-    pub fn put_dependency(&self, dependency: &StaticPath, module: &ModuleRef) {
+    pub fn assert_type(&self, item_type: ItemType, pos: ItemPosition) -> Result<(), SemanticError> {
+        let item = self.0.read();
+        let expected = item_type.into_semantic();
+        let got = self.get_type();
+        println!("Asserting item type ({} == {}) of {:?}", expected, got, *item);
+        if expected == got {
+            Ok(())
+        } else {
+            Err(SemanticError::expected_item_of_another_type(pos, expected, got))
+        }
+    }
+    //    pub fn get_data_type(&self, pos: ItemPosition) -> Result<DataTypeDefinition<'static>, SemanticError> {
+//        let item = self.0.read();
+//        match &item.body {
+//            &ItemBody::DataType(ref def) => Ok(def.clone()),
+//            _ => Err(SemanticError::expected_item_of_another_type(pos, SemanticItemType::DataType)),
+//        }
+//    }
+    pub fn get_module(&self, pos: ItemPosition) -> Result<ModuleRef, SemanticError> {
+        let item = self.0.read();
+        match &item.body {
+            &ItemBody::ModuleReference(ref module) => Ok(module.clone()),
+            _ => Err(SemanticError::expected_item_of_another_type(pos, SemanticItemType::Module, self.get_type())),
+        }
+    }
+    pub fn put_dependency(&self, dependency: &StaticPath, module: &ModuleRef) -> Result<(), SemanticError> {
         println!("Putting {:?} into item {:?}", dependency.path, self.0);
         let mut new_body = None;
         {
             let item = self.0.read();
             match &item.body {
-                &ItemBody::ImportDefinition(ExternalItemImport { ref path, tail: ExternalItemTail::None }) => {
+                &ItemBody::ImportDefinition(ExternalItemImport { ref path, ref tail }) => {
                     let dependency_len = dependency.path.len();
                     println!("Comparing paths (begin of {:?} and {:?}", dependency.path, path.path);
                     if (path.path.len() >= dependency_len)
@@ -99,31 +137,39 @@ impl ItemRef {
                         (dependency.path.as_slice() == &path.path[..dependency_len]) {
                         println!("Begin of dependency's path is equal to import's path. Trying to find item in dependency.");
                         let item_path = &path.path[dependency_len..];
-                        if item_path.is_empty() {
-                            panic!("Module import is not implemented yet");
-                        }
-                        let module = module.read();
-                        match module.find_item(ItemType::Unknown, item_path) {
+                        match module.find_item(item_path) {
                             Some(item) => {
                                 println!("Item found, putting {:?}", item);
-                                let name = path.path.last()
-                                    .expect("Path should not be empty!")
-                                    .clone()
-                                ;
-                                new_body = Some(ItemBody::ImportItem(name, item));
+                                match tail {
+                                    &ExternalItemTail::None => {
+                                        let name = path.path.last()
+                                            .expect("Path should not be empty!")
+                                            .clone();
+                                        new_body = Some(ItemBody::ImportItem(name, item));
+                                    }
+                                    &ExternalItemTail::Alias(ref alias) => {
+                                        let name = alias.clone();
+                                        new_body = Some(ItemBody::ImportItem(name, item));
+                                    }
+                                    &ExternalItemTail::Asterisk => {
+                                        match item.get_module(path.pos) {
+                                            Ok(module) => new_body = Some(ItemBody::ModuleReference(module)),
+                                            Err(err) => return Err(err),
+                                        }
+                                    }
+                                }
                             }
-                            None => return,
+                            None => return Ok(()),
                         }
                     }
                 }
-                &ItemBody::ImportDefinition(ExternalItemImport { path: ref _path, tail: ExternalItemTail::Alias(_) }) => unimplemented!(),
-                &ItemBody::ImportDefinition(ExternalItemImport { path: ref _path, tail: ExternalItemTail::Asterisk }) => unimplemented!(),
                 _ => {}
             }
         }
         if let Some(new_body) = new_body {
             self.0.write().body = new_body;
         }
+        Ok(())
     }
 }
 
@@ -146,7 +192,8 @@ impl SemanticResolve for Item {
                 }
             }
             &mut ItemBody::ImportItem(_, _) => self.is_resolved = true,
-            _ => unimplemented!(),
+            &mut ItemBody::ModuleReference(_) => self.is_resolved = true,
+//            _ => unimplemented!(),
         }
         if let Some(new_body) = new_body {
             self.body = new_body;
@@ -156,8 +203,17 @@ impl SemanticResolve for Item {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ItemType {
-    Unknown,
     DataType,
+    Module,
+}
+
+impl ItemType {
+    pub fn into_semantic(self) -> SemanticItemType {
+        match self {
+            ItemType::DataType => SemanticItemType::DataType,
+            ItemType::Module => SemanticItemType::Module,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -172,6 +228,8 @@ pub struct ItemContext {
 pub enum SemanticItemType {
     Field,
     DataType,
+    Module,
+    UnresolvedImport,
 }
 
 impl fmt::Display for SemanticItemType {
@@ -179,6 +237,8 @@ impl fmt::Display for SemanticItemType {
         match self {
             &SemanticItemType::Field => write!(f, "field"),
             &SemanticItemType::DataType => write!(f, "data type"),
+            &SemanticItemType::Module => write!(f, "module"),
+            &SemanticItemType::UnresolvedImport => write!(f, "unresolved import"),
         }
     }
 }
