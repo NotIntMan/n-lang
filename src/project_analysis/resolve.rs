@@ -10,10 +10,7 @@ use super::project::{
 };
 use super::source::TextSource;
 use super::module::ModuleRef;
-use super::item::{
-    ItemRef,
-    ItemType,
-};
+use super::item::ItemRef;
 
 #[derive(Debug)]
 pub struct ResolveContext {
@@ -43,13 +40,14 @@ impl ResolveContext {
         self.thrown_errors.clear();
         self.module = Some(module_ref);
     }
-    fn get_item(&self, item_type: ItemType, name: &[Identifier]) -> Option<ItemRef> {
-        let arc = self.module.clone()?;
-        let module = arc.read();
-        module.find_item(item_type, name)
+    fn get_item(&self, name: &[Identifier]) -> Option<ItemRef> {
+        match &self.module {
+            &Some(ref module) => module.find_item(name),
+            &None => None,
+        }
     }
-    pub fn resolve_item(&self, item_type: ItemType, path: &StaticPath) -> Result<ItemRef, SemanticError> {
-        match self.get_item(item_type, &path.path) {
+    pub fn resolve_item(&self, path: &StaticPath) -> Result<ItemRef, SemanticError> {
+        match self.get_item(&path.path) {
             Some(x) => Ok(x),
             None => {
                 Err(SemanticError::unresolved_item(
@@ -103,7 +101,7 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                 new_dependencies: false,
             };
             {
-                let module = module_ref.read();
+                let module = module_ref.0.read();
                 module_errors.clear();
                 for item in module.items() {
                     let mut item = item.0.write();
@@ -143,7 +141,7 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                                     let _ = dependence.path.pop();
                                 }
                                 println!("Loaded {:?} ({:?})", new_module_path, dependence.path);
-                                module_ref.write().put_dependency(dependence, new_module_ref.clone());
+                                module_ref.put_dependency(dependence, &new_module_ref, &mut module_errors);
                                 if is_new {
                                     next_queue.push((new_module_path, new_module_ref));
                                 }
