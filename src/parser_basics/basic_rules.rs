@@ -52,6 +52,19 @@ impl<'source> Identifier<'source> {
             &Cow::Owned(ref own) => &own[..],
         }
     }
+    pub fn make_owned(&mut self) {
+        let new_value = if let &mut Cow::Borrowed(borrow) = &mut self.0 {
+            borrow.to_string()
+        } else { return };
+        self.0 = Cow::Owned(new_value);
+    }
+    pub fn get_mut_text(&mut self) -> &mut String {
+        self.make_owned();
+        match &mut self.0 {
+            Cow::Owned(ref mut string) => string,
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl<'source> IntoStatic for Identifier<'source> {
