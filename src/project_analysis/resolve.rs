@@ -183,15 +183,43 @@ fn do_it() {
 
     source.simple_insert(vec![], "index.n", "\
         use complex::Complex;
+        use posts::*;
+
         struct Wave {
             signal: Complex,
             frequency: unsigned big integer,
+        }
+
+        struct PostComment {
+            post: PostID,
+            date: datetime,
+            text: text,
         }
     ");
 
     source.simple_insert(vec!["complex"], "complex.n", "\
         pub struct Complex(double, double)
+
         pub struct SuperComplex(double, double)
+    ");
+
+    source.simple_insert(vec!["users"], "users.n", "\
+        pub struct UserID(unsigned big integer)
+
+        pub struct User {
+            id: UserID,
+        }
+    ");
+
+    source.simple_insert(vec!["posts"], "posts.n", "\
+        use users as Users;
+
+        pub struct PostID(unsigned big integer)
+
+        pub struct Post {
+            id: PostID,
+            author: Users::UserID,
+        }
     ");
 
     match resolve(source) {
@@ -201,6 +229,6 @@ fn do_it() {
             for error in errors.extract_into_vec() {
                 println!("{}", error);
             }
-        },
+        }
     }
 }
