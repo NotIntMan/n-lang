@@ -166,12 +166,10 @@ impl SemanticResolve for DataType<'static> {
     fn is_resolved(&self, context: &ResolveContext) -> bool {
         match self {
             &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
-                fields.iter()
-                    .all(|item| item.1.field_type.is_resolved(context))
+                fields.is_resolved(context)
             }
             &DataType::Compound(CompoundDataType::Tuple(ref fields)) => {
-                fields.iter()
-                    .all(|item| item.field_type.is_resolved(context))
+                fields.is_resolved(context)
             }
             &DataType::Primitive(_) => true,
             &DataType::Reference(_) => false,
@@ -182,26 +180,10 @@ impl SemanticResolve for DataType<'static> {
         let mut new_value = None;
         match self {
             &mut DataType::Compound(CompoundDataType::Structure(ref mut fields)) => {
-                // Имена полей структуры должны быть уникальными
-                for (i, &(ref field_name, ref field)) in fields.iter().enumerate() {
-                    for &(ref field_before_name, _) in fields[..i].iter() {
-                        if field_before_name == field_name {
-                            context.throw_error(SemanticError::duplicate_definition(
-                                field.position,
-                                (*field_before_name).clone(),
-                                SemanticItemType::Field,
-                            ));
-                        }
-                    }
-                }
-                for &mut (_, ref mut field) in fields.iter_mut() {
-                    field.field_type.try_resolve(context);
-                }
+                fields.try_resolve(context);
             }
             &mut DataType::Compound(CompoundDataType::Tuple(ref mut fields)) => {
-                for field in fields.iter_mut() {
-                    field.field_type.try_resolve(context);
-                }
+                fields.try_resolve(context);
             }
             &mut DataType::Primitive(_) => {}
             &mut DataType::Reference(ref path) => {
@@ -221,6 +203,42 @@ impl SemanticResolve for DataType<'static> {
         }
         if let Some(new_value) = new_value {
             replace(self, new_value);
+        }
+    }
+}
+
+impl SemanticResolve for Vec<Field<'static>> {
+    fn is_resolved(&self, context: &ResolveContext) -> bool {
+        self.iter()
+            .all(|item| item.field_type.is_resolved(context))
+    }
+    fn try_resolve(&mut self, context: &mut ResolveContext) {
+        for field in self.iter_mut() {
+            field.field_type.try_resolve(context);
+        }
+    }
+}
+
+impl SemanticResolve for Vec<(Identifier<'static>, Field<'static>)> {
+    fn is_resolved(&self, context: &ResolveContext) -> bool {
+        self.iter()
+            .all(|item| item.1.field_type.is_resolved(context))
+    }
+    fn try_resolve(&mut self, context: &mut ResolveContext) {
+        // Имена полей структуры должны быть уникальными
+        for (i, &(ref field_name, ref field)) in self.iter().enumerate() {
+            for &(ref field_before_name, _) in self[..i].iter() {
+                if field_before_name == field_name {
+                    context.throw_error(SemanticError::duplicate_definition(
+                        field.position,
+                        (*field_before_name).clone(),
+                        SemanticItemType::Field,
+                    ));
+                }
+            }
+        }
+        for &mut (_, ref mut field) in self.iter_mut() {
+            field.field_type.try_resolve(context);
         }
     }
 }
