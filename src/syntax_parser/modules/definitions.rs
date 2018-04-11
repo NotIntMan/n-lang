@@ -8,9 +8,12 @@ use syntax_parser::compound_types::{
 use syntax_parser::functions::FunctionDefinition;
 use syntax_parser::others::{
     Path,
+    StaticPath,
 };
 use project_analysis::resolve::ResolveContext;
 use project_analysis::item::ItemBody;
+use project_analysis::error::SemanticError;
+use project_analysis::module::ModuleRef;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinition<'source> {
@@ -86,6 +89,42 @@ impl ExternalItemImport<'static> {
                 context.request_dependency(self.path.clone());
                 None
             }
+        }
+    }
+    pub fn try_put_dependency(&self, dependency: &StaticPath, module: &ModuleRef) -> Result<Option<ItemBody>, SemanticError> {
+        let dependency_len = dependency.path.len();
+        println!("Comparing paths (begin of {:?} and {:?}", dependency.path, self.path.path);
+        if (self.path.path.len() >= dependency_len)
+            &&
+            (dependency.path.as_slice() == &self.path.path[..dependency_len]) {
+            println!("Begin of dependency's path is equal to import's path. Trying to find item in dependency.");
+            let item_path = &self.path.path[dependency_len..];
+            match module.find_item(item_path) {
+                Some(item) => {
+                    println!("Item found, putting {:?}", item);
+                    match &self.tail {
+                        &ExternalItemTail::None => {
+                            let name = self.path.path.last()
+                                .expect("Path should not be empty!")
+                                .clone();
+                            Ok(Some(ItemBody::ImportItem(name, item)))
+                        }
+                        &ExternalItemTail::Alias(ref alias) => {
+                            let name = alias.clone();
+                            Ok(Some(ItemBody::ImportItem(name, item)))
+                        }
+                        &ExternalItemTail::Asterisk => {
+                            match item.get_module(self.path.pos) {
+                                Ok(module) => Ok(Some(ItemBody::ModuleReference(module))),
+                                Err(err) => Err(err),
+                            }
+                        }
+                    }
+                }
+                None => Ok(None),
+            }
+        } else {
+            Ok(None)
         }
     }
 }

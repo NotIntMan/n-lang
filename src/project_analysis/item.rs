@@ -10,7 +10,6 @@ use parser_basics::{
 use syntax_parser::modules::{
     DataTypeDefinition,
     ExternalItemImport,
-    ExternalItemTail,
     ModuleDefinitionItem,
     ModuleDefinitionValue,
 };
@@ -80,11 +79,11 @@ impl ItemRef {
                     return match item.get_module(ItemPosition::default()) {
                         Ok(module) => module.find_item(&name[1..]),
                         Err(_) => Some((*item).clone())
-                    }
+                    };
                 }
             }
             &ItemBody::ModuleReference(ref module) => {
-                return module.find_item(name)
+                return module.find_item(name);
             }
         }
         None
@@ -129,40 +128,10 @@ impl ItemRef {
         {
             let item = self.0.read();
             match &item.body {
-                &ItemBody::ImportDefinition(ExternalItemImport { ref path, ref tail }) => {
-                    let dependency_len = dependency.path.len();
-                    println!("Comparing paths (begin of {:?} and {:?}", dependency.path, path.path);
-                    if (path.path.len() >= dependency_len)
-                        &&
-                        (dependency.path.as_slice() == &path.path[..dependency_len]) {
-                        println!("Begin of dependency's path is equal to import's path. Trying to find item in dependency.");
-                        let item_path = &path.path[dependency_len..];
-                        match module.find_item(item_path) {
-                            Some(item) => {
-                                println!("Item found, putting {:?}", item);
-                                match tail {
-                                    &ExternalItemTail::None => {
-                                        let name = path.path.last()
-                                            .expect("Path should not be empty!")
-                                            .clone();
-                                        new_body = Some(ItemBody::ImportItem(name, item));
-                                    }
-                                    &ExternalItemTail::Alias(ref alias) => {
-                                        let name = alias.clone();
-                                        new_body = Some(ItemBody::ImportItem(name, item));
-                                    }
-                                    &ExternalItemTail::Asterisk => {
-                                        match item.get_module(path.pos) {
-                                            Ok(module) => new_body = Some(ItemBody::ModuleReference(module)),
-                                            Err(err) => return Err(err),
-                                        }
-                                    }
-                                }
-                            }
-                            None => return Ok(()),
-                        }
+                &ItemBody::ImportDefinition(ref def) =>
+                    if let Some(body) = def.try_put_dependency(dependency, module)? {
+                        new_body = Some(body);
                     }
-                }
                 _ => {}
             }
         }
