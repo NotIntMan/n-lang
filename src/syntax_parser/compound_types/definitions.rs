@@ -196,8 +196,13 @@ impl SemanticResolve for DataType<'static> {
             }
             &mut DataType::Primitive(_) => {}
             &mut DataType::Reference(ref path) => {
-                match context.resolve_item(ItemType::DataType, &path) {
-                    Ok(dep_ref) => new_value = Some(DataType::ItemReference(dep_ref)),
+                match context.resolve_item(&path) {
+                    Ok(dep_ref) => {
+                        match dep_ref.assert_type(ItemType::DataType, path.pos) {
+                            Ok(_) => new_value = Some(DataType::ItemReference(dep_ref)),
+                            Err(err) => context.throw_error(err),
+                        }
+                    },
                     Err(err) => context.throw_error(err),
                 }
             }
