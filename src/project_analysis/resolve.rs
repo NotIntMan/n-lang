@@ -198,15 +198,16 @@ fn do_it() {
     ");
 
     source.simple_insert(vec!["complex"], "complex.n", "\
-        pub struct Complex(double, double)
+        struct Complex(double, double)
 
-        pub struct SuperComplex(double, double)
+        struct SuperComplex(double, double)
     ");
 
     source.simple_insert(vec!["users"], "users.n", "\
-        pub struct UserID(unsigned big integer)
+        struct UserID(unsigned big integer)
 
-        pub struct User {
+        table User {
+            #[primary_key]
             id: UserID,
         }
     ");
@@ -214,9 +215,10 @@ fn do_it() {
     source.simple_insert(vec!["posts"], "posts.n", "\
         use users as Users;
 
-        pub struct PostID(unsigned big integer)
+        struct PostID(unsigned big integer)
 
-        pub struct Post {
+        table Post {
+            #[primary_key]
             id: PostID,
             author: Users::UserID,
         }
