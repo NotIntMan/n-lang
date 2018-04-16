@@ -133,24 +133,29 @@ pub struct ExternalItemImport<'source> {
 impl ExternalItemImport<'static> {
     pub fn try_semantic_resolve(&mut self, context: &mut ResolveContext) -> Option<ItemBody> {
         match context.resolve_item(&self.path) {
-            Ok(item) => match &self.tail {
-                &ExternalItemTail::None => Some(ItemBody::ImportItem {
-                    name: self.path.path.last()
-                        .expect("Path should not be empty")
-                        .clone(),
-                    item,
-                }),
-                &ExternalItemTail::Alias(ref alias) => Some(ItemBody::ImportItem {
-                    name: alias.clone(),
-                    item,
-                }),
-                &ExternalItemTail::Asterisk => match item.get_module(self.path.pos) {
-                    Ok(module) => Some(ItemBody::ModuleReference { module }),
-                    Err(err) => {
-                        context.throw_error(err);
-                        None
-                    }
-                },
+            Ok(item) => {
+                let name = self.path.path.last()
+                    .expect("Path should not be empty")
+                    .clone();
+                match &self.tail {
+                    &ExternalItemTail::None => Some(ItemBody::ImportItem {
+                        name: name.clone(),
+                        original_name: name,
+                        item,
+                    }),
+                    &ExternalItemTail::Alias(ref alias) => Some(ItemBody::ImportItem {
+                        name: alias.clone(),
+                        original_name: name,
+                        item,
+                    }),
+                    &ExternalItemTail::Asterisk => match item.get_module(self.path.pos) {
+                        Ok(module) => Some(ItemBody::ModuleReference { module }),
+                        Err(err) => {
+                            context.throw_error(err);
+                            None
+                        }
+                    },
+                }
             },
             Err(err) => {
                 context.throw_error(err);
@@ -172,14 +177,18 @@ impl ExternalItemImport<'static> {
                     println!("Item found, putting {:?}", item);
                     match &self.tail {
                         &ExternalItemTail::None => {
-                            let name = self.path.path.last()
-                                .expect("Path should not be empty!")
-                                .clone();
-                            Ok(Some(ItemBody::ImportItem { name, item }))
+                            Ok(Some(ItemBody::ImportItem {
+                                name: name.clone(),
+                                original_name: name,
+                                item,
+                            }))
                         }
                         &ExternalItemTail::Alias(ref alias) => {
-                            let name = alias.clone();
-                            Ok(Some(ItemBody::ImportItem { name, item }))
+                            Ok(Some(ItemBody::ImportItem {
+                                name: alias.clone(),
+                                original_name: name,
+                                item,
+                            }))
                         }
                         &ExternalItemTail::Asterisk => {
                             match item.get_module(self.path.pos) {

@@ -38,6 +38,7 @@ pub enum ItemBody {
     },
     ImportItem {
         name: StaticIdentifier,
+        original_name: StaticIdentifier,
         item: ItemRef,
     },
     ModuleReference {
@@ -91,12 +92,19 @@ impl ItemRef {
                 }
             }
             &ItemBody::ImportDefinition { def: _ } => {}
-            &ItemBody::ImportItem { name: ref import_name, ref item } => {
+            &ItemBody::ImportItem { name: ref import_name, ref original_name, ref item } => {
                 if (name.len() > 0)
                     && name[0] == *import_name {
                     return match item.get_module(ItemPosition::default()) {
                         Ok(module) => module.find_item(&name[1..]),
-                        Err(_) => Some((*item).clone())
+                        Err(_) => {
+                            let mut name_inside_import = Vec::with_capacity(name.len());
+                            name_inside_import.push(original_name.clone());
+                            for name_item in &name[1..] {
+                                name_inside_import.push(name_item.clone());
+                            }
+                            item.find_item(name_inside_import.as_slice())
+                        }
                     };
                 }
             }
@@ -125,7 +133,7 @@ impl ItemRef {
         match &item.body {
             &ItemBody::DataType { def: _ } => SemanticItemType::DataType,
             &ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
-            &ItemBody::ImportItem { name: _, ref item } => item.get_type(),
+            &ItemBody::ImportItem { name: _, original_name: _, ref item } => item.get_type(),
             &ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
             &ItemBody::Table { def: _, primary_key: _ } => SemanticItemType::Table,
         }
@@ -193,7 +201,7 @@ impl SemanticResolve for Item {
                     new_body = Some(body);
                 }
             }
-            &mut ItemBody::ImportItem { name: _, item: _ } => self.is_resolved = true,
+            &mut ItemBody::ImportItem { name: _, original_name: _, item: _ } => self.is_resolved = true,
             &mut ItemBody::ModuleReference { module: _ } => self.is_resolved = true,
             &mut ItemBody::Table { ref mut def, ref mut primary_key } => {
                 def.try_resolve(context);

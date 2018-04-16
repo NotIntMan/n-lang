@@ -213,14 +213,14 @@ fn do_it() {
     ");
 
     source.simple_insert(vec!["posts"], "posts.n", "\
-        use users as Users;
+        use users::User as Users;
 
         struct PostID(unsigned big integer)
 
         table Post {
             #[primary_key]
             id: PostID,
-            author: Users::UserID,
+            author: Users::primary_key,
         }
     ");
 
