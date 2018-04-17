@@ -74,7 +74,7 @@ pub trait SemanticResolve {
 struct ModuleResolvingStatus {
     resolved: bool,
     new_resolved_items: bool,
-    new_dependencies: bool,
+    new_injected_dependencies: bool,
 }
 
 pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
@@ -98,7 +98,7 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
             let mut resolving_status = ModuleResolvingStatus {
                 resolved: true,
                 new_resolved_items: false,
-                new_dependencies: false,
+                new_injected_dependencies: false,
             };
             {
                 let module = module_ref.0.read();
@@ -120,20 +120,12 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                             println!("Item not resolved {:?}", item.clone());
                         }
                     }
-                    // TODO Упростить это
                     'dep_load: for mut dependence in Extractor::new(&mut context.requested_dependencies) {
                         let mut new_module_path = dependence.path.clone();
                         for module_path_item in module_path.iter() {
                             new_module_path.insert(0, module_path_item.clone());
                         }
-//                            if tried_dependencies.contains(&new_module_path) {
-//                                continue 'dep_load;
-//                            } else {
-//                                tried_dependencies.push(new_module_path.clone());
-//                            }
                         println!("Loading dependence {:?}", dependence.path);
-                        // TODO Переделать механизм запроса новых зависимостей
-                        // TODO Учесть ранее загруженные модули
                         match project_ref.write().find_or_load_module(&source, dependence.clone()) {
                             Ok((new_module_ref, rest_path, is_new)) => {
                                 for _ in 0..rest_path.len() {
@@ -141,13 +133,17 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                                     let _ = dependence.path.pop();
                                 }
                                 println!("Loaded {:?} ({:?})", new_module_path, dependence.path);
-                                module_ref.put_dependency(dependence, &new_module_ref, &mut module_errors);
+                                if module_ref.put_dependency(dependence, &new_module_ref, &mut module_errors) {
+                                    resolving_status.new_injected_dependencies = true;
+                                }
                                 if is_new {
                                     next_queue.push((new_module_path, new_module_ref));
                                 }
-                                resolving_status.new_dependencies = true;
                             }
-                            Err(group) => module_errors.append(&mut group.extract_into_vec()),
+                            Err(group) => {
+                                resolving_status.resolved = false;
+                                module_errors.append(&mut group.extract_into_vec())
+                            },
                         }
                     }
                 }
@@ -159,7 +155,7 @@ pub fn resolve<S>(source: S) -> Result<ProjectRef, Group<SemanticError>>
                 println!("Module is resolved {:?}", module_path);
             } else {
                 println!("Module is not resolved {:?}", module_path);
-                if resolving_status.new_resolved_items || resolving_status.new_dependencies {
+                if resolving_status.new_resolved_items || resolving_status.new_injected_dependencies {
                     next_queue.push((module_path, module_ref));
                 } else {
                     errors.append(&mut module_errors);

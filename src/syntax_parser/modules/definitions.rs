@@ -175,6 +175,9 @@ impl ExternalItemImport<'static> {
             match module.find_item(item_path) {
                 Some(item) => {
                     println!("Item found, putting {:?}", item);
+                    let name = self.path.path.last()
+                        .expect("Path should not be empty!")
+                        .clone();
                     match &self.tail {
                         &ExternalItemTail::None => {
                             Ok(Some(ItemBody::ImportItem {

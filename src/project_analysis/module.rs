@@ -22,6 +22,7 @@ use super::error::SemanticError;
 pub struct Module {
     text: Arc<Text>,
     items: Vec<ItemRef>,
+    injected_dependencies: Vec<StaticPath>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +47,7 @@ impl Module {
         let module_ref = ModuleRef(Arc::new(ReEntrantRWLock::new(Module {
             text,
             items: Vec::with_capacity(items.len()),
+            injected_dependencies: Vec::new(),
         })));
         {
             let mut module = module_ref.0.write();
@@ -64,8 +66,11 @@ impl Module {
 }
 
 impl ModuleRef {
-    pub fn put_dependency(&self, path: StaticPath, dependency: &ModuleRef, errors: &mut Vec<SemanticError>) {
+    pub fn put_dependency(&self, path: StaticPath, dependency: &ModuleRef, errors: &mut Vec<SemanticError>) -> bool {
         let module = self.0.read();
+        if module.injected_dependencies.contains(&path) {
+            return false;
+        }
         println!("Putting {:?} into module {:?}", path.path, module.text.name);
         for item in module.items.iter() {
             match item.put_dependency(&path, dependency) {
@@ -73,6 +78,11 @@ impl ModuleRef {
                 Err(err) => errors.push(err),
             }
         }
+        {
+            let mut module = self.0.write();
+            module.injected_dependencies.push(path);
+        }
+        true
     }
     pub fn find_item(&self, name: &[Identifier]) -> Option<ItemRef> {
         let module = self.0.read();
