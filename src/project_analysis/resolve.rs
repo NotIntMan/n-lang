@@ -178,47 +178,43 @@ fn do_it() {
     let mut source = HashMapSource::new();
 
     source.simple_insert(vec![], "index.n", "\
-        use complex::Complex;
-        use posts::*;
-
-        struct Wave {
-            signal: Complex,
-            frequency: unsigned big integer,
-        }
-
-        struct PostComment {
-            post: PostID,
-            date: datetime,
-            text: text,
-        }
-    ");
-
-    source.simple_insert(vec!["complex"], "complex.n", "\
         struct Complex(double, double)
 
-        struct SuperComplex(double, double)
-    ");
+        extern fn sqrt(number: double): double;
 
-    source.simple_insert(vec!["users"], "users.n", "\
-        struct UserID(unsigned big integer)
-
-        table User {
-            #[primary_key]
-            id: UserID,
+        fn module(number: Complex): double {
+            let x2 = number.0 * number.0;
+            let y2 = number.1 * number.1;
+            sqrt(x2 + y2)
         }
     ");
 
-    source.simple_insert(vec!["posts"], "posts.n", "\
-        use users::User as Users;
-
-        struct PostID(unsigned big integer)
-
-        table Post {
-            #[primary_key]
-            id: PostID,
-            author: Users::primary_key,
-        }
-    ");
+//    source.simple_insert(vec!["complex"], "complex.n", "\
+//        struct Complex(double, double)
+//
+//        struct SuperComplex(double, double)
+//    ");
+//
+//    source.simple_insert(vec!["users"], "users.n", "\
+//        struct UserID(unsigned big integer)
+//
+//        table User {
+//            #[primary_key]
+//            id: UserID,
+//        }
+//    ");
+//
+//    source.simple_insert(vec!["posts"], "posts.n", "\
+//        use users::User as Users;
+//
+//        struct PostID(unsigned big integer)
+//
+//        table Post {
+//            #[primary_key]
+//            id: PostID,
+//            author: Users::primary_key,
+//        }
+//    ");
 
     match resolve(source) {
         Ok(project) => println!("Project: {:#?}", project),

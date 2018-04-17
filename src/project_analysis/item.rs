@@ -69,6 +69,9 @@ impl ItemRef {
                 let primary_key = def.make_primary_key();
                 ItemBody::Table { def, primary_key }
             }
+            ModuleDefinitionValue::Function(_def) => {
+                unimplemented!()
+            }
             _ => unimplemented!(),
         };
         ItemRef::from_body(body)
@@ -260,16 +263,24 @@ pub enum SemanticItemType {
     Module,
     UnresolvedImport,
     Table,
+    Variable,
+}
+
+impl SemanticItemType {
+    pub fn get_description(&self) -> &'static str {
+        match self {
+            &SemanticItemType::Field => "field",
+            &SemanticItemType::DataType => "data type",
+            &SemanticItemType::Module => "module",
+            &SemanticItemType::UnresolvedImport => "unresolved import",
+            &SemanticItemType::Table => "table",
+            &SemanticItemType::Variable => "variable",
+        }
+    }
 }
 
 impl fmt::Display for SemanticItemType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &SemanticItemType::Field => write!(f, "field"),
-            &SemanticItemType::DataType => write!(f, "data type"),
-            &SemanticItemType::Module => write!(f, "module"),
-            &SemanticItemType::UnresolvedImport => write!(f, "unresolved import"),
-            &SemanticItemType::Table => write!(f, "table"),
-        }
+        write!(f, "{}", self.get_description())
     }
 }

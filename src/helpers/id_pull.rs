@@ -16,7 +16,7 @@ pub struct IDPull {
 
 impl IDPull {
     #[inline]
-    pub fn with_init_value(counter: usize) {
+    pub fn with_init_value(counter: usize) -> Self {
         IDPull { counter }
     }
     #[inline]
