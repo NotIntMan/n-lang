@@ -1,3 +1,4 @@
+use helpers::into_static::IntoStatic;
 use parser_basics::Identifier;
 use syntax_parser::compound_types::DataType;
 use syntax_parser::expressions::Expression;
@@ -15,6 +16,17 @@ pub enum CycleType<'source> {
     PostPredicated(Expression<'source>),
 }
 
+impl<'source> IntoStatic for CycleType<'source> {
+    type Result = CycleType<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            CycleType::Simple => CycleType::Simple,
+            CycleType::PrePredicated(expr) => CycleType::PrePredicated(expr.into_static()),
+            CycleType::PostPredicated(expr) => CycleType::PostPredicated(expr.into_static()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CycleControlOperator {
     Break,
@@ -25,6 +37,16 @@ pub enum CycleControlOperator {
 pub enum StatementSource<'source> {
     Expression(Expression<'source>),
     Selection(Selection<'source>),
+}
+
+impl<'source> IntoStatic for StatementSource<'source> {
+    type Result = StatementSource<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            StatementSource::Expression(value) => StatementSource::Expression(value.into_static()),
+            StatementSource::Selection(value) => StatementSource::Selection(value.into_static()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,4 +96,41 @@ pub enum Statement<'source> {
 
 impl<'source> Default for Statement<'source> {
     fn default() -> Self { Statement::Nothing }
+}
+
+impl<'source> IntoStatic for Statement<'source> {
+    type Result = Statement<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            Statement::Nothing => Statement::Nothing,
+            Statement::VariableDefinition { name, data_type, default_value } => Statement::VariableDefinition {
+                name: name.into_static(),
+                data_type: data_type.into_static(),
+                default_value: default_value.into_static(),
+            },
+            Statement::VariableAssignment { name, source } => Statement::VariableAssignment {
+                name: name.into_static(),
+                source: source.into_static(),
+            },
+            Statement::Condition { condition, then_body, else_body } => Statement::Condition {
+                condition: condition.into_static(),
+                then_body: then_body.into_static(),
+                else_body: else_body.into_static(),
+            },
+            Statement::Cycle { cycle_type, body } => Statement::Cycle {
+                cycle_type: cycle_type.into_static(),
+                body: body.into_static(),
+            },
+            Statement::CycleControl { operator, name } => Statement::CycleControl {
+                operator,
+                name: name.into_static(),
+            },
+            Statement::Return { value } => Statement::Return { value: value.into_static() },
+            Statement::Block { statements } => Statement::Block { statements: statements.into_static() },
+            Statement::Expression { expression } => Statement::Expression { expression: expression.into_static() },
+            Statement::DeletingRequest { request } => Statement::DeletingRequest { request: request.into_static() },
+            Statement::InsertingRequest { request } => Statement::InsertingRequest { request: request.into_static() },
+            Statement::UpdatingRequest { request } => Statement::UpdatingRequest { request: request.into_static() },
+        }
+    }
 }

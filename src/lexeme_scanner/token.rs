@@ -3,6 +3,7 @@
 use std::fmt;
 use helpers::assertion::Assertion;
 use super::*;
+use parser_basics::Identifier;
 
 /// Тип токена
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,5 +149,11 @@ impl<'a> Token<'a> {
     #[allow(dead_code)]
     pub fn new_wrapped(kind: TokenKind, text: &'a str, pos: SymbolPosition) -> Option<ScannerItem<'a>> {
         Some(Ok(Self::new(kind, text, pos)))
+    }
+    pub fn ident(&self) -> Identifier<'a> {
+        Identifier::new(self.text)
+    }
+    pub fn pos(&self) -> ItemPosition {
+        self.pos.make_item_pos(self.text)
     }
 }

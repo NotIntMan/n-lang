@@ -231,9 +231,10 @@ impl<'source> IntoStatic for ModuleDefinitionValue<'source> {
     fn into_static(self) -> Self::Result {
         match self {
             ModuleDefinitionValue::DataType(value) => ModuleDefinitionValue::DataType(value.into_static()),
-            ModuleDefinitionValue::Import(value) => ModuleDefinitionValue::Import(value.into_static()),
             ModuleDefinitionValue::Table(value) => ModuleDefinitionValue::Table(value.into_static()),
-            _ => unimplemented!(),
+            ModuleDefinitionValue::Function(value) => ModuleDefinitionValue::Function(value.into_static()),
+            ModuleDefinitionValue::Module(value) => ModuleDefinitionValue::Module(value.into_static()),
+            ModuleDefinitionValue::Import(value) => ModuleDefinitionValue::Import(value.into_static()),
         }
     }
 }
@@ -263,4 +264,15 @@ impl<'source> IntoStatic for ModuleDefinitionItem<'source> {
 pub struct ModuleDefinition<'source> {
     pub name: Identifier<'source>,
     pub items: Vec<ModuleDefinitionItem<'source>>,
+}
+
+impl<'source> IntoStatic for ModuleDefinition<'source> {
+    type Result = ModuleDefinition<'static>;
+    fn into_static(self) -> Self::Result {
+        let ModuleDefinition { name, items } = self;
+        ModuleDefinition {
+            name: name.into_static(),
+            items: items.into_static(),
+        }
+    }
 }

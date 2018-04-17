@@ -79,11 +79,11 @@ impl<'source> IntoStatic for Identifier<'source> {
 
 impl<'source> PartialEq<str> for Identifier<'source> {
     fn eq(&self, other: &str) -> bool {
-        &*self.0 == other
+        self.get_text() == other
     }
 
     fn ne(&self, other: &str) -> bool {
-        &*self.0 != other
+        self.get_text() != other
     }
 }
 

@@ -1,5 +1,7 @@
-use lexeme_scanner::Token;
+use helpers::into_static::IntoStatic;
+use lexeme_scanner::ItemPosition;
 use helpers::assertion::Assertion;
+use parser_basics::Identifier;
 use syntax_parser::others::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,13 +30,26 @@ pub enum LiteralType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Literal<'source> {
     pub literal_type: LiteralType,
-    pub token: Token<'source>,
+    pub text: Identifier<'source>,
+    pub pos: ItemPosition,
 }
 
 impl<'source> Assertion for Literal<'source> {
     fn assert(&self, other: &Self) {
         assert_eq!(self.literal_type, other.literal_type);
-        self.token.assert(&other.token);
+        assert_eq!(self.text.get_text(), other.text.get_text());
+    }
+}
+
+impl<'source> IntoStatic for Literal<'source> {
+    type Result = Literal<'static>;
+    fn into_static(self) -> Self::Result {
+        let Literal { literal_type, text, pos } = self;
+        Literal {
+            literal_type,
+            text: text.into_static(),
+            pos,
+        }
     }
 }
 
@@ -101,7 +116,7 @@ pub enum PostfixUnaryOperator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression<'source> {
     Literal(Literal<'source>),
-    Identifier(Token<'source>),
+    Identifier(Identifier<'source>),
     BinaryOperation(Box<Expression<'source>>, BinaryOperator, Box<Expression<'source>>),
     PrefixUnaryOperation(PrefixUnaryOperator, Box<Expression<'source>>),
     PostfixUnaryOperation(PostfixUnaryOperator, Box<Expression<'source>>),
@@ -118,9 +133,9 @@ impl<'source> Assertion for Expression<'source> {
                     lit_left.assert(lit_right)
                 } else { assert_eq!(self, other) }
             }
-            &Expression::Identifier(ref token_left) => {
-                if let &Expression::Identifier(ref token_right) = other {
-                    token_left.assert(token_right)
+            &Expression::Identifier(ref ident_left) => {
+                if let &Expression::Identifier(ref ident_right) = other {
+                    assert_eq!(ident_left, ident_right);
                 } else { assert_eq!(self, other) }
             }
             &Expression::BinaryOperation(ref left_left, ref left_op, ref left_right) => {
@@ -176,5 +191,21 @@ impl<'source> Assertion<str> for Expression<'source> {
 impl<'a, 'source> Assertion<&'a str> for Expression<'source> {
     fn assert(&self, other: &&'a str) {
         self.assert(*other)
+    }
+}
+
+impl<'source> IntoStatic for Expression<'source> {
+    type Result = Expression<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            Expression::Literal(value) => Expression::Literal(value.into_static()),
+            Expression::Identifier(value) => Expression::Identifier(value.into_static()),
+            Expression::BinaryOperation(left, op, right) => Expression::BinaryOperation(left.into_static(), op, right.into_static()),
+            Expression::PrefixUnaryOperation(op, value) => Expression::PrefixUnaryOperation(op, value.into_static()),
+            Expression::PostfixUnaryOperation(op, value) => Expression::PostfixUnaryOperation(op, value.into_static()),
+            Expression::PropertyAccess(expr, path) => Expression::PropertyAccess(expr.into_static(), path.into_static()),
+            Expression::Set(value) => Expression::Set(value.into_static()),
+            Expression::FunctionCall(path, args) => Expression::FunctionCall(path.into_static(), args.into_static()),
+        }
     }
 }

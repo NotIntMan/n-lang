@@ -1,4 +1,5 @@
 use helpers::assertion::Assertion;
+use helpers::into_static::IntoStatic;
 use syntax_parser::expressions::Expression;
 use syntax_parser::data_sources::DataSource;
 use syntax_parser::selections::{
@@ -13,10 +14,34 @@ pub enum UpdatingValue<'source> {
     Expression(Expression<'source>),
 }
 
+impl<'source> IntoStatic for UpdatingValue<'source> {
+    type Result = UpdatingValue<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            UpdatingValue::Default => UpdatingValue::Default,
+            UpdatingValue::Expression(value) => UpdatingValue::Expression(value.into_static()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdatingAssignment<'source> {
     pub property: Path<'source>,
     pub value: UpdatingValue<'source>,
+}
+
+impl<'source> IntoStatic for UpdatingAssignment<'source> {
+    type Result = UpdatingAssignment<'static>;
+    fn into_static(self) -> Self::Result {
+        let UpdatingAssignment {
+            property,
+            value,
+        } = self;
+        UpdatingAssignment {
+            property: property.into_static(),
+            value: value.into_static(),
+        }
+    }
 }
 
 impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignment<'source> {
@@ -50,6 +75,30 @@ pub struct Updating<'source> {
     pub limit_clause: Option<u32>,
 }
 
+impl<'source> IntoStatic for Updating<'source> {
+    type Result = Updating<'static>;
+    fn into_static(self) -> Self::Result {
+        let Updating {
+            low_priority,
+            ignore,
+            source,
+            assignments,
+            where_clause,
+            order_by_clause,
+            limit_clause,
+        } = self;
+        Updating {
+            low_priority,
+            ignore,
+            source: source.into_static(),
+            assignments: assignments.into_static(),
+            where_clause: where_clause.into_static(),
+            order_by_clause: order_by_clause.into_static(),
+            limit_clause,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InsertingPriority {
     Usual,
@@ -73,6 +122,25 @@ pub enum InsertingSource<'source> {
     },
 }
 
+impl<'source> IntoStatic for InsertingSource<'source> {
+    type Result = InsertingSource<'static>;
+    fn into_static(self) -> Self::Result {
+        match self {
+            InsertingSource::ValueLists { properties, lists } => InsertingSource::ValueLists {
+                properties: properties.into_static(),
+                lists: lists.into_static(),
+            },
+            InsertingSource::AssignmentList { assignments } => InsertingSource::AssignmentList {
+                assignments: assignments.into_static(),
+            },
+            InsertingSource::Selection { properties, query } => InsertingSource::Selection {
+                properties: properties.into_static(),
+                query: query.into_static(),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inserting<'source> {
     pub priority: InsertingPriority,
@@ -80,6 +148,26 @@ pub struct Inserting<'source> {
     pub target: DataSource<'source>,
     pub source: InsertingSource<'source>,
     pub on_duplicate_key_update: Option<Vec<UpdatingAssignment<'source>>>,
+}
+
+impl<'source> IntoStatic for Inserting<'source> {
+    type Result = Inserting<'static>;
+    fn into_static(self) -> Self::Result {
+        let Inserting {
+            priority,
+            ignore,
+            target,
+            source,
+            on_duplicate_key_update,
+        } = self;
+        Inserting {
+            priority,
+            ignore,
+            target: target.into_static(),
+            source: source.into_static(),
+            on_duplicate_key_update: on_duplicate_key_update.into_static(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,4 +179,28 @@ pub struct Deleting<'source> {
     pub where_clause: Option<Expression<'source>>,
     pub order_by_clause: Option<Vec<SelectionSortingItem<'source>>>,
     pub limit_clause: Option<u32>,
+}
+
+impl<'source> IntoStatic for Deleting<'source> {
+    type Result = Deleting<'static>;
+    fn into_static(self) -> Self::Result {
+        let Deleting {
+            low_priority,
+            quick,
+            ignore,
+            source,
+            where_clause,
+            order_by_clause,
+            limit_clause,
+        } = self;
+        Deleting {
+            low_priority,
+            quick,
+            ignore,
+            source: source.into_static(),
+            where_clause: where_clause.into_static(),
+            order_by_clause: order_by_clause.into_static(),
+            limit_clause,
+        }
+    }
 }

@@ -20,6 +20,13 @@ impl<Item: IntoStatic> IntoStatic for Option<Item> {
     }
 }
 
+impl<Item: IntoStatic> IntoStatic for Box<Item> {
+    type Result = Box<Item::Result>;
+    fn into_static(self) -> Self::Result {
+        Box::new((*self).into_static())
+    }
+}
+
 impl<A: IntoStatic, B: IntoStatic> IntoStatic for (A, B) {
     type Result = (A::Result, B::Result);
     fn into_static(self) -> Self::Result {

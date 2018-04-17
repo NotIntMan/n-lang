@@ -5,7 +5,7 @@ pub mod others;
 
 use lexeme_scanner::Token;
 use parser_basics::{
-    identifier_raw,
+    identifier,
     ParserResult,
 };
 use super::*;
@@ -23,7 +23,7 @@ parser_rule!(expression_atom(i) -> Expression<'source> {
         literal => { |x| Expression::Literal(x) } |
         apply!(function_call, expression) |
         apply!(set, expression) |
-        identifier_raw => { |x: &Token<'source>| Expression::Identifier(*x) }
+        identifier => { |x| Expression::Identifier(x) }
     )
 });
 

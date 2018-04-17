@@ -27,7 +27,7 @@ parser_rule!(number_literal(i) -> Literal<'source> {
                     ParserErrorTokenInfo::from_kind(other.less()),
                 )),
             };
-            Literal { literal_type, token: *token }
+            Literal { literal_type, text: token.ident(), pos: token.pos() }
         })
     )
 });
@@ -46,7 +46,7 @@ parser_rule!(string_literal(i) -> Literal<'source> {
                     ParserErrorTokenInfo::from_kind(other.less()),
                 )),
             };
-            Literal { literal_type, token: *token }
+            Literal { literal_type, text: token.ident(), pos: token.pos() }
         })
     )
 });
@@ -65,7 +65,7 @@ parser_rule!(braced_literal(i) -> Literal<'source> {
                     ParserErrorTokenInfo::from_kind(other.less()),
                 )),
             };
-            Literal { literal_type, token: *token }
+            Literal { literal_type, text: token.ident(), pos: token.pos() }
         })
     )
 });
@@ -80,7 +80,7 @@ parser_rule!(keyword_literal(i) -> Literal<'source> {
         ) >>
         ({
             let (token, literal_type) = x;
-            Literal { literal_type: LiteralType::KeywordLiteral(literal_type), token: *token }
+            Literal { literal_type: LiteralType::KeywordLiteral(literal_type), text: token.ident(), pos: token.pos() }
         })
     )
 });
