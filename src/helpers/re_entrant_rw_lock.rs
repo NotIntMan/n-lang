@@ -153,6 +153,7 @@ pub struct ReEntrantRWLock<T: ? Sized> {
 }
 
 impl<T> ReEntrantRWLock<T> {
+    #[inline]
     pub fn new(data: T) -> Self {
         ReEntrantRWLock {
             head: Mutex::new(ReEntrantRWHead::new()),
@@ -168,6 +169,10 @@ impl<T: ? Sized> ReEntrantRWLock<T> {
     fn head(&self) -> MutexGuard<ReEntrantRWHead> {
         self.head.lock()
             .expect("Head of ReEntrantRWLock was poisoned!")
+    }
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.data
     }
 }
 
