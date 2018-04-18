@@ -46,6 +46,12 @@ pub enum SemanticErrorKind {
         got: SemanticItemType,
     },
     EmptyPrimaryKey,
+    NotInScope {
+        name: StaticIdentifier,
+    },
+    WrongProperty {
+        property: StaticIdentifier,
+    },
 }
 
 impl Default for SemanticErrorKind {
@@ -82,6 +88,8 @@ impl fmt::Display for SemanticErrorKind {
             &SemanticErrorKind::ParserError { ref kind } => write!(f, "{}", kind),
             &SemanticErrorKind::ExpectedItemOfAnotherType { ref expected, ref got } => write!(f, "{} expected here, got {}", expected, got),
             &SemanticErrorKind::EmptyPrimaryKey => write!(f, "empty primary key"),
+            &SemanticErrorKind::NotInScope { ref name } => write!(f, "{} is not in the scope", name.get_text()),
+            &SemanticErrorKind::WrongProperty { ref property } => write!(f, "property {} is not in the scope", property.get_text()),
         }
     }
 }
@@ -146,6 +154,14 @@ impl SemanticError {
     #[inline]
     pub fn empty_primary_key(pos: ItemPosition) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::EmptyPrimaryKey, text: None }
+    }
+    #[inline]
+    pub fn not_in_scope(pos: ItemPosition, name: StaticIdentifier) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::NotInScope { name }, text: None }
+    }
+    #[inline]
+    pub fn wrong_property(pos: ItemPosition, property: StaticIdentifier) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::WrongProperty { property }, text: None }
     }
     pub fn set_text(&mut self, text: Arc<Text>) {
         self.text = Some(text);
