@@ -25,7 +25,7 @@ pub struct Attribute<'source> {
 pub fn find_attribute<'a, 'source>(attributes: &'a [Attribute<'source>], name: &str) -> Option<&'a Attribute<'source>> {
     for attribute in attributes.iter() {
         if attribute.name.get_text() == name {
-            return Some(attribute)
+            return Some(attribute);
         }
     }
     None
@@ -126,6 +126,33 @@ pub enum DataType<'source> {
     ItemReference(ItemRef),
 }
 
+impl<'source> DataType<'source> {
+    pub fn prop(&self, pos: ItemPosition, prop: &Identifier<'source>) -> Result<&DataType<'source>, SemanticError> {
+        match self {
+            &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
+                if let Some(x) = fields.iter()
+                    .find(|&&(ref name, _)| name == prop)
+                    .map(|&(_, ref field)| &field.field_type)
+                    {
+                        return Ok(x);
+                    }
+            }
+            &DataType::Compound(CompoundDataType::Tuple(ref fields)) => {
+                // TODO Возможно, доступ к полям кортежа сейчас невозможен из-за того, что идентификатор не может начинаться с цифры.
+                if let Ok(index) = prop.get_text().parse::<usize>() {
+                    if let Some(x) = fields.get(index)
+                        .map(|field: &Field| &field.field_type)
+                        {
+                            return Ok(x);
+                        }
+                }
+            }
+            _ => {}
+        }
+        Err(SemanticError::wrong_property(pos, prop.clone().into_static()))
+    }
+}
+
 impl<'source> Assertion for DataType<'source> {
     fn assert(&self, other_data_type: &DataType) {
         match self {
@@ -193,7 +220,7 @@ impl SemanticResolve for DataType<'static> {
                             Ok(_) => new_value = Some(DataType::ItemReference(dep_ref)),
                             Err(err) => context.throw_error(err),
                         }
-                    },
+                    }
                     Err(err) => context.throw_error(err),
                 }
             }
