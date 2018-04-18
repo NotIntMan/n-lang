@@ -3,8 +3,12 @@ use helpers::id_pull::{
     IDPull,
 };
 use helpers::sync_ref::SyncRef;
+use lexeme_scanner::ItemPosition;
 use parser_basics::StaticIdentifier;
 use syntax_parser::compound_types::DataType;
+use syntax_parser::others::StaticPath;
+use project_analysis::error::SemanticError;
+use project_analysis::item::SemanticItemType;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionVariable {
@@ -19,6 +23,27 @@ impl FunctionVariable {
             name,
             data_type,
         })
+    }
+}
+
+impl SyncRef<FunctionVariable> {
+    pub fn type_of(&self, property_path: &StaticPath) -> Option<Result<DataType<'static>, SemanticError>> {
+        let var = self.read();
+        let mut var_type = match &var.data_type {
+            &Some(ref var_type) => var_type,
+            &None => return None,
+        };
+        let mut property_path_slice = property_path.path.as_slice();
+
+        while let Some(name) = property_path_slice.first() {
+            property_path_slice = &property_path_slice[1..];
+            var_type = match var_type.prop(property_path.pos, name) {
+                Ok(var_type) => var_type,
+                Err(e) => return Some(Err(e)),
+            };
+        }
+
+        Some(Ok(var_type.clone()))
     }
 }
 
@@ -62,9 +87,19 @@ impl SyncRef<FunctionVariableScope> {
             .get_scope(scope.parent?)?
             .get_variable(name)
     }
-    pub fn new_variable(&self, name: StaticIdentifier, data_type: Option<DataType<'static>>) -> SyncRef<FunctionVariable> {
-        let mut scope = self.write();
-        unimplemented!()
+    pub fn access_to_variable(&self, pos: ItemPosition, name: &StaticIdentifier) -> Result<SyncRef<FunctionVariable>, SemanticError> {
+        match self.get_variable(name) {
+            Some(var) => Ok(var),
+            None => Err(SemanticError::not_in_scope(pos, name.clone())),
+        }
+    }
+    pub fn new_variable(&self, pos: ItemPosition, name: StaticIdentifier, data_type: Option<DataType<'static>>) -> Result<SyncRef<FunctionVariable>, SemanticError> {
+        if self.get_variable(&name).is_some() {
+            return Err(SemanticError::duplicate_definition(pos, name, SemanticItemType::Variable));
+        }
+        let var = FunctionVariable::new(name, data_type);
+        self.write().variables.push(var.clone());
+        Ok(var)
     }
 }
 
@@ -91,7 +126,7 @@ impl SyncRef<FunctionContext> {
         let mut ctx = self.write();
         let scope = FunctionVariableScope::new(
             ctx.scope_id_pull.generate(),
-            None,
+            parent_scope,
             self.clone(),
         );
         ctx.scopes.push(scope.clone());
