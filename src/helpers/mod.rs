@@ -21,3 +21,6 @@ pub mod re_entrant_rw_lock;
 pub mod lazy;
 pub mod id_pull;
 pub mod sync_ref;
+pub mod resolve;
+pub mod as_unique;
+pub mod path;
