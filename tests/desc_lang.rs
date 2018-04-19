@@ -125,27 +125,27 @@ fn simple_text_type_parses_correctly() {
 #[test]
 fn struct_and_tuple_bodies_parses_correctly() {
     let result = parse!("(boolean, {a: integer, b: double})", data_type);
-    assert_eq!(result, DataType::Compound(CompoundDataType::Tuple(vec![
-            Field {
+    assert_eq!(result, DataTypeAST::Compound(CompoundDataTypeAST::Tuple(vec![
+        FieldAST {
                 attributes: vec![],
-                field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean)),
+            field_type: DataTypeAST::Primitive(PrimitiveDataType::Number(NumberType::Boolean)),
                 position: ItemPosition::new("(", "boolean"),
             },
-            Field {
+        FieldAST {
                 attributes: vec![],
-                field_type: DataType::Compound(CompoundDataType::Structure(vec![
-                    (Identifier::new("a"), Field {
+            field_type: DataTypeAST::Compound(CompoundDataTypeAST::Structure(vec![
+                (Identifier::new("a"), FieldAST {
                         attributes: vec![],
-                        field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
+                    field_type: DataTypeAST::Primitive(PrimitiveDataType::Number(NumberType::Integer {
                             integer_type: IntegerType::Normal,
                             unsigned: false,
                             zerofill: false,
                         })),
                         position: ItemPosition::new("(boolean, {", "a: integer"),
                     }),
-                    (Identifier::new("b"), Field {
+                (Identifier::new("b"), FieldAST {
                         attributes: vec![],
-                        field_type: DataType::Primitive(PrimitiveDataType::Number(NumberType::Float {
+                    field_type: DataTypeAST::Primitive(PrimitiveDataType::Number(NumberType::Float {
                             size: None,
                             double: true,
                         })),
@@ -189,13 +189,13 @@ fn simple_const_time_function_parses_correctly() {
     let &(ref arg_name, ref arg_type) = result.arguments.get(0)
         .expect("Function's arguments must have the first item");
     assert_eq!(*arg_name, "k");
-    assert_eq!(*arg_type, DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
+    assert_eq!(*arg_type, DataTypeAST::Primitive(PrimitiveDataType::Number(NumberType::Integer {
         integer_type: IntegerType::Normal,
         unsigned: true,
         zerofill: false,
     })));
     assert_eq!(result.arguments.get(1), None);
-    assert_eq!(result.result, Some(DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
+    assert_eq!(result.result, Some(DataTypeAST::Primitive(PrimitiveDataType::Number(NumberType::Integer {
         integer_type: IntegerType::Big,
         unsigned: true,
         zerofill: false,
@@ -269,7 +269,7 @@ parser_rule!(module_only(i) -> Vec<ModuleDefinitionItem<'source>> {
 
 #[test]
 fn module_of_two_usage_parses_correctly() {
-    let result: Vec<ModuleDefinitionItem> = parse!("\
+    let result: Vec<ModuleDefinitionItemAST> = parse!("\
         use foo::bar as Bar;
         #[no_mandle]
         pub use foo::TakeAll;
@@ -291,7 +291,7 @@ fn module_of_two_usage_parses_correctly() {
     });
 }
 
-fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<ModuleDefinitionItem>) {
+fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<ModuleDefinitionItemAST>) {
     assert_eq!(module.len(), 2);
     assert_eq!(module[0].public, true);
     assert_eq!(module[0].attributes.len(), 1);
@@ -330,7 +330,7 @@ fn assert_module_of_complex_number_struct_and_wave_signals_table(module: &Vec<Mo
 
 #[test]
 fn module_of_table_and_struct_parses_correctly() {
-    let result: Vec<ModuleDefinitionItem> = parse!("\
+    let result: Vec<ModuleDefinitionItemAST> = parse!("\
         #[derive(Hash)]
         pub struct Complex {
             real: double,
@@ -352,7 +352,7 @@ fn module_of_table_and_struct_parses_correctly() {
 #[test]
 fn simple_submodule_parses_correctly() {
     let _ = env_logger::try_init();
-    let result: Vec<ModuleDefinitionItem> = parse!("\
+    let result: Vec<ModuleDefinitionItemAST> = parse!("\
         mod wave {
             #[derive(Hash)]
             pub struct Complex {

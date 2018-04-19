@@ -3,7 +3,7 @@
 use std::ops::Range;
 use std::fmt;
 use nom::IResult;
-use helpers::into_static::IntoStatic;
+//use helpers::into_static::IntoStatic;
 use lexeme_scanner::{
     ItemPosition,
     Token,
@@ -55,15 +55,15 @@ impl<'source> Identifier<'source> {
     }
 }
 
-impl<'source> IntoStatic for Identifier<'source> {
-    type Result = StaticIdentifier;
-    fn into_static(self) -> Self::Result {
-        match self {
-            Identifier(Cow::Borrowed(borrow)) => Identifier(Cow::Owned(borrow.to_string())),
-            Identifier(Cow::Owned(own)) => Identifier(Cow::Owned(own)),
-        }
-    }
-}
+//impl<'source> IntoStatic for Identifier<'source> {
+//    type Result = StaticIdentifier;
+//    fn into_static(self) -> Self::Result {
+//        match self {
+//            Identifier(Cow::Borrowed(borrow)) => Identifier(Cow::Owned(borrow.to_string())),
+//            Identifier(Cow::Owned(own)) => Identifier(Cow::Owned(own)),
+//        }
+//    }
+//}
 
 impl<'source> PartialEq<str> for Identifier<'source> {
     fn eq(&self, other: &str) -> bool {

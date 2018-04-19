@@ -15,7 +15,7 @@ use syntax_parser::others::module_path;
 use super::*;
 
 /// "#[" identifier [(...identifier)] "]"
-parser_rule!(attribute(i) -> Attribute<'source> {
+parser_rule!(attribute(i) -> AttributeAST<'source> {
     do_parse!(i,
         apply!(symbols, "#[") >>
         name: identifier >>
@@ -26,17 +26,17 @@ parser_rule!(attribute(i) -> Attribute<'source> {
             (x)
         )) >>
         apply!(symbols, "]") >>
-        (Attribute { name, arguments })
+        (AttributeAST { name, arguments })
     )
 });
 
 /// ...attribute
-parser_rule!(pub attributes(i) -> Vec<Attribute<'source>> {
+parser_rule!(pub attributes(i) -> Vec<AttributeAST<'source>> {
     many0!(i, attribute)
 });
 
 /// attributes identifier ":" data_type
-parser_rule!(struct_field(i) -> (Identifier<'source>, Field<'source>) {
+parser_rule!(struct_field(i) -> (Identifier<'source>, FieldAST<'source>) {
     do_parse!(i,
         begin: symbol_position >>
         attributes: attributes >>
@@ -44,23 +44,23 @@ parser_rule!(struct_field(i) -> (Identifier<'source>, Field<'source>) {
         apply!(symbols, ":") >>
         field_type: data_type >>
         position: apply!(item_position, begin) >>
-        ((name, Field { attributes, field_type, position }))
+        ((name, FieldAST { attributes, field_type, position }))
     )
 });
 
 /// attributes data_type
-parser_rule!(tuple_field(i) -> Field<'source> {
+parser_rule!(tuple_field(i) -> FieldAST<'source> {
     do_parse!(i,
         begin: symbol_position >>
         attributes: attributes >>
         field_type: data_type >>
         position: apply!(item_position, begin) >>
-        (Field { attributes, field_type, position })
+        (FieldAST { attributes, field_type, position })
     )
 });
 
 /// attributes "{" ...struct_field "}"
-parser_rule!(pub struct_body(i) -> Vec<(Identifier<'source>, Field<'source>)> {
+parser_rule!(pub struct_body(i) -> Vec<(Identifier<'source>, FieldAST<'source>)> {
     do_parse!(i,
         apply!(symbols, "{") >>
         fields: apply!(comma_list, struct_field) >>
@@ -70,7 +70,7 @@ parser_rule!(pub struct_body(i) -> Vec<(Identifier<'source>, Field<'source>)> {
 });
 
 /// attributes "(" ...tuple_field ")"
-parser_rule!(tuple_body(i) -> Vec<Field<'source>> {
+parser_rule!(tuple_body(i) -> Vec<FieldAST<'source>> {
     do_parse!(i,
         apply!(symbols, "(") >>
         fields: apply!(comma_list, tuple_field) >>
@@ -80,18 +80,18 @@ parser_rule!(tuple_body(i) -> Vec<Field<'source>> {
 });
 
 /// Парсер, реализующий разбор грамматики составных типов
-pub fn compound_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataType<'source>> {
+pub fn compound_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataTypeAST<'source>> {
     alt!(input,
-        struct_body => { |x| DataType::Compound(CompoundDataType::Structure(x)) }
-        | tuple_body => { |x| DataType::Compound(CompoundDataType::Tuple(x)) }
+        struct_body => { |x| DataTypeAST::Compound(CompoundDataTypeAST::Structure(x)) }
+        | tuple_body => { |x| DataTypeAST::Compound(CompoundDataTypeAST::Tuple(x)) }
     )
 }
 
 /// Парсер, реализующий разбор грамматики составных и простых типов
-pub fn data_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataType<'source>> {
+pub fn data_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataTypeAST<'source>> {
     alt!(input,
         compound_type
-        | primitive_data_type => { |x| DataType::Primitive(x) }
-        | module_path => { |x| DataType::Reference(x) }
+        | primitive_data_type => { |x| DataTypeAST::Primitive(x) }
+        | module_path => { |x| DataTypeAST::Reference(x) }
     )
 }

@@ -9,12 +9,12 @@ use lexeme_scanner::Token;
 use parser_basics::ParserResult;
 use syntax_parser::compound_types::{
     data_type,
-    DataType,
+    DataTypeAST,
 };
 use syntax_parser::statements::block;
 use super::*;
 
-parser_rule!(type_of(i) -> DataType<'source> {
+parser_rule!(type_of(i) -> DataTypeAST<'source> {
     do_parse!(i,
         apply!(symbols, ":") >>
         data_type: data_type >>
@@ -22,7 +22,7 @@ parser_rule!(type_of(i) -> DataType<'source> {
     )
 });
 
-parser_rule!(argument(i) -> (Identifier<'source>, DataType<'source>) {
+parser_rule!(argument(i) -> (Identifier<'source>, DataTypeAST<'source>) {
     do_parse!(i,
         name: identifier >>
         data_type: type_of >>
@@ -30,7 +30,7 @@ parser_rule!(argument(i) -> (Identifier<'source>, DataType<'source>) {
     )
 });
 
-parser_rule!(arguments(i) -> Vec<(Identifier<'source>, DataType<'source>)> {
+parser_rule!(arguments(i) -> Vec<(Identifier<'source>, DataTypeAST<'source>)> {
     do_parse!(i,
         apply!(symbols, "(") >>
         argument_list: apply!(comma_list, argument) >>

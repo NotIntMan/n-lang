@@ -1,4 +1,4 @@
-use helpers::into_static::IntoStatic;
+//use helpers::into_static::IntoStatic;
 use lexeme_scanner::ItemPosition;
 use helpers::assertion::Assertion;
 use parser_basics::Identifier;
@@ -37,21 +37,21 @@ pub struct Literal<'source> {
 impl<'source> Assertion for Literal<'source> {
     fn assert(&self, other: &Self) {
         assert_eq!(self.literal_type, other.literal_type);
-        assert_eq!(self.text.get_text(), other.text.get_text());
+        assert_eq!(self.text.text(), other.text.text());
     }
 }
 
-impl<'source> IntoStatic for Literal<'source> {
-    type Result = Literal<'static>;
-    fn into_static(self) -> Self::Result {
-        let Literal { literal_type, text, pos } = self;
-        Literal {
-            literal_type,
-            text: text.into_static(),
-            pos,
-        }
-    }
-}
+//impl<'source> IntoStatic for Literal<'source> {
+//    type Result = Literal<'static>;
+//    fn into_static(self) -> Self::Result {
+//        let Literal { literal_type, text, pos } = self;
+//        Literal {
+//            literal_type,
+//            text: text.into_static(),
+//            pos,
+//        }
+//    }
+//}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
@@ -194,18 +194,18 @@ impl<'a, 'source> Assertion<&'a str> for Expression<'source> {
     }
 }
 
-impl<'source> IntoStatic for Expression<'source> {
-    type Result = Expression<'static>;
-    fn into_static(self) -> Self::Result {
-        match self {
-            Expression::Literal(value) => Expression::Literal(value.into_static()),
-            Expression::Identifier(value) => Expression::Identifier(value.into_static()),
-            Expression::BinaryOperation(left, op, right) => Expression::BinaryOperation(left.into_static(), op, right.into_static()),
-            Expression::PrefixUnaryOperation(op, value) => Expression::PrefixUnaryOperation(op, value.into_static()),
-            Expression::PostfixUnaryOperation(op, value) => Expression::PostfixUnaryOperation(op, value.into_static()),
-            Expression::PropertyAccess(expr, path) => Expression::PropertyAccess(expr.into_static(), path.into_static()),
-            Expression::Set(value) => Expression::Set(value.into_static()),
-            Expression::FunctionCall(path, args) => Expression::FunctionCall(path.into_static(), args.into_static()),
-        }
-    }
-}
+//impl<'source> IntoStatic for Expression<'source> {
+//    type Result = Expression<'static>;
+//    fn into_static(self) -> Self::Result {
+//        match self {
+//            Expression::Literal(value) => Expression::Literal(value.into_static()),
+//            Expression::Identifier(value) => Expression::Identifier(value.into_static()),
+//            Expression::BinaryOperation(left, op, right) => Expression::BinaryOperation(left.into_static(), op, right.into_static()),
+//            Expression::PrefixUnaryOperation(op, value) => Expression::PrefixUnaryOperation(op, value.into_static()),
+//            Expression::PostfixUnaryOperation(op, value) => Expression::PostfixUnaryOperation(op, value.into_static()),
+//            Expression::PropertyAccess(expr, path) => Expression::PropertyAccess(expr.into_static(), path.into_static()),
+//            Expression::Set(value) => Expression::Set(value.into_static()),
+//            Expression::FunctionCall(path, args) => Expression::FunctionCall(path.into_static(), args.into_static()),
+//        }
+//    }
+//}

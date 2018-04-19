@@ -1,5 +1,5 @@
 use std::fmt;
-use helpers::into_static::IntoStatic;
+//use helpers::into_static::IntoStatic;
 use lexeme_scanner::{
     ItemPosition,
     Token,
@@ -31,16 +31,16 @@ impl<'source> Path<'source> {
     }
 }
 
-impl<'source> IntoStatic for Path<'source> {
-    type Result = StaticPath;
-    fn into_static(self) -> StaticPath {
-        let Path { pos, path } = self;
-        Path {
-            pos,
-            path: path.into_static(),
-        }
-    }
-}
+//impl<'source> IntoStatic for Path<'source> {
+//    type Result = StaticPath;
+//    fn into_static(self) -> StaticPath {
+//        let Path { pos, path } = self;
+//        Path {
+//            pos,
+//            path: path.into_static(),
+//        }
+//    }
+//}
 
 impl<'source> PartialEq for Path<'source> {
     #[inline]
@@ -116,10 +116,10 @@ pub fn module_path<'token, 'source>(input: &'token [Token<'source>]) -> ParserRe
 pub fn write_path<W: fmt::Write>(w: &mut W, path: &[Identifier], delimiter: &str) -> fmt::Result {
     let mut path_iter = path.iter();
     if let Some(path_item) = path_iter.next() {
-        write!(w, "{}", path_item.get_text())?;
+        write!(w, "{}", path_item.text())?;
     }
     for path_item in path_iter {
-        write!(w, "{}{}", delimiter, path_item.get_text())?;
+        write!(w, "{}{}", delimiter, path_item.text())?;
     }
     Ok(())
 }

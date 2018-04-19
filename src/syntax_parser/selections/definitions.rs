@@ -1,4 +1,4 @@
-use helpers::into_static::IntoStatic;
+//use helpers::into_static::IntoStatic;
 use parser_basics::Identifier;
 use syntax_parser::expressions::Expression;
 use syntax_parser::data_sources::DataSource;
@@ -17,16 +17,16 @@ pub struct SelectionExpression<'source> {
     pub alias: Option<Identifier<'source>>,
 }
 
-impl<'source> IntoStatic for SelectionExpression<'source> {
-    type Result = SelectionExpression<'static>;
-    fn into_static(self) -> Self::Result {
-        let SelectionExpression { expr, alias } = self;
-        SelectionExpression {
-            expr: expr.into_static(),
-            alias: alias.into_static(),
-        }
-    }
-}
+//impl<'source> IntoStatic for SelectionExpression<'source> {
+//    type Result = SelectionExpression<'static>;
+//    fn into_static(self) -> Self::Result {
+//        let SelectionExpression { expr, alias } = self;
+//        SelectionExpression {
+//            expr: expr.into_static(),
+//            alias: alias.into_static(),
+//        }
+//    }
+//}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelectionResult<'source> {
@@ -34,15 +34,15 @@ pub enum SelectionResult<'source> {
     Some(Vec<SelectionExpression<'source>>),
 }
 
-impl<'source> IntoStatic for SelectionResult<'source> {
-    type Result = SelectionResult<'static>;
-    fn into_static(self) -> Self::Result {
-        match self {
-            SelectionResult::All => SelectionResult::All,
-            SelectionResult::Some(expressions) => SelectionResult::Some(expressions.into_static()),
-        }
-    }
-}
+//impl<'source> IntoStatic for SelectionResult<'source> {
+//    type Result = SelectionResult<'static>;
+//    fn into_static(self) -> Self::Result {
+//        match self {
+//            SelectionResult::All => SelectionResult::All,
+//            SelectionResult::Some(expressions) => SelectionResult::Some(expressions.into_static()),
+//        }
+//    }
+//}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectionSortingOrder {
@@ -56,16 +56,16 @@ pub struct SelectionSortingItem<'source> {
     pub order: SelectionSortingOrder,
 }
 
-impl<'source> IntoStatic for SelectionSortingItem<'source> {
-    type Result = SelectionSortingItem<'static>;
-    fn into_static(self) -> Self::Result {
-        let SelectionSortingItem { expr, order } = self;
-        SelectionSortingItem {
-            expr: expr.into_static(),
-            order,
-        }
-    }
-}
+//impl<'source> IntoStatic for SelectionSortingItem<'source> {
+//    type Result = SelectionSortingItem<'static>;
+//    fn into_static(self) -> Self::Result {
+//        let SelectionSortingItem { expr, order } = self;
+//        SelectionSortingItem {
+//            expr: expr.into_static(),
+//            order,
+//        }
+//    }
+//}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionGroupByClause<'source> {
@@ -73,16 +73,16 @@ pub struct SelectionGroupByClause<'source> {
     pub with_rollup: bool,
 }
 
-impl<'source> IntoStatic for SelectionGroupByClause<'source> {
-    type Result = SelectionGroupByClause<'static>;
-    fn into_static(self) -> Self::Result {
-        let SelectionGroupByClause { sorting, with_rollup } = self;
-        SelectionGroupByClause {
-            sorting: sorting.into_static(),
-            with_rollup,
-        }
-    }
-}
+//impl<'source> IntoStatic for SelectionGroupByClause<'source> {
+//    type Result = SelectionGroupByClause<'static>;
+//    fn into_static(self) -> Self::Result {
+//        let SelectionGroupByClause { sorting, with_rollup } = self;
+//        SelectionGroupByClause {
+//            sorting: sorting.into_static(),
+//            with_rollup,
+//        }
+//    }
+//}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SelectionLimit {
@@ -106,36 +106,36 @@ pub struct Selection<'source> {
     pub limit_clause: Option<SelectionLimit>,
 }
 
-impl<'source> IntoStatic for Selection<'source> {
-    type Result = Selection<'static>;
-    fn into_static(self) -> Self::Result {
-        let Selection {
-            distinct,
-            high_priority,
-            straight_join,
-            result_size,
-            cache,
-            result,
-            source,
-            where_clause,
-            group_by_clause,
-            having_clause,
-            order_by_clause,
-            limit_clause,
-        } = self;
-        Selection {
-            distinct,
-            high_priority,
-            straight_join,
-            result_size,
-            cache,
-            result: result.into_static(),
-            source: source.into_static(),
-            where_clause: where_clause.into_static(),
-            group_by_clause: group_by_clause.into_static(),
-            having_clause: having_clause.into_static(),
-            order_by_clause: order_by_clause.into_static(),
-            limit_clause,
-        }
-    }
-}
+//impl<'source> IntoStatic for Selection<'source> {
+//    type Result = Selection<'static>;
+//    fn into_static(self) -> Self::Result {
+//        let Selection {
+//            distinct,
+//            high_priority,
+//            straight_join,
+//            result_size,
+//            cache,
+//            result,
+//            source,
+//            where_clause,
+//            group_by_clause,
+//            having_clause,
+//            order_by_clause,
+//            limit_clause,
+//        } = self;
+//        Selection {
+//            distinct,
+//            high_priority,
+//            straight_join,
+//            result_size,
+//            cache,
+//            result: result.into_static(),
+//            source: source.into_static(),
+//            where_clause: where_clause.into_static(),
+//            group_by_clause: group_by_clause.into_static(),
+//            having_clause: having_clause.into_static(),
+//            order_by_clause: order_by_clause.into_static(),
+//            limit_clause,
+//        }
+//    }
+//}

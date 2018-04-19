@@ -1,11 +1,11 @@
-use helpers::into_static::IntoStatic;
+//use helpers::into_static::IntoStatic;
 use parser_basics::Identifier;
-use syntax_parser::compound_types::DataType;
+use syntax_parser::compound_types::DataTypeAST;
 use syntax_parser::statements::Statement;
-use project_analysis::resolve::{
-    SemanticResolve,
-    ResolveContext,
-};
+//use project_analysis::resolve::{
+//    SemanticResolve,
+//    ResolveContext,
+//};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionBody<'source> {
@@ -13,42 +13,42 @@ pub enum FunctionBody<'source> {
     Implementation(Statement<'source>),
 }
 
-impl<'source> IntoStatic for FunctionBody<'source> {
-    type Result = FunctionBody<'static>;
-    fn into_static(self) -> Self::Result {
-        match self {
-            FunctionBody::External => FunctionBody::External,
-            FunctionBody::Implementation(stmt) => FunctionBody::Implementation(stmt.into_static()),
-        }
-    }
-}
+//impl<'source> IntoStatic for FunctionBody<'source> {
+//    type Result = FunctionBody<'static>;
+//    fn into_static(self) -> Self::Result {
+//        match self {
+//            FunctionBody::External => FunctionBody::External,
+//            FunctionBody::Implementation(stmt) => FunctionBody::Implementation(stmt.into_static()),
+//        }
+//    }
+//}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionDefinition<'source> {
     pub name: Identifier<'source>,
-    pub arguments: Vec<(Identifier<'source>, DataType<'source>)>,
-    pub result: Option<DataType<'source>>,
+    pub arguments: Vec<(Identifier<'source>, DataTypeAST<'source>)>,
+    pub result: Option<DataTypeAST<'source>>,
     pub body: FunctionBody<'source>,
 }
 
-impl<'source> IntoStatic for FunctionDefinition<'source> {
-    type Result = FunctionDefinition<'static>;
-    fn into_static(self) -> Self::Result {
-        let FunctionDefinition { name, arguments, result, body } = self;
-        FunctionDefinition {
-            name: name.into_static(),
-            arguments: arguments.into_static(),
-            result: result.into_static(),
-            body: body.into_static(),
-        }
-    }
-}
+//impl<'source> IntoStatic for FunctionDefinition<'source> {
+//    type Result = FunctionDefinition<'static>;
+//    fn into_static(self) -> Self::Result {
+//        let FunctionDefinition { name, arguments, result, body } = self;
+//        FunctionDefinition {
+//            name: name.into_static(),
+//            arguments: arguments.into_static(),
+//            result: result.into_static(),
+//            body: body.into_static(),
+//        }
+//    }
+//}
 
-impl SemanticResolve for FunctionDefinition<'static> {
-    fn is_resolved(&self, context: &ResolveContext) -> bool {
-        unimplemented!()
-    }
-    fn try_resolve(&mut self, context: &mut ResolveContext) {
-        unimplemented!()
-    }
-}
+//impl SemanticResolve for FunctionDefinition<'static> {
+//    fn is_resolved(&self, _context: &ResolveContext) -> bool {
+//        unimplemented!()
+//    }
+//    fn try_resolve(&mut self, _context: &mut ResolveContext) {
+//        unimplemented!()
+//    }
+//}
