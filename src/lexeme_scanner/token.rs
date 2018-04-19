@@ -151,7 +151,7 @@ impl<'a> Token<'a> {
         Some(Ok(Self::new(kind, text, pos)))
     }
     pub fn ident(&self) -> Identifier<'a> {
-        Identifier::new(self.text)
+        Identifier::new(self.text, self.pos)
     }
     pub fn pos(&self) -> ItemPosition {
         self.pos.make_item_pos(self.text)

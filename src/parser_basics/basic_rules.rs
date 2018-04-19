@@ -1,7 +1,6 @@
 //! Набор примитивных правил для образования языка
 
 use std::ops::Range;
-use std::borrow::Cow;
 use std::fmt;
 use nom::IResult;
 use helpers::into_static::IntoStatic;
@@ -31,39 +30,28 @@ pub fn none<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'t
     input.ok(())
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Identifier<'source>(pub Cow<'source, str>);
-
-pub type StaticIdentifier = Identifier<'static>;
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Identifier<'source> {
+    text: &'source str,
+    pos: SymbolPosition,
+}
 
 impl<'source> Identifier<'source> {
-    pub fn new(text: &'source str) -> Self {
-        Identifier(Cow::Borrowed(text))
+    #[inline]
+    pub fn new(text: &'source str, pos: SymbolPosition) -> Self {
+        Identifier { text, pos }
     }
-    pub fn get_borrowed_text(&self) -> Option<&'source str> {
-        match &self.0 {
-            &Cow::Borrowed(borrow) => Some(borrow),
-            &Cow::Owned(_) => None,
-        }
+    #[inline]
+    pub fn text(&self) -> &'source str {
+        self.text
     }
-    pub fn get_text(&self) -> &str {
-        match &self.0 {
-            &Cow::Borrowed(borrow) => borrow,
-            &Cow::Owned(ref own) => &own[..],
-        }
+    #[inline]
+    pub fn pos(&self) -> SymbolPosition {
+        self.pos
     }
-    pub fn make_owned(&mut self) {
-        let new_value = if let &mut Cow::Borrowed(borrow) = &mut self.0 {
-            borrow.to_string()
-        } else { return };
-        self.0 = Cow::Owned(new_value);
-    }
-    pub fn get_mut_text(&mut self) -> &mut String {
-        self.make_owned();
-        match &mut self.0 {
-            Cow::Owned(ref mut string) => string,
-            _ => unreachable!(),
-        }
+    #[inline]
+    pub fn item_pos(&self) -> ItemPosition {
+        self.pos.make_item_pos(self.text)
     }
 }
 
@@ -79,48 +67,43 @@ impl<'source> IntoStatic for Identifier<'source> {
 
 impl<'source> PartialEq<str> for Identifier<'source> {
     fn eq(&self, other: &str) -> bool {
-        self.get_text() == other
+        self.text() == other
     }
 
     fn ne(&self, other: &str) -> bool {
-        self.get_text() != other
+        self.text() != other
     }
 }
 
 impl<'source, 'target> PartialEq<&'target str> for Identifier<'source> {
     fn eq(&self, other: &&'target str) -> bool {
-        self.get_text() == *other
+        self.text() == *other
     }
 
     fn ne(&self, other: &&'target str) -> bool {
-        self.get_text() != *other
+        self.text() != *other
     }
 }
 
 impl<'source, 'target> PartialEq<Identifier<'source>> for &'target str {
     fn eq(&self, other: &Identifier<'source>) -> bool {
-        *self == other.get_text()
+        *self == other.text()
     }
 
     fn ne(&self, other: &Identifier<'source>) -> bool {
-        *self != other.get_text()
+        *self != other.text()
     }
 }
 
 impl<'source> fmt::Debug for Identifier<'source> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let item = self.get_text();
-        if f.alternate() {
-            write!(f, "Identifier: {:#?}", &*item)
-        } else {
-            write!(f, "Identifier: {:?}", &*item)
-        }
+        write!(f, "{:?} on {}", self.text, self.pos)
     }
 }
 
-impl<T: ToString> From<T> for Identifier<'static> {
-    fn from(text: T) -> Self {
-        Identifier(Cow::Owned(text.to_string()))
+impl<'source> fmt::Display for Identifier<'source> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.text)
     }
 }
 
@@ -130,7 +113,7 @@ impl<T: ToString> From<T> for Identifier<'static> {
 */
 pub fn identifier<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Identifier<'source>> {
     token(input, TokenKindLess::Word)
-        .map(|token| Identifier::new(token.text))
+        .map(|token| Identifier::new(token.text, token.pos))
 }
 
 /**
@@ -170,8 +153,7 @@ array!(pub const KEYWORD_LIST: &'static str =
 pub fn not_keyword_identifier<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Identifier<'source>> {
     match identifier(input) {
         IResult::Done(new_input, result) => {
-            let text = result.get_borrowed_text()
-                .expect("Rule \"identifier\" should not return owned text as result");
+            let text = result.text();
             if KEYWORD_LIST.contains(&text) {
                 input.err(ParserErrorKind::expected_got(
                     ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::Word, "not keyword identifier"),

@@ -43,7 +43,6 @@ pub use self::basic_rules::{
     none,
     special_number_literal,
     string_literal,
-    StaticIdentifier,
     symbols,
     u32_literal,
     symbol_position,
