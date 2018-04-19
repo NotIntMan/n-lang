@@ -134,3 +134,12 @@ impl<'source> IntoStatic for Statement<'source> {
         }
     }
 }
+
+impl Statement<'static> {
+    pub fn is_resolved(&self) -> bool {
+        match self {
+            &Statement::Nothing => true,
+            _ => unimplemented!(),
+        }
+    }
+}

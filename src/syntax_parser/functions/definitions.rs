@@ -2,6 +2,10 @@ use helpers::into_static::IntoStatic;
 use parser_basics::Identifier;
 use syntax_parser::compound_types::DataType;
 use syntax_parser::statements::Statement;
+use project_analysis::resolve::{
+    SemanticResolve,
+    ResolveContext,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FunctionBody<'source> {
@@ -37,5 +41,14 @@ impl<'source> IntoStatic for FunctionDefinition<'source> {
             result: result.into_static(),
             body: body.into_static(),
         }
+    }
+}
+
+impl SemanticResolve for FunctionDefinition<'static> {
+    fn is_resolved(&self, context: &ResolveContext) -> bool {
+        unimplemented!()
+    }
+    fn try_resolve(&mut self, context: &mut ResolveContext) {
+        unimplemented!()
     }
 }
