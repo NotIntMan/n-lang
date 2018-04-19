@@ -6,7 +6,7 @@ use helpers::re_entrant_rw_lock::{
     ReEntrantWriteGuard,
 };
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct SyncRef<T: ? Sized> {
     res: Arc<ReEntrantRWLock<T>>,
 }
@@ -44,6 +44,14 @@ impl<'a, T: ? Sized> SyncRef<T>
     #[inline]
     pub fn write(&'a self) -> ReEntrantWriteGuard<'a, T> {
         self.res.write()
+    }
+}
+
+impl<T> Clone for SyncRef<T> {
+    fn clone(&self) -> Self {
+        SyncRef {
+            res: self.res.clone(),
+        }
     }
 }
 
