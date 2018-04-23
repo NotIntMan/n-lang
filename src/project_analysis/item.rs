@@ -1,20 +1,21 @@
-//use std::fmt;
+use std::fmt;
 //use std::sync::Arc;
 ////use helpers::into_static::IntoStatic;
 //use helpers::re_entrant_rw_lock::ReEntrantRWLock;
-//use helpers::sync_ref::SyncRef;
+use helpers::sync_ref::SyncRef;
+use helpers::path::Path;
 //use lexeme_scanner::ItemPosition;
 //use parser_basics::{
 //    Identifier,
 //    StaticIdentifier,
 //};
-//use syntax_parser::modules::{
-//    DataTypeDefinition,
+use syntax_parser::modules::{
+    DataTypeDefinition,
 //    ExternalItemImport,
 //    ModuleDefinitionItem,
 ////    ModuleDefinitionValue,
 //    TableDefinition,
-//};
+};
 //use syntax_parser::others::StaticPath;
 //use super::resolve::{
 //    SemanticResolve,
@@ -25,15 +26,14 @@
 //
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
-    is_resolved: bool,
     body: ItemBody,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ItemBody {
-//    DataType {
-//        def: DataTypeDefinition<'static>,
-//    },
+    DataType {
+        def: DataTypeDefinition,
+    },
 //    ImportDefinition {
 //        def: ExternalItemImport<'static>
 //    },
@@ -49,6 +49,27 @@ pub enum ItemBody {
 //        def: TableDefinition<'static>,
 //        primary_key: Result<ItemRef, SemanticError>,
 //    },
+}
+
+impl Item {
+    #[inline]
+    pub fn data_type(def: DataTypeDefinition) -> Self {
+        Item { body: ItemBody::DataType { def } }
+    }
+}
+
+impl SyncRef<Item> {
+    pub fn get_item(&self, path: Path) -> Option<Self> {
+        let item = self.read();
+        match &item.body {
+            &ItemBody::DataType { def: _ } => {
+                if path.is_empty() {
+                    return Some(self.clone());
+                }
+            }
+        }
+        None
+    }
 }
 
 //#[derive(Debug, Clone, PartialEq, Eq)]
@@ -260,31 +281,33 @@ pub enum ItemBody {
 ////    item_id: ItemId,
 //}
 //
-//#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-//pub enum SemanticItemType {
-//    Field,
-//    DataType,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SemanticItemType {
+    Definition,
+    Field,
+    DataType,
 //    Module,
 //    UnresolvedImport,
 //    Table,
 //    Variable,
-//}
-//
-//impl SemanticItemType {
-//    pub fn get_description(&self) -> &'static str {
-//        match self {
-//            &SemanticItemType::Field => "field",
-//            &SemanticItemType::DataType => "data type",
+}
+
+impl SemanticItemType {
+    pub fn get_description(&self) -> &'static str {
+        match self {
+            &SemanticItemType::Definition => "definition",
+            &SemanticItemType::Field => "field",
+            &SemanticItemType::DataType => "data type",
 //            &SemanticItemType::Module => "module",
 //            &SemanticItemType::UnresolvedImport => "unresolved import",
 //            &SemanticItemType::Table => "table",
 //            &SemanticItemType::Variable => "variable",
-//        }
-//    }
-//}
-//
-//impl fmt::Display for SemanticItemType {
-//    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//        write!(f, "{}", self.get_description())
-//    }
-//}
+        }
+    }
+}
+
+impl fmt::Display for SemanticItemType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.get_description())
+    }
+}

@@ -42,3 +42,7 @@ pub use self::item::*;
 pub mod module_context;
 
 pub use self::module_context::*;
+
+pub mod new_resolve;
+
+pub use self::new_resolve::*;
