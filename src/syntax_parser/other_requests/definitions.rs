@@ -6,7 +6,7 @@ use syntax_parser::selections::{
     Selection,
     SelectionSortingItem,
 };
-use syntax_parser::others::Path;
+use syntax_parser::others::ItemPath;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdatingValue<'source> {
@@ -26,7 +26,7 @@ pub enum UpdatingValue<'source> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdatingAssignment<'source> {
-    pub property: Path<'source>,
+    pub property: ItemPath,
     pub value: UpdatingValue<'source>,
 }
 
@@ -110,14 +110,14 @@ pub enum InsertingPriority {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InsertingSource<'source> {
     ValueLists {
-        properties: Option<Vec<Path<'source>>>,
+        properties: Option<Vec<ItemPath>>,
         lists: Vec<Vec<Expression<'source>>>,
     },
     AssignmentList {
         assignments: Vec<UpdatingAssignment<'source>>,
     },
     Selection {
-        properties: Option<Vec<Path<'source>>>,
+        properties: Option<Vec<ItemPath>>,
         query: Selection<'source>,
     },
 }

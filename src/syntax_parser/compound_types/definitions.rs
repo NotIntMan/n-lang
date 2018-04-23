@@ -6,23 +6,21 @@ use helpers::assertion::Assertion;
 //use helpers::into_static::IntoStatic;
 use helpers::resolve::Resolve;
 use helpers::sync_ref::SyncRef;
-use helpers::as_unique::as_unique;
+use helpers::as_unique::as_unique_identifier;
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
-use syntax_parser::others::Path;
+use syntax_parser::others::ItemPath;
 use syntax_parser::primitive_types::PrimitiveDataType;
 //use project_analysis::resolve::{
 //    SemanticResolve,
 //ResolveContext,
 //};
-//use project_analysis::error::SemanticError;
-use project_analysis::item::{
+use project_analysis::{
     Item,
-//    ItemRef,
-//    ItemType,
-//    SemanticItemType,
+    SemanticItemType,
+    SemanticError,
+    ModuleContext,
 };
-use project_analysis::module_context::ModuleContext;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AttributeAST<'source> {
@@ -94,8 +92,8 @@ impl<'source> Assertion for FieldAST<'source> {
 
 impl<'source> Resolve<ModuleContext> for FieldAST<'source> {
     type Result = Field;
-    type Error = ();
-    fn resolve(&mut self, ctx: &mut ModuleContext) -> Result<Self::Result, Self::Error> {
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
         let field_type = self.field_type.resolve(ctx)?;
         let attributes = self.attributes.iter()
             .map(|attr| attr.into())
@@ -178,23 +176,31 @@ impl<'source> Assertion for CompoundDataTypeAST<'source> {
 
 impl<'source> Resolve<ModuleContext> for CompoundDataTypeAST<'source> {
     type Result = CompoundDataType;
-    type Error = ();
-    fn resolve(&mut self, ctx: &mut ModuleContext) -> Result<Self::Result, Self::Error> {
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
         match self {
-            &mut CompoundDataTypeAST::Structure(ref mut fields) => Ok(CompoundDataType::Structure(
-                as_unique(fields.resolve(ctx)?)?
+            &CompoundDataTypeAST::Structure(ref fields) => Ok(CompoundDataType::Structure(
+                match as_unique_identifier(fields.clone()) {
+                    Ok(map) => map,
+                    Err(name) => return Err(vec![SemanticError::duplicate_definition(
+                        name.item_pos(),
+                        name.text().to_string(),
+                        SemanticItemType::Field,
+                    )])
+                }
+                    .resolve(ctx)?
             )),
-            &mut CompoundDataTypeAST::Tuple(ref mut fields) => Ok(CompoundDataType::Tuple(fields.resolve(ctx)?)),
+            &CompoundDataTypeAST::Tuple(ref fields) => Ok(CompoundDataType::Tuple(fields.resolve(ctx)?)),
         }
     }
 }
 
 impl<'source> Resolve<ModuleContext> for Vec<(Identifier<'source>, FieldAST<'source>)> {
     type Result = Vec<(String, Field)>;
-    type Error = ();
-    fn resolve(&mut self, ctx: &mut ModuleContext) -> Result<Self::Result, Self::Error> {
-        self.iter_mut()
-            .map(|&mut (ref name, ref mut field)| {
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+        self.iter()
+            .map(|&(ref name, ref field)| {
                 let field = field.resolve(ctx)?;
                 Ok((name.text().to_string(), field))
             })
@@ -206,7 +212,7 @@ impl<'source> Resolve<ModuleContext> for Vec<(Identifier<'source>, FieldAST<'sou
 pub enum DataTypeAST<'source> {
     Compound(CompoundDataTypeAST<'source>),
     Primitive(PrimitiveDataType),
-    Reference(Path<'source>),
+    Reference(ItemPath),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -375,18 +381,13 @@ impl<'a, 'source> Assertion<&'a str> for DataTypeAST<'source> {
 
 impl<'source> Resolve<ModuleContext> for DataTypeAST<'source> {
     type Result = DataType;
-    type Error = ();
-    fn resolve(&mut self, ctx: &mut ModuleContext) -> Result<Self::Result, Self::Error> {
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
         match self {
-            &mut DataTypeAST::Compound(ref mut value) => Ok(DataType::Compound(value.resolve(ctx)?)),
-            &mut DataTypeAST::Primitive(ref mut value) => Ok(DataType::Primitive(value.clone())),
-            &mut DataTypeAST::Reference(ref mut path) => {
-                let name = path.path
-                    .first()
-                    .unwrap()
-                    .text();
-                let item = ctx.get_item(name)
-                    .ok_or(())?;
+            &DataTypeAST::Compound(ref value) => Ok(DataType::Compound(value.resolve(ctx)?)),
+            &DataTypeAST::Primitive(ref value) => Ok(DataType::Primitive(value.clone())),
+            &DataTypeAST::Reference(ref path) => {
+                let item = ctx.get_item(path)?;
                 // TODO Assert item.type == data_type
                 Ok(DataType::Reference(item))
             }

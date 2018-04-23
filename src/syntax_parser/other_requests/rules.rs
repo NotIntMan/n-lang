@@ -13,7 +13,7 @@ use syntax_parser::expressions::{
     expression,
 };
 use syntax_parser::others::{
-    Path,
+    ItemPath,
     property_path,
 };
 use syntax_parser::selections::{
@@ -89,7 +89,7 @@ parser_rule!(value_list(i) -> Vec<Expression<'source>> {
     )
 });
 
-parser_rule!(property_list(i) -> Vec<Path<'source>> {
+parser_rule!(property_list(i) -> Vec<ItemPath> {
     do_parse!(i,
         apply!(symbols, "(") >>
         result: apply!(comma_list, property_path) >>

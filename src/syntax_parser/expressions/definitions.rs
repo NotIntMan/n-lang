@@ -2,7 +2,7 @@
 use lexeme_scanner::ItemPosition;
 use helpers::assertion::Assertion;
 use parser_basics::Identifier;
-use syntax_parser::others::Path;
+use syntax_parser::others::ItemPath;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordLiteralType {
@@ -120,9 +120,9 @@ pub enum Expression<'source> {
     BinaryOperation(Box<Expression<'source>>, BinaryOperator, Box<Expression<'source>>),
     PrefixUnaryOperation(PrefixUnaryOperator, Box<Expression<'source>>),
     PostfixUnaryOperation(PostfixUnaryOperator, Box<Expression<'source>>),
-    PropertyAccess(Box<Expression<'source>>, Path<'source>),
+    PropertyAccess(Box<Expression<'source>>, ItemPath),
     Set(Vec<Expression<'source>>),
-    FunctionCall(Path<'source>, Vec<Expression<'source>>),
+    FunctionCall(ItemPath, Vec<Expression<'source>>),
 }
 
 impl<'source> Assertion for Expression<'source> {
