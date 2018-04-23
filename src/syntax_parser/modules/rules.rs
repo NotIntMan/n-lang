@@ -80,6 +80,7 @@ parser_rule!(external_item_definition(i) -> ModuleDefinitionValueAST<'source> {
 
 parser_rule!(module_definition_item(i) -> ModuleDefinitionItemAST<'source> {
     do_parse!(i,
+        begin: symbol_position >>
         attributes: attributes >>
         public: opt!(apply!(keyword, "pub")) >>
         value: alt!(
@@ -89,8 +90,10 @@ parser_rule!(module_definition_item(i) -> ModuleDefinitionItemAST<'source> {
             | module_definitions
             | external_item_definition
         ) >>
+        position: apply!(item_position, begin) >>
         (ModuleDefinitionItemAST {
             public: public.is_some(),
+            position,
             attributes,
             value,
         })

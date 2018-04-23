@@ -1,11 +1,12 @@
 use indexmap::IndexMap;
 //use helpers::into_static::IntoStatic;
 use helpers::resolve::Resolve;
-use helpers::as_unique::as_unique;
+//use helpers::as_unique::as_unique_identifier;
 use helpers::sync_ref::SyncRef;
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use syntax_parser::compound_types::{
+    Attribute,
     AttributeAST,
 //    CompoundDataType,
     DataTypeAST,
@@ -16,21 +17,22 @@ use syntax_parser::compound_types::{
 };
 use syntax_parser::functions::FunctionDefinition;
 use syntax_parser::others::{
-    Path,
+    ItemPath,
 //    StaticPath,
 };
 //use project_analysis::resolve::{
 //    ResolveContext,
 ////    SemanticResolve,
 //};
-use project_analysis::item::{
+use project_analysis::{
     Item,
+    ModuleContext,
+//    SemanticItemType,
+    SemanticError,
 //    ItemBody,
 //    ItemRef,
 };
-//use project_analysis::error::SemanticError;
 //use project_analysis::module::ModuleRef;
-use project_analysis::module_context::ModuleContext;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinitionAST<'source> {
@@ -39,14 +41,16 @@ pub struct DataTypeDefinitionAST<'source> {
 }
 
 impl<'source> Resolve<ModuleContext> for DataTypeDefinitionAST<'source> {
-    type Result = DataTypeDefinition;
-    type Error = ();
-    fn resolve(&mut self, ctx: &mut ModuleContext) -> Result<Self::Result, Self::Error> {
+    type Result = SyncRef<Item>;
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
         let body = self.body.resolve(ctx)?;
-        Ok(DataTypeDefinition {
+        let def = DataTypeDefinition {
             name: self.name.to_string(),
             body,
-        })
+        };
+        let item = ctx.put_item(self.name.text(), Item::data_type(def));
+        Ok(item)
     }
 }
 
@@ -76,10 +80,18 @@ pub struct TableDefinitionAST<'source> {
 
 impl<'source> Resolve<ModuleContext> for TableDefinitionAST<'source> {
     type Result = SyncRef<Item>;
-    type Error = ();
-    fn resolve(&mut self, ctx: &mut ModuleContext) -> Result<Self::Result, Self::Error> {
-        let body = as_unique(self.body.resolve(ctx)?)?;
-        let name = self.name.to_string();
+    type Error = SemanticError;
+    fn resolve(&self, _ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+//        let body = match as_unique_identifier(self.body.clone()) {
+//            Ok(map) => map,
+//            Err(name) => return Err(vec![SemanticError::duplicate_definition(
+//                name.item_pos(),
+//                name.text().to_string(),
+//                SemanticItemType::Field,
+//            )]),
+//        }
+//            .resolve(ctx)?;
+//        let name = self.name.to_string();
 //        Ok(TableDefinition {
 //            name: self.name.to_string(),
 //            pos: self.pos,
@@ -191,7 +203,7 @@ pub enum ExternalItemTail {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalItemImportAST<'source> {
-    pub path: Path<'source>,
+    pub path: ItemPath,
     pub tail: ExternalItemTailAST<'source>,
 }
 
@@ -300,6 +312,23 @@ pub enum ModuleDefinitionValueAST<'source> {
     Import(ExternalItemImportAST<'source>),
 }
 
+impl<'source> Resolve<ModuleContext> for ModuleDefinitionValueAST<'source> {
+    type Result = (String, SyncRef<Item>);
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+        match self {
+            &ModuleDefinitionValueAST::DataType(ref def) => {
+                let item = def.resolve(ctx)?;
+                Ok((
+                    def.name.text().to_string(),
+                    item,
+                ))
+            }
+            _ => unimplemented!(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModuleDefinitionValue {
     DataType(DataTypeDefinition),
@@ -325,8 +354,37 @@ pub enum ModuleDefinitionValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleDefinitionItemAST<'source> {
     pub public: bool,
+    pub position: ItemPosition,
     pub attributes: Vec<AttributeAST<'source>>,
     pub value: ModuleDefinitionValueAST<'source>,
+}
+
+impl<'source> Resolve<ModuleContext> for ModuleDefinitionItemAST<'source> {
+    type Result = (String, ModuleDefinitionItem);
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+        let ModuleDefinitionItemAST { ref public, ref position, ref attributes, ref value } = self;
+        let (name, value) = value.resolve(ctx)?;
+        Ok((
+            name,
+            ModuleDefinitionItem {
+                public: *public,
+                position: *position,
+                attributes: attributes.iter()
+                    .map(|attr| attr.into())
+                    .collect(),
+                value,
+            },
+        ))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleDefinitionItem {
+    pub public: bool,
+    pub position: ItemPosition,
+    pub attributes: Vec<Attribute>,
+    pub value: SyncRef<Item>,
 }
 
 //impl<'source> IntoStatic for ModuleDefinitionItem<'source> {
