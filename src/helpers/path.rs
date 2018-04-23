@@ -8,6 +8,12 @@ pub struct PathBuf {
 }
 
 impl PathBuf {
+    pub fn new(delimiter: &str) -> Self {
+        PathBuf {
+            data: "".to_string(),
+            delimiter: delimiter.to_string(),
+        }
+    }
     pub fn from_path(path: Path) -> Self {
         let data = path.data.to_string();
         let delimiter = path.delimiter.to_string();
@@ -105,6 +111,27 @@ impl<'a> Path<'a> {
             delimiter,
         }
     }
+    pub fn is_begin_of(self, other: Path) -> Option<Path> {
+        let mut other_components = other.components();
+        for self_component in self.components() {
+            match other_components.next() {
+                Some(other_component) => if self_component != other_component {
+                    return None;
+                }
+                None => return None,
+            }
+        }
+        Some(other_components.into_path())
+    }
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        *self == ([] as [&str; 0])[..]
+    }
+    pub fn pop_left(self) -> (Option<&'a str>, Path<'a>) {
+        let mut components = self.components();
+        let first = components.next();
+        (first, components.into_path())
+    }
 }
 
 impl<'a> fmt::Display for Path<'a> {
@@ -130,10 +157,26 @@ impl<'a> cmp::PartialEq for Path<'a> {
     }
 }
 
+impl<'a> cmp::PartialEq<[&'a str]> for Path<'a> {
+    fn eq(&self, other: &[&'a str]) -> bool {
+        self.components().eq(other.into_iter().cloned())
+    }
+    fn ne(&self, other: &[&'a str]) -> bool {
+        self.components().ne(other.into_iter().cloned())
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PathComponents<'a> {
     data: &'a str,
     delimiter: &'a str,
+}
+
+impl<'a> PathComponents<'a> {
+    fn into_path(self) -> Path<'a> {
+        let PathComponents { data, delimiter } = self;
+        Path { data, delimiter }
+    }
 }
 
 impl<'a> Iterator for PathComponents<'a> {
@@ -162,6 +205,12 @@ impl<'a> Iterator for PathComponents<'a> {
         let new_data = &self.data[delimiter_end..];
         self.data = new_data;
         Some(result)
+    }
+}
+
+impl<'a> Into<Path<'a>> for PathComponents<'a> {
+    fn into(self) -> Path<'a> {
+        self.into_path()
     }
 }
 
