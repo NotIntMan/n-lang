@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::fmt;
+use std::hash;
 use helpers::re_entrant_rw_lock::{
     ReEntrantRWLock,
     ReEntrantReadGuard,
@@ -70,5 +71,14 @@ impl<T: fmt::Display + ? Sized> fmt::Display for SyncRef<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let data = self.read();
         write!(f, "SyncRef of {}", &*data)
+    }
+}
+
+impl<T: hash::Hash> hash::Hash for SyncRef<T> {
+    fn hash<H>(&self, state: &mut H)
+        where H: hash::Hasher
+    {
+        let item = self.read();
+        item.hash(state);
     }
 }
