@@ -1,9 +1,11 @@
 use std::sync::Arc;
+use std::fmt;
 use indexmap::IndexMap;
 //use helpers::group::Group;
 //use helpers::re_entrant_rw_lock::ReEntrantRWLock;
 use helpers::resolve::Resolve;
 use helpers::sync_ref::SyncRef;
+use helpers::path::PathBuf;
 use lexeme_scanner::{
 //    ItemPosition,
 Scanner,
@@ -24,7 +26,7 @@ ModuleContext,
 Text,
 SemanticItemType,
 SemanticError,
-Project,
+ProjectContext,
 };
 //use super::item::{
 //    ItemBody,
@@ -75,11 +77,11 @@ impl Drop for UnresolvedModule {
     }
 }
 
-impl Resolve<SyncRef<Project>> for UnresolvedModule {
+impl Resolve<(SyncRef<PathBuf>, SyncRef<ProjectContext>)> for UnresolvedModule {
     type Result = Module;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &mut SyncRef<Project>) -> Result<Self::Result, Vec<Self::Error>> {
-        let mut context = ModuleContext::new(ctx.clone());
+    fn resolve(&self, ctx: &mut (SyncRef<PathBuf>, SyncRef<ProjectContext>)) -> Result<Self::Result, Vec<Self::Error>> {
+        let mut context = ModuleContext::new(ctx.0.clone(), ctx.1.clone());
         let items_vec = match self.items.resolve(&mut context) {
             Ok(items) => items,
             Err(mut errors) => {
@@ -103,15 +105,26 @@ impl Resolve<SyncRef<Project>> for UnresolvedModule {
         }
         Ok(Module {
             items,
-            project: ctx.clone(),
+            path: ctx.0.clone(),
+            project: ctx.1.clone(),
         })
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Module {
     items: IndexMap<String, ModuleDefinitionItem>,
-    project: SyncRef<Project>,
+    path: SyncRef<PathBuf>,
+    project: SyncRef<ProjectContext>,
+}
+
+impl fmt::Debug for Module {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Module")
+            .field("items", &self.items)
+            .field("path", &self.path)
+            .finish()
+    }
 }
 
 //#[derive(Debug, Clone, PartialEq, Eq)]
