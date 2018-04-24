@@ -1,7 +1,7 @@
 use std::fmt;
 use std::cmp;
 
-#[derive(Debug, Clone, Eq, Hash)]
+#[derive(Clone, Eq, Hash)]
 pub struct PathBuf {
     pub data: String,
     pub delimiter: String,
@@ -49,6 +49,12 @@ impl PathBuf {
     }
 }
 
+impl fmt::Debug for PathBuf {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "PathBuf: {:?}", self.data)
+    }
+}
+
 impl fmt::Display for PathBuf {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.data)
@@ -89,7 +95,7 @@ impl<'a> From<Path<'a>> for PathBuf {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, Hash)]
+#[derive(Clone, Copy, Eq, Hash)]
 pub struct Path<'a> {
     pub data: &'a str,
     pub delimiter: &'a str,
@@ -131,6 +137,12 @@ impl<'a> Path<'a> {
         let mut components = self.components();
         let first = components.next();
         (first, components.into_path())
+    }
+}
+
+impl<'a> fmt::Debug for Path<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Path: {:?}", self.data)
     }
 }
 
