@@ -1,25 +1,28 @@
 use std::collections::HashMap;
+use std::fmt;
 use helpers::sync_ref::SyncRef;
+use helpers::path::PathBuf;
 use syntax_parser::others::ItemPath;
 use project_analysis::{
     Item,
     SemanticError,
-    Project,
+    ProjectContext,
 };
 
-#[derive(Debug)]
 pub struct ModuleContext {
     items: HashMap<String, SyncRef<Item>>,
-    project: SyncRef<Project>,
+    module_path: SyncRef<PathBuf>,
+    project: SyncRef<ProjectContext>,
 }
 
 pub struct ErrorTypeNotFound;
 
 impl ModuleContext {
     #[inline]
-    pub fn new(project: SyncRef<Project>) -> Self {
+    pub fn new(module_path: SyncRef<PathBuf>, project: SyncRef<ProjectContext>) -> Self {
         ModuleContext {
             items: HashMap::new(),
+            module_path,
             project,
         }
     }
@@ -55,4 +58,13 @@ impl ModuleContext {
 //            None => Err(ErrorTypeNotFound),
 //        }
 //    }
+}
+
+impl fmt::Debug for ModuleContext {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ModuleContext")
+            .field("items", &self.items)
+            .field("module_path", &self.module_path)
+            .finish()
+    }
 }
