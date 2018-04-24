@@ -1,25 +1,30 @@
 #[test]
 fn do_it() {
     use helpers::resolve::Resolve;
-    use helpers::sync_ref::SyncRef;
+    use helpers::path::Path;
     use project_analysis::{
-        Project,
-        Text,
-        UnresolvedModule,
+        ProjectContext,
+        HashMapSource,
     };
 
-    let mut project = SyncRef::new(Project {});
-    let result = UnresolvedModule::from_text(Text::new("index.n", "\
-        struct Complex(double, double)
+    let mut source = HashMapSource::new();
 
-        struct Wave {
-            freq: integer,
-            signal: Complex,
-        }
-    "))
-        .unwrap()
-        .resolve(&mut project)
-    ;
+    source.simple_insert(
+        Path::new("", "::"),
+        "index.n",
+        "\
+            struct Complex(double, double)
+
+            struct Wave {
+                freq: integer,
+                signal: Complex,
+            }
+        ",
+    );
+
+    let project = ProjectContext::new();
+    project.request_resolving_module(Path::new("", "::"));
+    let result = project.resolve(&mut source);
     match result {
         Ok(result) => println!("Resolved: {:#?}", result),
         Err(errors) => {
