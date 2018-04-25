@@ -19,7 +19,7 @@ use project_analysis::{
     Item,
     SemanticItemType,
     SemanticError,
-    ModuleContext,
+    Module,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -90,10 +90,10 @@ impl<'source> Assertion for FieldAST<'source> {
     }
 }
 
-impl<'source> Resolve<ModuleContext> for FieldAST<'source> {
+impl<'source> Resolve<Module> for FieldAST<'source> {
     type Result = Field;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &mut Module) -> Result<Self::Result, Vec<Self::Error>> {
         let field_type = self.field_type.resolve(ctx)?;
         let attributes = self.attributes.iter()
             .map(|attr| attr.into())
@@ -174,10 +174,10 @@ impl<'source> Assertion for CompoundDataTypeAST<'source> {
 //    }
 //}
 
-impl<'source> Resolve<ModuleContext> for CompoundDataTypeAST<'source> {
+impl<'source> Resolve<Module> for CompoundDataTypeAST<'source> {
     type Result = CompoundDataType;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &mut Module) -> Result<Self::Result, Vec<Self::Error>> {
         match self {
             &CompoundDataTypeAST::Structure(ref fields) => Ok(CompoundDataType::Structure(
                 match as_unique_identifier(fields.clone()) {
@@ -195,10 +195,10 @@ impl<'source> Resolve<ModuleContext> for CompoundDataTypeAST<'source> {
     }
 }
 
-impl<'source> Resolve<ModuleContext> for Vec<(Identifier<'source>, FieldAST<'source>)> {
+impl<'source> Resolve<Module> for Vec<(Identifier<'source>, FieldAST<'source>)> {
     type Result = Vec<(String, Field)>;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &mut Module) -> Result<Self::Result, Vec<Self::Error>> {
         self.iter()
             .map(|&(ref name, ref field)| {
                 let field = field.resolve(ctx)?;
@@ -379,16 +379,26 @@ impl<'a, 'source> Assertion<&'a str> for DataTypeAST<'source> {
 //    }
 //}
 
-impl<'source> Resolve<ModuleContext> for DataTypeAST<'source> {
+impl<'source> Resolve<Module> for DataTypeAST<'source> {
     type Result = DataType;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &mut ModuleContext) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &mut Module) -> Result<Self::Result, Vec<Self::Error>> {
         match self {
             &DataTypeAST::Compound(ref value) => Ok(DataType::Compound(value.resolve(ctx)?)),
             &DataTypeAST::Primitive(ref value) => Ok(DataType::Primitive(value.clone())),
             &DataTypeAST::Reference(ref path) => {
-                let item = ctx.get_item(path)?;
-                // TODO Assert item.type == data_type
+                let item = match ctx.get_item(path.path.as_path(), &mut vec![]) {
+                    Some(item) => item,
+                    None => return Err(vec![SemanticError::unresolved_item(path.pos, path.path.clone())]),
+                };
+                let item_type = item.get_type();
+                if item_type != SemanticItemType::DataType {
+                    return Err(vec![SemanticError::expected_item_of_another_type(
+                        path.pos,
+                        SemanticItemType::DataType,
+                        item_type,
+                    )]);
+                }
                 Ok(DataType::Reference(item))
             }
         }

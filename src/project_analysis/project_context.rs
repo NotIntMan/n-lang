@@ -7,6 +7,7 @@ use helpers::path::{
 use helpers::sync_ref::SyncRef;
 use helpers::resolve::Resolve;
 use project_analysis::{
+    Item,
     Module,
     TextSource,
     SemanticError,
@@ -17,6 +18,7 @@ use project_analysis::{
 pub struct ProjectContext {
     modules: IndexMap<SyncRef<PathBuf>, ResolutionModuleState>,
     new_module_requested: bool,
+    new_module_resolved: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -34,15 +36,19 @@ impl ProjectContext {
         SyncRef::new(ProjectContext {
             modules: IndexMap::new(),
             new_module_requested: false,
+            new_module_resolved: false,
         })
     }
     pub fn get_module(&self, path: Path) -> Option<&ResolutionModuleState> {
+        println!("Getting module {:?} from project's context required", path);
         for (item_path, item) in self.modules.iter() {
             let item_path = item_path.read();
             if item_path.as_path() == path {
+                println!("Found {:?}", item);
                 return Some(item);
             }
         }
+        println!("Nothing was found");
         None
     }
 }
@@ -81,15 +87,22 @@ impl SyncRef<ProjectContext> {
     }
     fn resolution_step(&self) -> Vec<SemanticError> {
         let mut project = self.write();
+        project.new_module_requested = false;
+        let mut new_module_resolved = false;
         let mut result = Vec::new();
         for (module_path, module) in project.modules.iter_mut() {
             let new_state = match module {
                 &mut ResolutionModuleState::Unresolved(ref module) => {
                     let mut project_context = (module_path.clone(), self.clone());
+                    println!("Resolving module {:?}", *module_path.read());
                     match module.resolve(&mut project_context) {
-                        Ok(module) => ResolutionModuleState::Resolved(SyncRef::new(module)),
+                        Ok(module) => {
+                            new_module_resolved = true;
+                            println!("Resolved");
+                            ResolutionModuleState::Resolved(SyncRef::new(module))
+                        }
                         Err(mut errors) => {
-//                            println!("Errors while resolving module {:#?}", errors);
+                            println!("Failed with: {:#?}", errors);
                             result.append(&mut errors);
                             continue;
                         }
@@ -99,7 +112,45 @@ impl SyncRef<ProjectContext> {
             };
             replace(module, new_state);
         }
+        project.new_module_resolved = new_module_resolved;
         result
+    }
+    #[inline]
+    fn need_more_resolution_steps(&self) -> bool {
+        let project = self.read();
+        project.new_module_resolved || project.new_module_requested
+    }
+    pub fn get_module(&self, path: Path) -> Option<SyncRef<Module>> {
+        {
+            let project = self.read();
+            match project.get_module(path) {
+                Some(module_state) => match module_state {
+                    &ResolutionModuleState::Resolved(ref module) => return Some(module.clone()),
+                    _ => return None,
+                }
+                _ => {}
+            }
+        }
+        let mut project = self.write();
+        project.modules.insert(SyncRef::new(path.into()), ResolutionModuleState::Requested);
+        project.new_module_requested = true;
+        None
+    }
+    pub fn resolve_item(&self, mut path: Path) -> Option<SyncRef<Item>> {
+        let mut module_path = path;
+        let module = loop {
+            if let Some(module) = self.get_module(module_path) {
+                break module
+            }
+            if module_path.is_empty() {
+                return None;
+            }
+            module_path.pop_right();
+        };
+        for _ in module_path {
+            path.pop_left();
+        }
+        module.get_item(path, &mut Vec::new())
     }
 }
 
@@ -109,13 +160,16 @@ impl<S: TextSource> Resolve<S> for SyncRef<ProjectContext> {
     fn resolve(&self, ctx: &mut S) -> Result<Self::Result, Vec<Self::Error>> {
         let mut errors = Vec::new();
         loop {
-            if !self.load_requested_modules(ctx) {
+            if !(
+                self.load_requested_modules(ctx)
+                    ||
+                    self.need_more_resolution_steps()
+            ) {
+                println!("Breaking resolution cycle");
                 break;
             }
             errors = self.resolution_step();
-            if !self.read().new_module_requested {
-                break;
-            }
+            println!("Continuing resolution cycle");
         }
         {
             let mut project = self.write();
