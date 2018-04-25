@@ -1,5 +1,6 @@
 use std::fmt;
 use std::cmp;
+use std::mem::replace;
 
 #[derive(Clone, Eq, Hash)]
 pub struct PathBuf {
@@ -133,10 +134,33 @@ impl<'a> Path<'a> {
     pub fn is_empty(&self) -> bool {
         *self == ([] as [&str; 0])[..]
     }
-    pub fn pop_left(self) -> (Option<&'a str>, Path<'a>) {
+    pub fn pop_left(&mut self) -> Option<&'a str> {
         let mut components = self.components();
-        let first = components.next();
-        (first, components.into_path())
+        let result = components.next();
+        replace(self, components.into_path());
+        result
+    }
+    pub fn pop_right(&mut self) -> Option<&'a str> {
+        let delimiter_length = self.delimiter.len();
+        let mut shrink_point = match self.data.len().checked_sub(delimiter_length) {
+            Some(x) => x,
+            None => 0,
+        };
+        loop {
+            if shrink_point == 0 {
+                let result = self.data;
+                self.data = "";
+                return Some(result);
+            }
+            let last_begin = shrink_point + delimiter_length;
+            let may_be_delimiter = &self.data[shrink_point..last_begin];
+            if may_be_delimiter == self.delimiter {
+                let result = &self.data[last_begin..];
+                self.data = &self.data[..shrink_point];
+                return Some(result);
+            }
+            shrink_point -= 1;
+        }
     }
 }
 
@@ -185,7 +209,7 @@ pub struct PathComponents<'a> {
 }
 
 impl<'a> PathComponents<'a> {
-    fn into_path(self) -> Path<'a> {
+    pub fn into_path(self) -> Path<'a> {
         let PathComponents { data, delimiter } = self;
         Path { data, delimiter }
     }
