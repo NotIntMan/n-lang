@@ -26,6 +26,19 @@ impl<T: ? Sized> SyncRef<T> {
         let unique_lock = Arc::get_mut(&mut self.res)?;
         Some(unique_lock.get_mut())
     }
+    #[inline]
+    pub fn is_same_ref(&self, other: &Self) -> bool {
+        Arc::ptr_eq(
+            &self.res,
+            &other.res,
+        )
+    }
+    #[inline]
+    pub fn has_same_ref_in(&self, vec: &Vec<Self>) -> bool {
+        vec.iter()
+            .find(|&refer| self.is_same_ref(refer))
+            .is_some()
+    }
 }
 
 impl<'a, T: ? Sized> SyncRef<T>
