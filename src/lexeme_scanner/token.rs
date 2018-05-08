@@ -1,12 +1,12 @@
 //! Набор структур для отображения элемента лексического разбора
 
 use std::fmt;
-use helpers::assertion::Assertion;
+use helpers::Assertion;
 use super::*;
 use parser_basics::Identifier;
 
 /// Тип токена
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenKind {
     /// Конец ввода. Этот тип токена генерируется сканером после окончания чтения ввода.
     EndOfInput,
@@ -20,6 +20,8 @@ pub enum TokenKind {
         fractional: bool,
         /// Базис системы счисления
         radix: u32,
+        /// Приблизительное значение найденного числа
+        approx_value: f64,
     },
     /**
         Стрововый литерал. Генерируется сканером при нахождении символа кавычек (`"`).
@@ -79,7 +81,7 @@ impl fmt::Display for TokenKindLess {
 }
 
 /// Токен. Содержит информацию о своём типе, местоположении и тексте элемента, который отображает.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub text: &'a str,
@@ -114,6 +116,7 @@ impl TokenKind {
                 negative: _,
                 fractional: _,
                 radix: _,
+                approx_value: _,
             } => TokenKindLess::NumberLiteral,
             &TokenKind::StringLiteral {
                 length: _,

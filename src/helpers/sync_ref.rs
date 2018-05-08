@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::fmt;
 use std::hash;
-use helpers::re_entrant_rw_lock::{
+use helpers::{
     ReEntrantRWLock,
     ReEntrantReadGuard,
     ReEntrantWriteGuard,

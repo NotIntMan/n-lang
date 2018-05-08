@@ -1,8 +1,8 @@
 //use std::mem::swap;
-//use helpers::group::Group;
-//use helpers::extractor::Extractor;
+//use helpers::Group;
+//use helpers::Extractor;
 //use parser_basics::Identifier;
-//use syntax_parser::others::StaticPath;
+//use language::others::StaticPath;
 //use super::error::SemanticError;
 //use super::project::{
 //    Project,

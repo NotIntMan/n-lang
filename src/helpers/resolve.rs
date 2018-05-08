@@ -5,10 +5,10 @@ use indexmap::IndexMap;
 pub trait Resolve<Context = ()>: Sized {
     type Result;
     type Error;
-    fn resolve(&self, ctx: &mut Context) -> Result<Self::Result, Vec<Self::Error>>;
+    fn resolve(&self, ctx: &Context) -> Result<Self::Result, Vec<Self::Error>>;
 
     fn map<F, R>(self, mapper: F) -> Map<Self, F>
-        where F: Fn(Self::Result, &mut Context) -> R,
+        where F: Fn(Self::Result, &Context) -> R,
     { Map { resolver: self, mapper } }
 }
 
@@ -21,7 +21,7 @@ impl<C, T> Resolve<C> for Value<T>
     type Result = T;
     type Error = ();
     #[inline]
-    fn resolve(&self, _ctx: &mut C) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, _ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
         Ok(self.0.clone())
     }
 }
@@ -35,11 +35,11 @@ pub struct Map<T, F> {
 impl<C, T, F, R> Resolve<C> for Map<T, F>
     where
         T: Resolve<C>,
-        F: Fn(T::Result, &mut C) -> R,
+        F: Fn(T::Result, &C) -> R,
 {
     type Result = R;
     type Error = T::Error;
-    fn resolve(&self, ctx: &mut C) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
         Ok((self.mapper)(self.resolver.resolve(ctx)?, ctx))
     }
 }
@@ -49,7 +49,7 @@ impl<C, T> Resolve<C> for Vec<T>
 {
     type Result = Vec<T::Result>;
     type Error = T::Error;
-    fn resolve(&self, ctx: &mut C) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
         let mut result_vec = Vec::with_capacity(self.len());
         let mut current_iter = Vec::with_capacity(self.len());
         let mut next_iter = Vec::new();
@@ -69,7 +69,7 @@ impl<C, T> Resolve<C> for Vec<T>
                     Err(mut err) => {
                         next_iter.push(item);
                         errors.append(&mut err)
-                    },
+                    }
                 }
             }
             if !new_results {
@@ -91,7 +91,7 @@ impl<C, K, T> Resolve<C> for IndexMap<K, T>
 {
     type Result = IndexMap<K, T::Result>;
     type Error = T::Error;
-    fn resolve(&self, ctx: &mut C) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
         let mut result_map = IndexMap::new();
         let mut current_iter = Vec::with_capacity(self.len());
         let mut next_iter = Vec::new();
@@ -111,7 +111,7 @@ impl<C, K, T> Resolve<C> for IndexMap<K, T>
                     Err(mut err) => {
                         next_iter.push((name, item));
                         errors.append(&mut err)
-                    },
+                    }
                 }
             }
             if !new_results {
@@ -127,6 +127,40 @@ impl<C, K, T> Resolve<C> for IndexMap<K, T>
     }
 }
 
+impl<C, T> Resolve<C> for Option<T>
+    where T: Resolve<C> {
+    type Result = Option<T::Result>;
+    type Error = T::Error;
+    #[inline]
+    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
+        match self {
+            &Some(ref value) => Ok(Some(value.resolve(ctx)?)),
+            &None => Ok(None),
+        }
+    }
+}
+
+impl<C, T> Resolve<C> for Box<T>
+    where T: Resolve<C> {
+    type Result = Box<T::Result>;
+    type Error = T::Error;
+    #[inline]
+    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
+        let result = (&**self).resolve(ctx)?;
+        Ok(Box::new(result))
+    }
+}
+
+impl<'a, C, T> Resolve<C> for &'a Box<T>
+    where T: Resolve<C> {
+    type Result = Box<T::Result>;
+    type Error = T::Error;
+    #[inline]
+    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
+        (*self).resolve(ctx)
+    }
+}
+
 impl<C, E, T0, T1> Resolve<C> for (T0, T1)
     where
         T0: Resolve<C, Error=E>,
@@ -137,7 +171,7 @@ impl<C, E, T0, T1> Resolve<C> for (T0, T1)
         T1::Result,
     );
     type Error = E;
-    fn resolve(&self, ctx: &mut C) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
         match self.0.resolve(ctx) {
             Ok(result0) => {
                 Ok((

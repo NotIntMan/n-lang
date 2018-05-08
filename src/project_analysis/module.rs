@@ -2,22 +2,22 @@ use std::sync::Arc;
 use std::fmt;
 use std::cmp;
 use indexmap::IndexMap;
-//use helpers::group::Group;
-//use helpers::re_entrant_rw_lock::ReEntrantRWLock;
-use helpers::resolve::Resolve;
-use helpers::sync_ref::SyncRef;
-use helpers::path::{
+//use helpers::Group;
+//use helpers::ReEntrantRWLock;
+use helpers::{
     Path,
     PathBuf,
+    Resolve,
+    SyncRef,
 };
 use lexeme_scanner::Scanner;
 use parser_basics::parse;
-use syntax_parser::modules::{
+use language::modules::{
     module,
     ModuleDefinitionItem,
     ModuleDefinitionItemAST,
 };
-//use syntax_parser::others::StaticPath;
+//use language::others::StaticPath;
 use project_analysis::{
     Item,
     Text,
@@ -32,7 +32,7 @@ use project_analysis::{
 //};
 //use super::error::SemanticError;
 //
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnresolvedModule {
     text: Arc<Text>,
     source: &'static str,
@@ -76,12 +76,12 @@ impl Drop for UnresolvedModule {
 }
 
 impl Resolve<(SyncRef<PathBuf>, SyncRef<ProjectContext>)> for UnresolvedModule {
-    type Result = Module;
+    type Result = SyncRef<Module>;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &mut (SyncRef<PathBuf>, SyncRef<ProjectContext>)) -> Result<Self::Result, Vec<Self::Error>> {
-        let mut context = Module::new(ctx.0.clone(), ctx.1.clone());
+    fn resolve(&self, ctx: &(SyncRef<PathBuf>, SyncRef<ProjectContext>)) -> Result<Self::Result, Vec<Self::Error>> {
+        let context = SyncRef::new(Module::new(ctx.0.clone(), ctx.1.clone()));
         {
-            let mut errors = match self.items.resolve(&mut context) {
+            let mut errors = match self.items.resolve(&context) {
                 Ok(_) => Vec::new(),
                 Err(mut errors) => {
                     for error in errors.iter_mut() {
@@ -90,6 +90,7 @@ impl Resolve<(SyncRef<PathBuf>, SyncRef<ProjectContext>)> for UnresolvedModule {
                     errors
                 }
             };
+            let context = context.read();
             let mut item_names = Vec::new();
             for (name, item) in context.items.iter() {
                 let borrowed_name = name.as_str();
@@ -167,6 +168,10 @@ impl Module {
 }
 
 impl SyncRef<Module> {
+    #[inline]
+    pub fn put_item(&self, name: &str, value: ModuleDefinitionItem) {
+        self.write().put_item(name, value)
+    }
     pub fn get_item(&self, path: Path, search_route: &mut Vec<SyncRef<Module>>) -> Option<SyncRef<Item>> {
         if self.has_same_ref_in(search_route) {
             return None;
@@ -176,6 +181,14 @@ impl SyncRef<Module> {
             return Some(SyncRef::new(Item::module_ref(self.clone())));
         }
         self.read().get_item(path, search_route)
+    }
+    #[inline]
+    pub fn resolve_import(&self, path: Path) -> Option<SyncRef<Item>> {
+        self.read().resolve_import(path)
+    }
+    #[inline]
+    pub fn inject_import_module(&self, module: SyncRef<Module>) {
+        self.write().inject_import_module(module)
     }
 }
 

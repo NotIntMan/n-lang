@@ -1,11 +1,13 @@
 use std::mem::replace;
 use indexmap::IndexMap;
-use helpers::path::{
+use helpers::{
     Path,
     PathBuf,
 };
-use helpers::sync_ref::SyncRef;
-use helpers::resolve::Resolve;
+use helpers::{
+    Resolve,
+    SyncRef,
+};
 use project_analysis::{
     Item,
     Module,
@@ -99,7 +101,7 @@ impl SyncRef<ProjectContext> {
                         Ok(module) => {
                             new_module_resolved = true;
                             println!("Resolved");
-                            ResolutionModuleState::Resolved(SyncRef::new(module))
+                            ResolutionModuleState::Resolved(module)
                         }
                         Err(mut errors) => {
                             println!("Failed with: {:#?}", errors);
@@ -157,7 +159,7 @@ impl SyncRef<ProjectContext> {
 impl<S: TextSource> Resolve<S> for SyncRef<ProjectContext> {
     type Result = IndexMap<SyncRef<PathBuf>, SyncRef<Module>>;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &mut S) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &S) -> Result<Self::Result, Vec<Self::Error>> {
         let mut errors = Vec::new();
         loop {
             if !(

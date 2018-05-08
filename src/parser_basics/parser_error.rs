@@ -11,12 +11,14 @@ use std::cmp::{
     PartialOrd,
 };
 use std::borrow::Cow;
-use helpers::group::{
+use helpers::{
     Appendable,
     Group,
 };
-use helpers::display_list::display_list;
-use helpers::into_static::IntoStatic;
+use helpers::{
+    display_list,
+    IntoStatic,
+};
 use lexeme_scanner::{
     TokenKindLess,
     SymbolPosition,

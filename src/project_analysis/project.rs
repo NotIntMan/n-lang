@@ -1,9 +1,9 @@
 //use std::collections::HashMap;
 //use std::sync::Arc;
-//use helpers::group::Group;
-//use helpers::re_entrant_rw_lock::ReEntrantRWLock;
+//use helpers::Group;
+//use helpers::ReEntrantRWLock;
 ////use parser_basics::StaticIdentifier;
-//use syntax_parser::others::{
+//use language::others::{
 //    Path,
 //    StaticPath,
 //};

@@ -3,7 +3,8 @@
 use std::ops::Range;
 use std::fmt;
 use nom::IResult;
-//use helpers::into_static::IntoStatic;
+//use helpers::IntoStatic;
+use helpers::parse_integer_literal;
 use lexeme_scanner::{
     ItemPosition,
     Token,
@@ -296,7 +297,7 @@ pub fn special_number_literal<'token, 'source>(input: &'token [Token<'source>], 
         IResult::Done(i, output) => {
             match output.kind {
                 TokenKind::NumberLiteral {
-                    negative, fractional, radix
+                    negative, fractional, radix, approx_value: _
                 } => {
                     if let Some(v) = spec.negative {
                         if v != negative {
@@ -353,59 +354,6 @@ pub const UNSIGNED_INTEGER_SPEC: NumberLiteralSpec = NumberLiteralSpec {
     radix: None,
 };
 
-/// Генерирует ошибку, которая "ожидала" целочисленный неотрицательный числовой литерал, а получила другой числовой литерал.
-fn make_parse_error(input: &str) -> ParserErrorKind {
-    ParserErrorKind::expected_got(
-        ParserErrorTokenInfo::from_desc("integer literal"),
-        ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, input),
-    )
-}
-
-/// Совершает попытку разбора целочисленного неотрицательного литерала.
-/// Полностью соответствует спецификации числовых литералов языка.
-pub fn parse_integer_literal(input: &str) -> Result<u32, ParserErrorKind> {
-    let mut chars = input.chars()
-        .skip_while(|c| c.is_whitespace());
-    let first = match chars.next() {
-        Some(v) => v,
-        None => return Err(make_parse_error(input)),
-    };
-    let (
-        mut result,
-        radix,
-    ) = match first {
-        '0' => {
-            let second = match chars.next() {
-                Some(v) => v,
-                None => return Err(make_parse_error(input)),
-            };
-            match second {
-                'b' => (0, 2),
-                'o' => (0, 8),
-                'x' => (0, 16),
-                c => match c.to_digit(8) {
-                    Some(v) => (v, 8),
-                    None => return Err(make_parse_error(input)),
-                },
-            }
-        }
-        c => match c.to_digit(10) {
-            Some(v) => (v, 10),
-            None => return Err(make_parse_error(input)),
-        },
-    };
-    for c in chars {
-        match c.to_digit(radix) {
-            Some(v) => {
-                result *= 10;
-                result += v;
-            }
-            None => return Err(make_parse_error(input)),
-        }
-    }
-    Ok(result)
-}
-
 /**
     Правило "u32-литерал".
     Ищет целочисленных неотрицательный литерал, проводит его разбор и возвращает значение.
@@ -415,8 +363,11 @@ pub fn u32_literal<'token, 'source>(input: &'token [Token<'source>]) -> ParserRe
     match special_number_literal(input, UNSIGNED_INTEGER_SPEC.clone()) {
         IResult::Done(input, result) => {
             match parse_integer_literal(result.text) {
-                Ok(v) => input.ok(v),
-                Err(e) => input.err(e),
+                Some(v) => input.ok(v),
+                None => input.err(ParserErrorKind::expected_got(
+                    ParserErrorTokenInfo::from_desc("integer literal"),
+                    ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, result.text),
+                ))
             }
         }
         IResult::Incomplete(n) => IResult::Incomplete(n),

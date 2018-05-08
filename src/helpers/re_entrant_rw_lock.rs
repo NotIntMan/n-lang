@@ -17,7 +17,7 @@ use std::cmp::{
     PartialEq,
 };
 use std::fmt;
-use helpers::find_index::find_index;
+use helpers::find_index;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ThreadEntityCount {

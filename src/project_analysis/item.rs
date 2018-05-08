@@ -1,22 +1,24 @@
 use std::fmt;
 //use std::sync::Arc;
-////use helpers::into_static::IntoStatic;
-//use helpers::re_entrant_rw_lock::ReEntrantRWLock;
-use helpers::sync_ref::SyncRef;
-use helpers::path::Path;
+////use helpers::IntoStatic;
+//use helpers::ReEntrantRWLock;
+use helpers::{
+    Path,
+    SyncRef,
+};
 //use lexeme_scanner::ItemPosition;
 //use parser_basics::{
 //    Identifier,
 //    StaticIdentifier,
 //};
-use syntax_parser::modules::{
+use language::modules::{
     DataTypeDefinition,
 //    ExternalItemImport,
 //    ModuleDefinitionItem,
 ////    ModuleDefinitionValue,
 //    TableDefinition,
 };
-//use syntax_parser::others::StaticPath;
+//use language::others::StaticPath;
 //use super::resolve::{
 //    SemanticResolve,
 //    ResolveContext,
@@ -325,8 +327,8 @@ pub enum SemanticItemType {
     DataType,
     Module,
 //    UnresolvedImport,
-//    Table,
-//    Variable,
+Table,
+    Variable,
 }
 
 impl SemanticItemType {
@@ -337,8 +339,8 @@ impl SemanticItemType {
             &SemanticItemType::DataType => "data type",
             &SemanticItemType::Module => "module",
 //            &SemanticItemType::UnresolvedImport => "unresolved import",
-//            &SemanticItemType::Table => "table",
-//            &SemanticItemType::Variable => "variable",
+            &SemanticItemType::Table => "table",
+            &SemanticItemType::Variable => "variable",
         }
     }
 }

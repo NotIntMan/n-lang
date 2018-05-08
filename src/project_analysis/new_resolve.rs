@@ -1,7 +1,7 @@
 #[test]
 fn do_it() {
-    use helpers::resolve::Resolve;
-    use helpers::path::Path;
+    use helpers::Resolve;
+    use helpers::Path;
     use project_analysis::{
         ProjectContext,
         HashMapSource,

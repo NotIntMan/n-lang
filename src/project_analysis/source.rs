@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::collections::HashMap;
-use helpers::path::{
+use helpers::{
     Path,
     PathBuf,
 };

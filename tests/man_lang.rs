@@ -6,14 +6,10 @@ extern crate pretty_assertions;
 
 use n_lang::helpers::assertion::Assertion;
 use n_lang::parser_basics::*;
-use n_lang::syntax_parser::expressions::*;
-use n_lang::syntax_parser::data_sources::*;
-use n_lang::syntax_parser::selections::*;
-use n_lang::syntax_parser::other_requests::*;
-use n_lang::syntax_parser::statements::*;
+use n_lang::language::*;
 
-fn extract_literal<'source>(expr: Expression<'source>) -> LiteralType {
-    match_it!(expr, Expression::Literal(lit) => lit.literal_type)
+fn extract_literal<'source>(expr: ExpressionAST<'source>) -> LiteralType {
+    match_it!(expr, ExpressionAST::Literal(lit) => lit.literal_type)
 }
 
 #[test]
@@ -78,19 +74,19 @@ fn keyword_literals_parses_correctly() {
     }
 }
 
-fn assert_identifier<'source>(expr: Expression, text: &str) {
-    match_it!(expr, Expression::Identifier(token) => assert_eq!(token.text, text));
+fn assert_identifier<'source>(expr: ExpressionAST, text: &str) {
+    match_it!(expr, ExpressionAST::Identifier(token) => assert_eq!(token.text, text));
 }
 
-fn extract_prefix_unary_expression<'source>(expr: Expression<'source>, operator: PrefixUnaryOperator) -> Expression<'source> {
-    match_it!(expr, Expression::PrefixUnaryOperation(op, expr) => {
+fn extract_prefix_unary_expression<'source>(expr: ExpressionAST<'source>, operator: PrefixUnaryOperator) -> ExpressionAST<'source> {
+    match_it!(expr, ExpressionAST::PrefixUnaryOperation(op, expr) => {
         assert_eq!(op, operator);
         *expr
     })
 }
 
-fn extract_postfix_unary_expression<'source>(expr: Expression<'source>, operator: PostfixUnaryOperator) -> Expression<'source> {
-    match_it!(expr, Expression::PostfixUnaryOperation(op, expr) => {
+fn extract_postfix_unary_expression<'source>(expr: ExpressionAST<'source>, operator: PostfixUnaryOperator) -> ExpressionAST<'source> {
+    match_it!(expr, ExpressionAST::PostfixUnaryOperation(op, expr) => {
         assert_eq!(op, operator);
         *expr
     })
@@ -128,8 +124,8 @@ fn all_unary_operations_parses_correctly() {
     assert_identifier(expr, "data");
 }
 
-fn extract_binary_expression<'source>(expr: Expression<'source>, operator: BinaryOperator) -> (Expression<'source>, Expression<'source>) {
-    match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+fn extract_binary_expression<'source>(expr: ExpressionAST<'source>, operator: BinaryOperator) -> (ExpressionAST<'source>, ExpressionAST<'source>) {
+    match_it!(expr, ExpressionAST::BinaryOperation(left, op, right) => {
         assert_eq!(op, operator);
         (*left, *right)
     })
@@ -213,17 +209,17 @@ fn simple_operations_of_all_types_parses_correctly() {
 #[test]
 fn property_access_and_set_and_function_call_expression_parses_correctly() {
     let result = parse!("foo(bar, bar.baz, (box, boz))", expression);
-    let mut args = match_it!(result, Expression::FunctionCall(name, args) => {
+    let mut args = match_it!(result, ExpressionAST::FunctionCall(name, args) => {
         assert_eq!(name, vec!["foo"]);
         args
     });
     assert_identifier(args.remove(0), "bar");
-    let arg1 = match_it!(args.remove(0), Expression::PropertyAccess(expr, prop) => {
+    let arg1 = match_it!(args.remove(0), ExpressionAST::PropertyAccess(expr, prop) => {
         assert_eq!(prop, &["baz"][..]);
         *expr
     });
     assert_identifier(arg1, "bar");
-    let mut arg2 = match_it!(args.remove(0), Expression::Set(vec) => vec);
+    let mut arg2 = match_it!(args.remove(0), ExpressionAST::Set(vec) => vec);
     assert_identifier(arg2.remove(0), "box");
     assert_identifier(arg2.remove(0), "boz");
 }

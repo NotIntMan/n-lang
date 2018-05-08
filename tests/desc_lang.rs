@@ -13,12 +13,7 @@ extern crate env_logger;
 use n_lang::helpers::assertion::Assertion;
 use n_lang::lexeme_scanner::ItemPosition;
 use n_lang::parser_basics::*;
-use n_lang::syntax_parser::primitive_types::*;
-use n_lang::syntax_parser::compound_types::*;
-use n_lang::syntax_parser::functions::*;
-use n_lang::syntax_parser::modules::*;
-use n_lang::syntax_parser::statements::*;
-use n_lang::syntax_parser::expressions::*;
+use n_lang::language::*;
 
 #[test]
 fn simple_type_parses_correctly() {
@@ -26,6 +21,7 @@ fn simple_type_parses_correctly() {
     assert_eq!(
         result,
         PrimitiveDataType::Number(NumberType::Integer {
+            size: None,
             zerofill: false,
             unsigned: false,
             integer_type: IntegerType::Big,
@@ -160,7 +156,7 @@ fn struct_and_tuple_bodies_parses_correctly() {
 
 #[test]
 fn simple_external_function_parses_correctly() {
-    let result: FunctionDefinition = parse!("extern fn sum(a: integer, b: integer): big integer", function_definition);
+    let result: FunctionDefinitionAST = parse!("extern fn sum(a: integer, b: integer): big integer", function_definition);
     assert_eq!(result.name, "sum");
     let &(ref arg_name, ref arg_type) = result.arguments.get(0)
         .expect("Function's arguments must have the first item");
@@ -172,12 +168,12 @@ fn simple_external_function_parses_correctly() {
     arg_type.assert("integer");
     assert_eq!(result.arguments.get(2), None);
     result.result.assert(&Some("big integer"));
-    assert_eq!(result.body, FunctionBody::External);
+    assert_eq!(result.body, FunctionBodyAST::External);
 }
 
 #[test]
 fn simple_const_time_function_parses_correctly() {
-    let result: FunctionDefinition = parse!("\
+    let result: FunctionDefinitionAST = parse!("\
             fn sum_of_k_series_of_n (k: unsigned integer): unsigned big integer {
                 let a := k / 2;
                 let b: big integer := k + 1;
@@ -201,8 +197,8 @@ fn simple_const_time_function_parses_correctly() {
         zerofill: false,
     }))));
     let mut statement_iterator = match result.body {
-        FunctionBody::Implementation(statement) => match statement {
-            Statement::Block { statements } => statements.into_iter(),
+        FunctionBodyAST::Implementation(statement) => match statement {
+            StatementAST::Block { statements } => statements.into_iter(),
             o => panic!("Pattern FunctionBody::Implementation do not matches this value: {:?}", o),
         },
         o => panic!("Pattern FunctionBody::Implementation do not matches this value: {:?}", o),
@@ -213,7 +209,7 @@ fn simple_const_time_function_parses_correctly() {
             assert_eq!(name, "a");
             assert_eq!(data_type, None);
             match_it!(default_value, Some(StatementSource::Expression(expr)) => {
-                match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+                match_it!(expr, ExpressionAST::BinaryOperation(left, op, right) => {
                     assert_eq!(op, BinaryOperator::Divide);
                     left.assert("k");
                     right.assert("2");
@@ -230,7 +226,7 @@ fn simple_const_time_function_parses_correctly() {
                 zerofill: false,
             }))));
             match_it!(default_value, Some(StatementSource::Expression(expr)) => {
-                match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+                match_it!(expr, ExpressionAST::BinaryOperation(left, op, right) => {
                     assert_eq!(op, BinaryOperator::Plus);
                     left.assert("k");
                     right.assert("1");
@@ -242,7 +238,7 @@ fn simple_const_time_function_parses_correctly() {
     match_it!(statement, Statement::VariableAssignment { name, source } => {
             assert_eq!(name, "b");
             match_it!(source, StatementSource::Expression(expr) => {
-                match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+                match_it!(expr, ExpressionAST::BinaryOperation(left, op, right) => {
                     assert_eq!(op, BinaryOperator::Times);
                     left.assert("a");
                     right.assert("b");
@@ -259,7 +255,7 @@ fn simple_const_time_function_parses_correctly() {
     assert_eq!(statement_iterator.next(), None);
 }
 
-parser_rule!(module_only(i) -> Vec<ModuleDefinitionItem<'source>> {
+parser_rule!(module_only(i) -> Vec<ModuleDefinitionItem> {
     do_parse!(i,
         module: module >>
         end_of_input >>
@@ -378,7 +374,7 @@ fn simple_submodule_parses_correctly() {
     assert_eq!(result.len(), 4);
     assert_eq!(result[0].public, false);
     assert_eq!(result[0].attributes.len(), 0);
-    match_it!(&result[0].value, &ModuleDefinitionValue::Module(ModuleDefinition { ref name, ref items }) => {
+    match_it!(&result[0].value, &ModuleDefinitionValue::Module(ModuleDefinitionAST { ref name, ref items }) => {
         assert_eq!(name, "wave");
         assert_module_of_complex_number_struct_and_wave_signals_table(items);
     });

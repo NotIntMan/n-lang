@@ -2,14 +2,14 @@
 use std::fmt;
 use std::cmp::max;
 use std::sync::Arc;
-//use helpers::group::Appendable;
-use helpers::into_static::IntoStatic;
-use helpers::write_pad::{
+//use helpers::Appendable;
+use helpers::{
     decimal_unsigned_length,
+    IntoStatic,
+    PathBuf,
     write_pointer_line,
     write_line_numbers_columns_row,
 };
-use helpers::path::PathBuf;
 use lexeme_scanner::{
     ItemPosition,
     ScannerError,
@@ -20,7 +20,7 @@ use parser_basics::{
 ParserErrorItem,
 ParserErrorKind,
 };
-//use syntax_parser::others::write_path;
+//use language::others::write_path;
 use project_analysis::{
     SemanticItemType,
     Text,
@@ -54,6 +54,12 @@ pub enum SemanticErrorKind {
     },
     WrongProperty {
         property: String,
+    },
+    VariableTypeIsUnknown {
+        name: String,
+    },
+    NotSupportedYet {
+        feature: &'static str,
     },
 }
 
@@ -90,6 +96,8 @@ impl fmt::Display for SemanticErrorKind {
             &SemanticErrorKind::EmptyPrimaryKey => write!(f, "empty primary key"),
             &SemanticErrorKind::NotInScope { ref name } => write!(f, "{} is not in the scope", name),
             &SemanticErrorKind::WrongProperty { ref property } => write!(f, "property {} is not in the scope", property),
+            &SemanticErrorKind::VariableTypeIsUnknown { ref name } => write!(f, "type of variable {} is unknown", name),
+            &SemanticErrorKind::NotSupportedYet { ref feature } => write!(f, "{} is not supported yet", feature),
         }
     }
 }
@@ -162,6 +170,14 @@ impl SemanticError {
     #[inline]
     pub fn wrong_property(pos: ItemPosition, property: String) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::WrongProperty { property }, text: None }
+    }
+    #[inline]
+    pub fn variable_type_is_unknown(pos: ItemPosition, name: String) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::VariableTypeIsUnknown { name }, text: None }
+    }
+    #[inline]
+    pub fn not_supported_yet(pos: ItemPosition, feature: &'static str) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::NotSupportedYet { feature }, text: None }
     }
     pub fn set_text(&mut self, text: Arc<Text>) {
         self.text = Some(text);

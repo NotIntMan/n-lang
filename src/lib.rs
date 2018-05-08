@@ -19,5 +19,5 @@ pub mod helpers;
 pub mod lexeme_scanner;
 #[macro_use]
 pub mod parser_basics;
-pub mod syntax_parser;
+pub mod language;
 pub mod project_analysis;
