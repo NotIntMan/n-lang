@@ -7,24 +7,24 @@ use lexeme_scanner::ItemPosition;
 use language::{
     ItemPath,
     DataType,
-    StatementResultType,
 };
 use project_analysis::{
     Module,
+    ProjectContext,
     SemanticError,
     SemanticItemType,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionVariable {
     name: String,
     pos: ItemPosition,
-    data_type: Option<StatementResultType>,
+    data_type: Option<DataType>,
 }
 
 impl FunctionVariable {
     #[inline]
-    fn new(pos: ItemPosition, name: String, data_type: Option<StatementResultType>) -> SyncRef<Self> {
+    fn new(pos: ItemPosition, name: String, data_type: Option<DataType>) -> SyncRef<Self> {
         SyncRef::new(FunctionVariable {
             name,
             pos,
@@ -36,24 +36,16 @@ impl FunctionVariable {
 impl SyncRef<FunctionVariable> {
     pub fn property_type(&self, property_path: &ItemPath) -> Result<DataType, SemanticError> {
         let var = self.read();
-        let stmt_type = match &var.data_type {
+        let var_type = match &var.data_type {
             &Some(ref var_type) => var_type,
             &None => return Err(SemanticError::variable_type_is_unknown(property_path.pos, var.name.clone())),
-        };
-        let var_type = match stmt_type {
-            &StatementResultType::Data(ref data_type) => data_type,
-            &StatementResultType::Table(_) => return Err(SemanticError::expected_item_of_another_type(
-                property_path.pos,
-                SemanticItemType::DataType,
-                SemanticItemType::Table,
-            )),
         };
         let result = var_type.property_type(property_path.pos, property_path.path.as_path())?;
         Ok(result)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionVariableScope {
     id: ID,
     parent: Option<ID>,
@@ -100,7 +92,7 @@ impl SyncRef<FunctionVariableScope> {
             None => Err(SemanticError::not_in_scope(pos, name.to_string())),
         }
     }
-    pub fn new_variable(&self, pos: ItemPosition, name: String, data_type: Option<StatementResultType>) -> Result<SyncRef<FunctionVariable>, SemanticError> {
+    pub fn new_variable(&self, pos: ItemPosition, name: String, data_type: Option<DataType>) -> Result<SyncRef<FunctionVariable>, SemanticError> {
         if self.get_variable(name.as_str()).is_some() {
             return Err(SemanticError::duplicate_definition(pos, name, SemanticItemType::Variable));
         }
@@ -112,9 +104,13 @@ impl SyncRef<FunctionVariableScope> {
     pub fn context(&self) -> SyncRef<FunctionContext> {
         self.read().context.clone()
     }
+    #[inline]
+    pub fn module(&self) -> SyncRef<Module> { self.context().module() }
+    #[inline]
+    pub fn project(&self) -> SyncRef<ProjectContext> { self.module().project() }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionContext {
     module: SyncRef<Module>,
     scope_id_pull: IDPull,
@@ -173,4 +169,6 @@ impl SyncRef<FunctionContext> {
     pub fn module(&self) -> SyncRef<Module> {
         self.read().module.clone()
     }
+    #[inline]
+    pub fn project(&self) -> SyncRef<ProjectContext> { self.module().project() }
 }
