@@ -9,9 +9,13 @@ pub struct PathBuf {
 }
 
 impl PathBuf {
+    #[inline]
+    pub fn empty() -> Self {
+        PathBuf::new("")
+    }
     pub fn new(delimiter: &str) -> Self {
         PathBuf {
-            data: "".to_string(),
+            data: String::new(),
             delimiter: delimiter.to_string(),
         }
     }
@@ -103,6 +107,10 @@ pub struct Path<'a> {
 }
 
 impl<'a> Path<'a> {
+    #[inline]
+    pub fn empty() -> Self {
+        Path::new("", "")
+    }
     #[inline]
     pub fn new(data: &'a str, delimiter: &'a str) -> Self {
         Path {
@@ -265,4 +273,10 @@ fn b() {
     let p1 = Path::new("click->for", "->");
     let buf = PathBuf::from_paths(p0, p1);
     assert_eq!(buf.data, "foo::bar::click::for");
+}
+
+#[test]
+fn c() {
+    assert!(Path::empty().is_empty());
+    assert!(PathBuf::empty().as_path().is_empty());
 }
