@@ -30,7 +30,7 @@ pub enum TokenKind {
         (символы, обозначенные префиксным обратным слэшем (`\`), кроме символа кавычек.
     */
     StringLiteral {
-        length: usize,
+        length: u32,
     },
     /**
         Литерал выражения. Генерируется сканером при нахождения опострофа (`'`).
@@ -40,7 +40,7 @@ pub enum TokenKind {
         эквивалентен строковому литералу.
     */
     BracedExpressionLiteral {
-        length: usize,
+        length: u32,
     },
     /**
         Словестный литерал. Генерируется сканером при нахождении группы букв, цифр и символа `_`.
@@ -134,7 +134,7 @@ impl TokenKind {
         В прочих случаях, `kind` приравнивается к `StringLiteral`.
     */
     #[inline]
-    pub fn new_string_literal(kind: TokenKindLess, length: usize) -> Self {
+    pub fn new_string_literal(kind: TokenKindLess, length: u32) -> Self {
         match kind {
             TokenKindLess::BracedExpressionLiteral => TokenKind::BracedExpressionLiteral { length },
             _ => TokenKind::StringLiteral { length },

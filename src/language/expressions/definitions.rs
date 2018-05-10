@@ -39,10 +39,10 @@ pub enum LiteralType {
         approx_value: f64,
     },
     StringLiteral {
-        length: usize,
+        length: u32,
     },
     BracedExpressionLiteral {
-        length: usize,
+        length: u32,
     },
     KeywordLiteral(KeywordLiteralType),
 }
