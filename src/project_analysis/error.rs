@@ -21,12 +21,13 @@ ParserErrorItem,
 ParserErrorKind,
 };
 //use language::others::write_path;
+use language::DataType;
 use project_analysis::{
     SemanticItemType,
     Text,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SemanticErrorKind {
     Empty,
     UnresolvedItem {
@@ -60,6 +61,14 @@ pub enum SemanticErrorKind {
     },
     NotSupportedYet {
         feature: &'static str,
+    },
+    WrongArgumentsCount {
+        expected: usize,
+        got: usize,
+    },
+    CannotCastType {
+        source: DataType,
+        target: DataType,
     },
 }
 
@@ -98,11 +107,13 @@ impl fmt::Display for SemanticErrorKind {
             &SemanticErrorKind::WrongProperty { ref property } => write!(f, "property {} is not in the scope", property),
             &SemanticErrorKind::VariableTypeIsUnknown { ref name } => write!(f, "type of variable {} is unknown", name),
             &SemanticErrorKind::NotSupportedYet { ref feature } => write!(f, "{} is not supported yet", feature),
+            &SemanticErrorKind::WrongArgumentsCount { ref expected, ref got } => write!(f, "expected {} arguments, got {}", expected, got),
+            &SemanticErrorKind::CannotCastType { ref source, ref target } => write!(f, "cannot cast type {} to {}", source, target),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SemanticError {
     pub pos: ItemPosition,
     pub kind: SemanticErrorKind,
@@ -178,6 +189,14 @@ impl SemanticError {
     #[inline]
     pub fn not_supported_yet(pos: ItemPosition, feature: &'static str) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::NotSupportedYet { feature }, text: None }
+    }
+    #[inline]
+    pub fn wrong_arguments_count(pos: ItemPosition, expected: usize, got: usize) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::WrongArgumentsCount { expected, got }, text: None }
+    }
+    #[inline]
+    pub fn cannot_cast_type(pos: ItemPosition, source: DataType, target: DataType) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::CannotCastType { source, target }, text: None }
     }
     pub fn set_text(&mut self, text: Arc<Text>) {
         self.text = Some(text);
