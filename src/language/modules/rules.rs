@@ -1,5 +1,7 @@
+use nom::IResult;
 use lexeme_scanner::Token;
 use parser_basics::{
+    end_of_input,
     identifier,
     item_position,
     keyword,
@@ -101,6 +103,19 @@ parser_rule!(module_definition_item(i) -> ModuleDefinitionItemAST<'source> {
 });
 
 /// Выполняет разбор грамматики модуля
-pub fn module<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<ModuleDefinitionItemAST<'source>>> {
-    many0!(input, module_definition_item)
+pub fn module<'token, 'source>(mut input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<ModuleDefinitionItemAST<'source>>> {
+    let mut result = Vec::new();
+    loop {
+        match module_definition_item(input) {
+            IResult::Done(new_input, output) => {
+                input = new_input;
+                result.push(output);
+                if let IResult::Done(newest_input, _) = end_of_input(input) {
+                    return IResult::Done(newest_input, result);
+                }
+            }
+            IResult::Incomplete(n) => return IResult::Incomplete(n),
+            IResult::Error(e) => return IResult::Error(e),
+        }
+    }
 }
