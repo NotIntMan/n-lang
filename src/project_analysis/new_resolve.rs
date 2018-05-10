@@ -13,20 +13,11 @@ fn do_it() {
         Path::new("", "::"),
         "index.n",
         "\
-            use complex::*;
-
-            struct Wave {
-                freq: integer,
-                signal: Complex,
-            }
-        ",
-    );
-
-    source.simple_insert(
-        Path::new("complex", "::"),
-        "complex.n",
-        "\
             pub struct Complex(double, double)
+
+            fn alpha() {
+                let a := 2;
+            }
         ",
     );
 
