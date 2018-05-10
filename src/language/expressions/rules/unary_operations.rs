@@ -1,9 +1,14 @@
-use lexeme_scanner::Token;
+use lexeme_scanner::{
+    ItemPosition,
+    Token,
+    SymbolPosition,
+};
 use parser_basics::{
     keyword,
     Parser,
     ParserResult,
     symbols,
+    symbol_position,
 };
 use super::super::*;
 
@@ -45,30 +50,41 @@ parser_rule!(exists(i) -> PrefixUnaryOperator {
 });
 
 /// Функция, выполняющая разбор префиксного унарного оператора инфиксных выражений
-pub fn prefix_unary_operator<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, PrefixUnaryOperator> {
-    alt!(input,
-        logic_not |
-        all |
-        any |
-        plus |
-        minus |
-        tilde |
-        binary |
-        row |
-        exists
+pub fn prefix_unary_operator<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, (PrefixUnaryOperator, SymbolPosition)> {
+    do_parse!(input,
+        begin: symbol_position >>
+        operator: alt!(
+            logic_not |
+            all |
+            any |
+            plus |
+            minus |
+            tilde |
+            binary |
+            row |
+            exists
+        ) >>
+        ((operator, begin))
     )
 }
 
 /// Создаёт новое `Expression::PrefixUnaryOperation`, помещая в него данный оператор и упакованное данное выражение
 #[inline]
-pub fn make_prefix_unary<'source>(operator: PrefixUnaryOperator, expr: ExpressionAST<'source>) -> ExpressionAST<'source> {
-    ExpressionAST::PrefixUnaryOperation(operator, Box::new(expr))
+pub fn make_prefix_unary<'source>(operator: PrefixUnaryOperator, begin: SymbolPosition, expr: ExpressionAST<'source>) -> ExpressionAST<'source> {
+    let pos = ItemPosition {
+        begin,
+        end: expr.pos.end,
+    };
+    ExpressionAST {
+        body: ExpressionASTBody::PrefixUnaryOperation(operator, Box::new(expr)),
+        pos,
+    }
 }
 
 #[inline]
-pub fn fold_prefix_unary<'source>(mut operators: Vec<PrefixUnaryOperator>, mut expression: ExpressionAST<'source>) -> ExpressionAST<'source> {
-    while let Some(operator) = operators.pop() {
-        expression = make_prefix_unary(operator, expression);
+pub fn fold_prefix_unary<'source>(mut operators: Vec<(PrefixUnaryOperator, SymbolPosition)>, mut expression: ExpressionAST<'source>) -> ExpressionAST<'source> {
+    while let Some((operator, begin_position)) = operators.pop() {
+        expression = make_prefix_unary(operator, begin_position, expression);
     }
     expression
 }
@@ -100,14 +116,22 @@ pub fn postfix_unary_operation<'token, 'source>(input: &'token [Token<'source>],
             apply!(keyword, "is") >>
             not: is_not >>
             what: is_what >>
-            ((not, what))
+            end: symbol_position >>
+            ((not, what, end))
         )) >>
         ({
             let mut result = expr;
-            for (not, what) in items {
-                result = ExpressionAST::PostfixUnaryOperation(what, Box::new(result));
+            for (not, what, end) in items {
+                let pos = ItemPosition {
+                    begin: result.pos.begin,
+                    end,
+                };
+                result = ExpressionAST {
+                    body: ExpressionASTBody::PostfixUnaryOperation(what, Box::new(result)),
+                    pos,
+                };
                 if not {
-                    result = make_prefix_unary(PrefixUnaryOperator::Not, result)
+                    result = make_prefix_unary(PrefixUnaryOperator::Not, result.pos.begin, result)
                 }
             }
             result

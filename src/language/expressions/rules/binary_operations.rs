@@ -1,4 +1,7 @@
-use lexeme_scanner::Token;
+use lexeme_scanner::{
+    ItemPosition,
+    Token,
+};
 use parser_basics::{
     Parser,
     keyword,
@@ -8,6 +11,7 @@ use parser_basics::{
 use language::expressions::{
     BinaryOperator,
     ExpressionAST,
+    ExpressionASTBody,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,11 +25,32 @@ fn fold_left<'source>(
     left: ExpressionAST<'source>,
     tails: Vec<ExpressionAST<'source>>,
 ) -> ExpressionAST<'source> {
+    let begin = left.pos.begin;
     let mut result = left;
     for tail in tails {
-        result = ExpressionAST::BinaryOperation(Box::new(result), operator, Box::new(tail));
+        let end = tail.pos.end;
+        result = ExpressionAST {
+            body: ExpressionASTBody::BinaryOperation(Box::new(result), operator, Box::new(tail)),
+            pos: ItemPosition { begin, end },
+        };
     }
     result
+}
+
+#[inline]
+fn fold_right<'source>(
+    operator: BinaryOperator,
+    left: ExpressionAST<'source>,
+    right: ExpressionAST<'source>,
+) -> ExpressionAST<'source> {
+    let pos = ItemPosition {
+        begin: left.pos.begin,
+        end: right.pos.end,
+    };
+    ExpressionAST {
+        body: ExpressionASTBody::BinaryOperation(Box::new(left), operator, Box::new(right)),
+        pos,
+    }
 }
 
 type Resolver<'a, 'b> = (ResolutionOrder, BinaryOperator, Parser<'a, 'b, ()>);
@@ -54,7 +79,7 @@ fn infix<'token, 'source>(
                 )) >>
                 (fold_left(operator, left, tails))
             )
-        },
+        }
         ResolutionOrder::Right => {
             do_parse!(input,
                 left: apply!(infix, &resolvers[1..], atom) >>
@@ -64,11 +89,11 @@ fn infix<'token, 'source>(
                     (right)
                 )) >>
                 (match tail {
-                    Some(tail) => ExpressionAST::BinaryOperation(Box::new(left), operator, Box::new(tail)),
+                    Some(tail) => fold_right(operator, left, tail),
                     None => left,
                 })
             )
-        },
+        }
     }
 }
 

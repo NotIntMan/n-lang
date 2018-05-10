@@ -1,10 +1,11 @@
+use lexeme_scanner::ItemPosition;
 use parser_basics::{
     comma_list,
     Parser,
     ParserResult,
     symbols,
 };
-use language::others::{
+use language::{
     property_path,
     module_path,
 };
@@ -22,7 +23,16 @@ pub fn property_access<'token, 'source>(
             (path)
         )) >>
         (match tail {
-            Some(path) => ExpressionAST::PropertyAccess(Box::new(atomic), path),
+            Some(path) => {
+                let pos = ItemPosition {
+                    begin: atomic.pos.begin,
+                    end: path.pos.end,
+                };
+                ExpressionAST {
+                    body: ExpressionASTBody::PropertyAccess(Box::new(atomic), path),
+                    pos,
+                }
+            },
             None => atomic,
         })
     )
@@ -40,22 +50,22 @@ parser_rule!(expression_set(i, atom: Parser<'token, 'source, ExpressionAST<'sour
 pub fn set<'token, 'source>(
     input: &'token [Token<'source>],
     atom: Parser<'token, 'source, ExpressionAST<'source>>,
-) -> ParserResult<'token, 'source, ExpressionAST<'source>> {
+) -> ParserResult<'token, 'source, ExpressionASTBody<'source>> {
     expression_set(input, atom)
         .map(|mut items| if items.len() == 1 {
-            items.swap_remove(0)
+            items.swap_remove(0).body
         } else {
-            ExpressionAST::Set(items)
+            ExpressionASTBody::Set(items)
         })
 }
 
 pub fn function_call<'token, 'source>(
     input: &'token [Token<'source>],
     atom: Parser<'token, 'source, ExpressionAST<'source>>,
-) -> ParserResult<'token, 'source, ExpressionAST<'source>> {
+) -> ParserResult<'token, 'source, ExpressionASTBody<'source>> {
     do_parse!(input,
         name: module_path >>
         args: apply!(expression_set, atom) >>
-        (ExpressionAST::FunctionCall(name, args))
+        (ExpressionASTBody::FunctionCall(name, args))
     )
 }

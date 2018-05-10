@@ -6,7 +6,9 @@ pub mod others;
 use lexeme_scanner::Token;
 use parser_basics::{
     identifier,
+    item_position,
     ParserResult,
+    symbol_position,
 };
 use super::*;
 use self::literals::literal;
@@ -19,11 +21,16 @@ use self::others::{
 };
 
 parser_rule!(expression_atom(i) -> ExpressionAST<'source> {
-    alt!(i,
-        literal => { |x| ExpressionAST::Literal(x) } |
-        apply!(function_call, expression) |
-        apply!(set, expression) |
-        identifier => { |x| ExpressionAST::Reference(x) }
+    do_parse!(i,
+        begin: symbol_position >>
+        body: alt!(
+            literal => { |x| ExpressionASTBody::Literal(x) } |
+            apply!(function_call, expression) |
+            apply!(set, expression) |
+            identifier => { |x| ExpressionASTBody::Reference(x) }
+        ) >>
+        pos: apply!(item_position, begin) >>
+        (ExpressionAST { body, pos })
     )
 });
 

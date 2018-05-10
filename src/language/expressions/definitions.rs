@@ -1,6 +1,7 @@
 use std::u8::MAX as U8MAX;
 //use helpers::IntoStatic;
 use helpers::{
+    PathBuf,
     Resolve,
     SyncRef,
 };
@@ -11,15 +12,19 @@ use helpers::{
 };
 use parser_basics::Identifier;
 use language::{
+    CompoundDataType,
     DataType,
+    Field,
     ItemPath,
     FunctionVariableScope,
     FunctionVariable,
     NumberType,
     PrimitiveDataType,
+    StringType,
 };
 use project_analysis::{
     Item,
+    SemanticItemType,
     SemanticError,
 };
 
@@ -45,6 +50,56 @@ pub enum LiteralType {
         length: u32,
     },
     KeywordLiteral(KeywordLiteralType),
+}
+
+impl LiteralType {
+    pub fn type_of(self, pos: ItemPosition) -> Result<DataType, SemanticError> {
+        let result = match self {
+            LiteralType::NumberLiteral { negative, fractional, radix: _, approx_value } => {
+                if fractional {
+                    DataType::Primitive(PrimitiveDataType::Number(NumberType::Float {
+                        size: None,
+                        double: !is_f32_enough(approx_value),
+                    }))
+                } else {
+                    let log2 = if approx_value < 0.0 {
+                        (1.0 - approx_value).log2().ceil()
+                    } else {
+                        (approx_value + 1.0).log2().ceil()
+                    };
+
+                    let size = if log2 > 0.0 {
+                        if log2 > f64::from(U8MAX) { U8MAX } else { log2 as u8 }
+                    } else { 0 };
+                    DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
+                        size,
+                        unsigned: !negative,
+                        zerofill: false,
+                    }))
+                }
+            }
+            LiteralType::StringLiteral { length } => {
+                let string_type = if length < 256 {
+                    StringType::Varchar { size: Some(length), character_set: None }
+                } else {
+                    StringType::Text { character_set: None }
+                };
+                DataType::Primitive(PrimitiveDataType::String(string_type))
+            }
+            LiteralType::BracedExpressionLiteral { length: _ } => {
+                return Err(SemanticError::not_supported_yet(pos, "braced expression literals"));
+            }
+            LiteralType::KeywordLiteral(keyword) => match keyword {
+                KeywordLiteralType::True | KeywordLiteralType::False => {
+                    DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean))
+                }
+                KeywordLiteralType::Null => {
+                    return Err(SemanticError::not_supported_yet(pos, "null"));
+                }
+            }
+        };
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,38 +132,6 @@ pub struct Literal {
     pub literal_type: LiteralType,
     pub text: String,
     pub pos: ItemPosition,
-}
-
-impl Literal {
-    pub fn type_of(&self) -> Result<DataType, SemanticError> {
-        let result = match self.literal_type {
-            LiteralType::NumberLiteral { negative, fractional, radix: _, approx_value } => {
-                if fractional {
-                    DataType::Primitive(PrimitiveDataType::Number(NumberType::Float {
-                        // TODO Изучить вопрос "Зачем float типам точность?"
-                        size: None,
-                        double: !is_f32_enough(approx_value),
-                    }))
-                } else {
-                    let log2 = if approx_value < 0.0 {
-                        (1.0 - approx_value).log2().ceil()
-                    } else {
-                        (approx_value + 1.0).log2().ceil()
-                    };
-
-                    let size = if log2 > 0.0 {
-                        if log2 > f64::from(U8MAX) { U8MAX } else { log2 as u8 }
-                    } else { 0 };
-                    DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
-                        size,
-                        unsigned: !negative,
-                        zerofill: false,
-                    }))
-                }
-            }
-        };
-        Ok(result)
-    }
 }
 
 //impl<'source> IntoStatic for Literal<'source> {
@@ -184,7 +207,7 @@ pub enum PostfixUnaryOperator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ExpressionAST<'source> {
+pub enum ExpressionASTBody<'source> {
     Literal(LiteralAST<'source>),
     Reference(Identifier<'source>),
     BinaryOperation(Box<ExpressionAST<'source>>, BinaryOperator, Box<ExpressionAST<'source>>),
@@ -195,54 +218,60 @@ pub enum ExpressionAST<'source> {
     FunctionCall(ItemPath, Vec<ExpressionAST<'source>>),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExpressionAST<'source> {
+    pub body: ExpressionASTBody<'source>,
+    pub pos: ItemPosition,
+}
+
 impl<'source> Assertion for ExpressionAST<'source> {
     fn assert(&self, other: &Self) {
-        match self {
-            &ExpressionAST::Literal(ref lit_left) => {
-                if let &ExpressionAST::Literal(ref lit_right) = other {
+        match &self.body {
+            &ExpressionASTBody::Literal(ref lit_left) => {
+                if let &ExpressionASTBody::Literal(ref lit_right) = &other.body {
                     lit_left.assert(lit_right)
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionAST::Reference(ref ident_left) => {
-                if let &ExpressionAST::Reference(ref ident_right) = other {
+            &ExpressionASTBody::Reference(ref ident_left) => {
+                if let &ExpressionASTBody::Reference(ref ident_right) = &other.body {
                     assert_eq!(ident_left, ident_right);
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionAST::BinaryOperation(ref left_left, ref left_op, ref left_right) => {
-                if let &ExpressionAST::BinaryOperation(ref right_left, ref right_op, ref right_right) = other {
+            &ExpressionASTBody::BinaryOperation(ref left_left, ref left_op, ref left_right) => {
+                if let &ExpressionASTBody::BinaryOperation(ref right_left, ref right_op, ref right_right) = &other.body {
                     (*left_left).assert(&**right_left);
                     assert_eq!(left_op, right_op);
                     (*left_right).assert(&**right_right);
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionAST::PrefixUnaryOperation(ref left_op, ref left) => {
-                if let &ExpressionAST::PrefixUnaryOperation(ref right_op, ref right) = other {
+            &ExpressionASTBody::PrefixUnaryOperation(ref left_op, ref left) => {
+                if let &ExpressionASTBody::PrefixUnaryOperation(ref right_op, ref right) = &other.body {
                     assert_eq!(left_op, right_op);
                     (*left).assert(&**right);
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionAST::PostfixUnaryOperation(ref left_op, ref left) => {
-                if let &ExpressionAST::PostfixUnaryOperation(ref right_op, ref right) = other {
+            &ExpressionASTBody::PostfixUnaryOperation(ref left_op, ref left) => {
+                if let &ExpressionASTBody::PostfixUnaryOperation(ref right_op, ref right) = &other.body {
                     assert_eq!(left_op, right_op);
                     (*left).assert(&**right);
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionAST::PropertyAccess(ref left, ref left_path) => {
-                if let &ExpressionAST::PropertyAccess(ref right, ref right_path) = other {
+            &ExpressionASTBody::PropertyAccess(ref left, ref left_path) => {
+                if let &ExpressionASTBody::PropertyAccess(ref right, ref right_path) = &other.body {
                     assert_eq!(left_path.path, right_path.path);
                     (*left).assert(&**right);
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionAST::Set(ref left_items) => {
-                if let &ExpressionAST::Set(ref right_items) = other {
+            &ExpressionASTBody::Set(ref left_items) => {
+                if let &ExpressionASTBody::Set(ref right_items) = &other.body {
                     left_items.as_slice().assert(&right_items.as_slice());
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionAST::FunctionCall(ref left_name, ref left_args) => {
-                if let &ExpressionAST::FunctionCall(ref right_name, ref right_args) = other {
+            &ExpressionASTBody::FunctionCall(ref left_name, ref left_args) => {
+                if let &ExpressionASTBody::FunctionCall(ref right_name, ref right_args) = &other.body {
                     assert_eq!(left_name.path, right_name.path);
                     left_args.as_slice().assert(&right_args.as_slice());
-                } else { assert_eq!(self, other) }
+                } else { assert_eq!(self.body, other.body) }
             }
         }
     }
@@ -284,38 +313,142 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for ExpressionAST<'source>
     type Result = Expression;
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        let result = match self {
-            &ExpressionAST::Literal(ref lit) => Expression::Literal(lit.clone().into()),
-            &ExpressionAST::Reference(ref ident) => {
+        let result = match &self.body {
+            &ExpressionASTBody::Literal(ref lit) => {
+                let literal: Literal = lit.clone().into();
+                let data_type = literal.literal_type.type_of(self.pos)
+                    .map_err(|e| vec![e])?;
+                Expression {
+                    body: ExpressionBody::Literal(literal),
+                    pos: self.pos,
+                    data_type,
+                }
+            }
+            &ExpressionASTBody::Reference(ref ident) => {
                 let var = scope.access_to_variable(ident.item_pos(), ident.text())
                     .map_err(|e| vec![e])?;
-                Expression::Variable(var)
+                let data_type = var.property_type(&ItemPath {
+                    pos: self.pos,
+                    path: PathBuf::empty(),
+                })
+                    .map_err(|e| vec![e])?;
+                Expression {
+                    body: ExpressionBody::Variable(var),
+                    pos: self.pos,
+                    data_type,
+                }
             }
-            &ExpressionAST::BinaryOperation(ref left, op, ref right) => {
+            &ExpressionASTBody::BinaryOperation(ref left, op, ref right) => {
                 let (left, right) = (left, right).resolve(scope)?;
-                Expression::BinaryOperation(left, op, right)
+                let data_type = scope.project()
+                    .resolve_binary_operation(self.pos, op, &left.data_type, &right.data_type)
+                    .map_err(|e| vec![e])?;
+                Expression {
+                    body: ExpressionBody::BinaryOperation(left, op, right),
+                    pos: self.pos,
+                    data_type,
+                }
             }
-            &ExpressionAST::PrefixUnaryOperation(op, ref expr) => Expression::PrefixUnaryOperation(op, expr.resolve(scope)?),
-            &ExpressionAST::PostfixUnaryOperation(op, ref expr) => Expression::PostfixUnaryOperation(op, expr.resolve(scope)?),
-            &ExpressionAST::PropertyAccess(ref expr, ref path) => {
+            &ExpressionASTBody::PrefixUnaryOperation(op, ref expr) => {
                 let expr = expr.resolve(scope)?;
-                let path = path.clone();
-                Expression::PropertyAccess(expr, path)
+                let data_type = scope.project()
+                    .resolve_prefix_unary_operation(self.pos, op, &expr.data_type)
+                    .map_err(|e| vec![e])?;
+                Expression {
+                    body: ExpressionBody::PrefixUnaryOperation(op, expr),
+                    pos: self.pos,
+                    data_type,
+                }
             }
-            &ExpressionAST::Set(ref components) => Expression::Set(components.resolve(scope)?),
-            &ExpressionAST::FunctionCall(ref function, ref arguments) => {
+            &ExpressionASTBody::PostfixUnaryOperation(op, ref expr) => {
+                let expr = expr.resolve(scope)?;
+                let data_type = scope.project()
+                    .resolve_postfix_unary_operation(self.pos, op, &expr.data_type)
+                    .map_err(|e| vec![e])?;
+                Expression {
+                    body: ExpressionBody::PostfixUnaryOperation(op, expr),
+                    pos: self.pos,
+                    data_type,
+                }
+            }
+            &ExpressionASTBody::PropertyAccess(ref expr, ref path) => {
+                let expr = expr.resolve(scope)?;
+                let data_type = expr.data_type.property_type(self.pos, path.path.as_path())
+                    .map_err(|e| vec![e])?;
+                let path = path.clone();
+                Expression {
+                    body: ExpressionBody::PropertyAccess(expr, path),
+                    pos: self.pos,
+                    data_type,
+                }
+            }
+            &ExpressionASTBody::Set(ref components) => {
+                let components = components.resolve(scope)?;
+                let fields: Vec<Field> = components.iter()
+                    .map(|expr| {
+                        let field_type = expr.data_type.clone();
+                        Field {
+                            attributes: Vec::new(),
+                            field_type,
+                            position: self.pos,
+                        }
+                    })
+                    .collect();
+                let data_type = DataType::Compound(CompoundDataType::Tuple(fields));
+                Expression {
+                    body: ExpressionBody::Set(components),
+                    pos: self.pos,
+                    data_type,
+                }
+            }
+            &ExpressionASTBody::FunctionCall(ref function, ref arguments) => {
                 let module = scope.context().module();
-                let function = match module.get_item(function.path.as_path(), &mut Vec::new()) {
-                    // TODO Проверка на правильность ссылки (чтобы нельзя было вызвать не функцию, окда?)
+                let function_item = match module.get_item(function.path.as_path(), &mut Vec::new()) {
                     Some(item) => item,
                     None => return Err(vec![SemanticError::unresolved_item(
                         function.pos,
                         function.path.clone(),
                     )]),
                 };
-                // TODO Проверка на правильность типов аргументов
-                let arguments = arguments.resolve(scope)?;
-                Expression::FunctionCall(function, arguments)
+                let arguments: Vec<Expression> = arguments.resolve(scope)?;
+                let data_type = {
+                    let function_guard = function_item.read();
+                    let function = match function_guard.get_function() {
+                        Some(func) => func,
+                        None => return Err(vec![SemanticError::expected_item_of_another_type(
+                            self.pos,
+                            SemanticItemType::Function,
+                            function_guard.get_type(),
+                        )]),
+                    };
+
+                    if arguments.len() != function.arguments.len() {
+                        return Err(vec![SemanticError::wrong_arguments_count(
+                            self.pos,
+                            function.arguments.len(),
+                            arguments.len(),
+                        )]);
+                    }
+
+                    for (i, argument) in arguments.iter().enumerate() {
+                        let (_, target_data_type) = function.arguments.get_index(i)
+                            .expect("The argument can not cease to exist immediately after checking the length of the collection");
+                        if !argument.data_type.can_cast(target_data_type) {
+                            return Err(vec![SemanticError::cannot_cast_type(
+                                self.pos,
+                                argument.data_type.clone(),
+                                target_data_type.clone(),
+                            )]);
+                        }
+                    }
+
+                    function.result.clone()
+                };
+                Expression {
+                    body: ExpressionBody::FunctionCall(function_item, arguments),
+                    pos: self.pos,
+                    data_type,
+                }
             }
         };
         Ok(result)
@@ -323,7 +456,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for ExpressionAST<'source>
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expression {
+pub enum ExpressionBody {
     Literal(Literal),
     Variable(SyncRef<FunctionVariable>),
     BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>),
@@ -332,4 +465,11 @@ pub enum Expression {
     PropertyAccess(Box<Expression>, ItemPath),
     Set(Vec<Expression>),
     FunctionCall(SyncRef<Item>, Vec<Expression>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Expression {
+    pub body: ExpressionBody,
+    pub pos: ItemPosition,
+    pub data_type: DataType,
 }
