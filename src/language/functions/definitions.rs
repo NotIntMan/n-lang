@@ -7,12 +7,14 @@ use helpers::{
 };
 use parser_basics::Identifier;
 use language::{
+    AttributeAST,
     DataType,
     DataTypeAST,
+    find_attribute,
     FunctionContext,
     FunctionVariableScope,
+    Statement,
     StatementAST,
-    StatementResultType,
 };
 use project_analysis::{
     Module,
@@ -31,18 +33,19 @@ pub enum FunctionBodyAST<'source> {
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for FunctionBodyAST<'source> {
     type Result = FunctionBody;
     type Error = SemanticError;
-    fn resolve(&self, _ctx: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        match self {
-            &FunctionBodyAST::External => Ok(FunctionBody::External),
-            &FunctionBodyAST::Implementation(ref _stmt) => unimplemented!(),
-        }
+    fn resolve(&self, ctx: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let result = match self {
+            &FunctionBodyAST::External => FunctionBody::External,
+            &FunctionBodyAST::Implementation(ref stmt) => FunctionBody::Implementation(stmt.resolve(ctx)?),
+        };
+        Ok(result)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FunctionBody {
     External,
-//    Implementation(Statement),
+    Implementation(Statement),
 }
 
 //impl<'source> IntoStatic for FunctionBody<'source> {
@@ -85,21 +88,24 @@ pub struct FunctionDefinitionAST<'source> {
 //    }
 //}
 
-impl<'source> Resolve<SyncRef<Module>> for FunctionDefinitionAST<'source> {
+impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for FunctionDefinitionAST<'source> {
     type Result = FunctionDefinition;
     type Error = SemanticError;
-    fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &(SyncRef<Module>, Vec<AttributeAST<'source>>)) -> Result<Self::Result, Vec<Self::Error>> {
         let arguments = match as_unique_identifier(self.arguments.clone()) {
-            Ok(map) => map.resolve(ctx)?,
+            Ok(map) => map.resolve(&ctx.0)?,
             Err(name) => return Err(vec![SemanticError::duplicate_definition(
                 name.item_pos(),
                 name.text().to_string(),
                 SemanticItemType::Variable,
             )])
         };
-        let result = self.result.resolve(ctx)?;
+        let result = match &self.result {
+            &Some(ref data_type) => data_type.resolve(&ctx.0)?,
+            &None => DataType::Void,
+        };
 
-        let context = FunctionContext::new(ctx.clone());
+        let context = FunctionContext::new(ctx.0.clone());
         let root = context.root();
         let mut errors = Vec::new();
 
@@ -108,12 +114,29 @@ impl<'source> Resolve<SyncRef<Module>> for FunctionDefinitionAST<'source> {
             let &(ident, _) = self.arguments.iter()
                 .find(|&&(ref ident, _)| ident.text() == name)
                 .expect("The argument has already been preprocessed and its name can not not exist in the input data");
-            if let Err(error) = root.new_variable(ident.item_pos(), name.to_string(), Some(StatementResultType::Data(data_type.clone()))) {
+            if let Err(error) = root.new_variable(ident.item_pos(), name.to_string(), Some(data_type.clone())) {
                 errors.push(error);
             }
         }
 
         let body = self.body.resolve(&root)?;
+
+        // TODO Разработать критерий определения функции как аггрегатной.
+        let is_aggregate = match &body {
+            &FunctionBody::External => {
+                find_attribute(&ctx.1, "aggregate").is_some()
+            },
+            _ => false,
+        };
+
+        let has_side_effects = match &body {
+            &FunctionBody::External => {
+                find_attribute(&ctx.1, "no_side_effects").is_none()
+            }
+            &FunctionBody::Implementation(ref stmt) => {
+                stmt.has_side_effects()
+            }
+        };
 
         Ok(FunctionDefinition {
             name: self.name.to_string(),
@@ -121,15 +144,19 @@ impl<'source> Resolve<SyncRef<Module>> for FunctionDefinitionAST<'source> {
             result,
             body,
             context,
+            is_aggregate,
+            has_side_effects,
         })
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDefinition {
     pub name: String,
     pub arguments: IndexMap<String, DataType>,
-    pub result: Option<DataType>,
+    pub result: DataType,
     pub body: FunctionBody,
     pub context: SyncRef<FunctionContext>,
+    pub is_aggregate: bool,
+    pub has_side_effects: bool,
 }

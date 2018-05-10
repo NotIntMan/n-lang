@@ -51,7 +51,7 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeDefinitionAST<'source> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DataTypeDefinition {
     pub name: String,
     pub body: DataType,
@@ -98,7 +98,7 @@ impl<'source> Resolve<SyncRef<Module>> for TableDefinitionAST<'source> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TableDefinition {
     pub name: String,
     pub pos: ItemPosition,
@@ -204,7 +204,7 @@ pub struct ExternalItemImportAST<'source> {
     pub tail: ExternalItemTailAST<'source>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExternalItemImport {
     pub item: SyncRef<Item>,
     pub tail: ExternalItemTail,
@@ -319,31 +319,32 @@ impl<'source> ModuleDefinitionValueAST<'source> {
                         def.path.path.as_path()
                             .pop_right()
                             .expect("Import's path should not be empty!")
-                    },
+                    }
                     &ExternalItemTailAST::Alias(ref alias) => {
                         alias.text()
-                    },
+                    }
                 }
             }
+            &ModuleDefinitionValueAST::Function(ref def) => def.name.text(),
             _ => unimplemented!(),
         }
     }
 }
 
-impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionValueAST<'source> {
+impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for ModuleDefinitionValueAST<'source> {
     type Result = SyncRef<Item>;
     type Error = SemanticError;
     #[allow(unused_assignments)]
-    fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &(SyncRef<Module>, Vec<AttributeAST<'source>>)) -> Result<Self::Result, Vec<Self::Error>> {
         match self {
             &ModuleDefinitionValueAST::DataType(ref def) => {
-                Ok(SyncRef::new(def.resolve(ctx)?))
+                Ok(SyncRef::new(def.resolve(&ctx.0)?))
             }
             &ModuleDefinitionValueAST::Import(
                 ExternalItemImportAST { ref path, ref tail }
             ) => {
                 let mut item_path = path.path.as_path();
-                let item = match ctx.resolve_import(item_path) {
+                let item = match ctx.0.resolve_import(item_path) {
                     Some(item) => item,
                     None => return Err(vec![SemanticError::unresolved_item(path.pos, path.path.clone())]),
                 };
@@ -351,7 +352,7 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionValueAST<'source> {
                     let item = item.read();
                     match item.get_module_ref() {
                         Some(module) => {
-                            ctx.inject_import_module(module.clone());
+                            ctx.0.inject_import_module(module.clone());
                         }
                         None => return Err(vec![SemanticError::expected_item_of_another_type(
                             path.pos,
@@ -362,12 +363,16 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionValueAST<'source> {
                 }
                 Ok(item)
             }
+            &ModuleDefinitionValueAST::Function(ref def) => {
+                let def = def.resolve(ctx)?;
+                Ok(SyncRef::new(Item::function(def)))
+            }
             _ => unimplemented!(),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ModuleDefinitionValue {
     DataType(DataTypeDefinition),
     Table(TableDefinition),
@@ -403,11 +408,12 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionItemAST<'source> {
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
         let ModuleDefinitionItemAST { ref public, ref position, ref attributes, ref value } = self;
         let item = {
-            let value = value.resolve(ctx)?;
+            let ctx = (ctx.clone(), attributes.clone());
+            let value = value.resolve(&ctx)?;
             ModuleDefinitionItem {
                 public: *public,
                 position: *position,
-                attributes: attributes.iter()
+                attributes: ctx.1.iter()
                     .map(|attr| attr.into())
                     .collect(),
                 value,
@@ -419,7 +425,7 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionItemAST<'source> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModuleDefinitionItem {
     pub public: bool,
     pub position: ItemPosition,
