@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 
 use std::mem::replace;
+use std::fmt;
 use indexmap::IndexMap;
 use helpers::Assertion;
 //use helpers::IntoStatic;
@@ -47,6 +48,99 @@ pub enum NumberType {
     },
 }
 
+impl NumberType {
+    pub fn can_cast(&self, target: &NumberType) -> bool {
+        match self {
+            &NumberType::Bit { ref size } => {
+                let self_size = size.unwrap_or(1);
+                if let &NumberType::Bit { ref size } = target {
+                    let other_size = size.unwrap_or(1);
+                    return self_size <= other_size;
+                }
+            }
+            &NumberType::Boolean => {
+                if let &NumberType::Boolean = target { return true; }
+            }
+            &NumberType::Integer { size: ref self_size, unsigned: ref self_unsigned, zerofill: _ } => {
+                if let &NumberType::Integer { ref size, ref unsigned, zerofill: _ } = target {
+                    if !*self_unsigned && *unsigned { return false; }
+                    return *self_size <= *size;
+                }
+            }
+            &NumberType::Decimal { ref size, unsigned: ref self_unsigned, zerofill: _ } => {
+                let self_size = match *size {
+                    Some((m, d)) => match d {
+                        Some(d) => (m, d),
+                        None => (m, 30),
+                    },
+                    None => (65, 30),
+                };
+                if let &NumberType::Decimal { ref size, ref unsigned, zerofill: _ } = target {
+                    let other_size = match *size {
+                        Some((m, d)) => match d {
+                            Some(d) => (m, d),
+                            None => (m, 30),
+                        },
+                        None => (65, 30),
+                    };
+                    if !*self_unsigned && *unsigned { return false; }
+                    return (self_size.0 <= other_size.0) && (self_size.1 <= other_size.1);
+                }
+            },
+            &NumberType::Float { size: _, double: ref self_double } => {
+                if let &NumberType::Float { size: _, ref double } = target {
+                    return !*self_double || *double;
+                }
+            }
+        }
+        false
+    }
+}
+
+impl fmt::Display for NumberType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &NumberType::Bit { ref size } => {
+                write!(f, "bit")?;
+                if let &Some(ref size) = size {
+                    write!(f, "({})", size)?;
+                }
+                Ok(())
+            }
+            &NumberType::Boolean => write!(f, "boolean"),
+            &NumberType::Integer { ref size, ref unsigned, ref zerofill } => {
+                if *unsigned { write!(f, "unsigned")?; }
+                if *zerofill { write!(f, "zerofill")?; }
+                write!(f, "integer({})", size)
+            }
+            &NumberType::Decimal { ref size, ref unsigned, ref zerofill } => {
+                if *unsigned { write!(f, "unsigned")?; }
+                if *zerofill { write!(f, "zerofill")?; }
+                write!(f, "decimal")?;
+                if let &Some((ref size_a, ref size_b)) = size {
+                    write!(f, "({}", size_a)?;
+                    if let &Some(ref size_b) = size_b {
+                        write!(f, ", {}", size_b)?;
+                    }
+                    write!(f, ")")?;
+                }
+                Ok(())
+            }
+            &NumberType::Float { ref size, ref double } => {
+                if *double {
+                    write!(f, "double")?;
+                } else {
+                    write!(f, "float")?;
+                }
+                if let &Some((ref size_a, ref size_b)) = size {
+                    write!(f, "({}, {})", size_a, size_b)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DateTimeType {
     Date,
@@ -61,16 +155,75 @@ pub enum DateTimeType {
     },
 }
 
+impl fmt::Display for DateTimeType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &DateTimeType::Date => write!(f, "date"),
+            &DateTimeType::Time { ref precision } => {
+                write!(f, "time")?;
+                if let &Some(ref precision) = precision {
+                    write!(f, "({})", precision)?;
+                }
+                Ok(())
+            }
+            &DateTimeType::Datetime { ref precision } => {
+                write!(f, "datetime")?;
+                if let &Some(ref precision) = precision {
+                    write!(f, "({})", precision)?;
+                }
+                Ok(())
+            }
+            &DateTimeType::Timestamp { ref precision } => {
+                write!(f, "timestamp")?;
+                if let &Some(ref precision) = precision {
+                    write!(f, "({})", precision)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum YearType {
     Year2,
     Year4,
 }
 
+impl YearType {
+    #[inline]
+    pub fn can_cast(&self, target: &YearType) -> bool {
+        match self {
+            &YearType::Year2 => true,
+            &YearType::Year4 => *target == YearType::Year4,
+        }
+    }
+}
+
+impl fmt::Display for YearType {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &YearType::Year2 => write!(f, "year(2)"),
+            &YearType::Year4 => write!(f, "year(4)"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CharacterSet {
     Binary,
     UTF8,
+}
+
+impl fmt::Display for CharacterSet {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &CharacterSet::Binary => write!(f, "binary"),
+            &CharacterSet::UTF8 => write!(f, "UTF-8"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -84,6 +237,54 @@ pub enum StringType {
     },
 }
 
+impl StringType {
+    #[inline]
+    pub fn can_cast(&self, target: &StringType) -> bool {
+        match self {
+            &StringType::Varchar { ref size, character_set: _ } => {
+                let self_size = size.unwrap_or(255);
+                match target {
+                    &StringType::Varchar { ref size, character_set: _ } => {
+                        let size = size.unwrap_or(255);
+                        self_size <= size
+                    }
+                    &StringType::Text { character_set: _ } => true,
+                }
+            }
+            &StringType::Text { character_set: _ } => {
+                match target {
+                    &StringType::Varchar { size: _, character_set: _ } => false,
+                    &StringType::Text { character_set: _ } => true,
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for StringType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &StringType::Varchar { ref size, ref character_set } => {
+                write!(f, "varchar")?;
+                if let &Some(ref size) = size {
+                    write!(f, "({})", size)?;
+                }
+                if let &Some(ref character_set) = character_set {
+                    write!(f, " character set {}", character_set)?;
+                }
+                Ok(())
+            }
+            &StringType::Text { ref character_set } => {
+                write!(f, "text")?;
+                if let &Some(ref character_set) = character_set {
+                    write!(f, " character set {}", character_set)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PrimitiveDataType {
     Null,
@@ -91,6 +292,43 @@ pub enum PrimitiveDataType {
     DateTime(DateTimeType),
     Year(YearType),
     String(StringType),
+}
+
+impl PrimitiveDataType {
+    pub fn can_cast(&self, target: &PrimitiveDataType) -> bool {
+        match self {
+            &PrimitiveDataType::Null => return *target == PrimitiveDataType::Null,
+            &PrimitiveDataType::Number(ref self_number) => {
+                if let &PrimitiveDataType::Number(ref number) = target {
+                    return self_number.can_cast(number);
+                }
+            }
+            &PrimitiveDataType::DateTime(_) => unimplemented!(),
+            &PrimitiveDataType::Year(ref self_year) => {
+                if let &PrimitiveDataType::Year(ref year) = target {
+                    return self_year.can_cast(year);
+                }
+            }
+            &PrimitiveDataType::String(ref self_string) => {
+                if let &PrimitiveDataType::String(ref string) = target {
+                    return self_string.can_cast(string);
+                }
+            }
+        }
+        false
+    }
+}
+
+impl fmt::Display for PrimitiveDataType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &PrimitiveDataType::Null => write!(f, "null"),
+            &PrimitiveDataType::Number(ref primitive) => write!(f, "{}", primitive),
+            &PrimitiveDataType::DateTime(ref primitive) => write!(f, "{}", primitive),
+            &PrimitiveDataType::Year(ref primitive) => write!(f, "{}", primitive),
+            &PrimitiveDataType::String(ref primitive) => write!(f, "{}", primitive),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -120,7 +358,8 @@ pub struct Attribute {
     pub arguments: Option<Vec<String>>,
 }
 
-pub fn find_attribute<'a>(attributes: &'a [Attribute], name: &str) -> Option<&'a Attribute> {
+#[inline]
+pub fn find_attribute<'a, 'source>(attributes: &'a [AttributeAST<'source>], name: &str) -> Option<&'a AttributeAST<'source>> {
     for attribute in attributes.iter() {
         if attribute.name == name {
             return Some(attribute);
@@ -147,7 +386,7 @@ pub struct FieldAST<'source> {
     pub position: ItemPosition,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Field {
     pub attributes: Vec<Attribute>,
     pub field_type: DataType,
@@ -199,10 +438,46 @@ pub enum CompoundDataTypeAST<'source> {
     Tuple(Vec<FieldAST<'source>>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CompoundDataType {
     Structure(IndexMap<String, Field>),
     Tuple(Vec<Field>),
+}
+
+impl CompoundDataType {
+    pub fn can_cast(&self, target: &CompoundDataType) -> bool {
+        match self {
+            &CompoundDataType::Structure(ref self_fields) => {
+                if let &CompoundDataType::Structure(ref fields) = target {
+                    for (name, field) in fields.iter() {
+                        let self_field = match self_fields.get(name.as_str()) {
+                            Some(field) => field,
+                            None => return false,
+                        };
+                        if !self_field.field_type.can_cast(&field.field_type) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+            &CompoundDataType::Tuple(ref self_fields) => {
+                if let &CompoundDataType::Tuple(ref fields) = target {
+                    for (i, field) in fields.iter().enumerate() {
+                        let self_field = match self_fields.get(i) {
+                            Some(field) => field,
+                            None => return false,
+                        };
+                        if !self_field.field_type.can_cast(&field.field_type) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 impl<'source> Assertion for CompoundDataTypeAST<'source> {
@@ -440,11 +715,13 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DataType {
+    Array(Box<DataType>),
     Compound(CompoundDataType),
     Primitive(PrimitiveDataType),
     Reference(SyncRef<Item>),
+    Void,
 }
 
 impl DataType {
@@ -476,5 +753,73 @@ impl DataType {
             _ => {}
         }
         Err(SemanticError::wrong_property(pos, field_name.to_string()))
+    }
+    pub fn can_cast(&self, target: &DataType) -> bool {
+        if let &DataType::Reference(ref reference) = target {
+            let guard = reference.read();
+            let data_type = match guard.get_data_type() {
+                Some(data_type) => data_type,
+                None => return false,
+            };
+            return self.can_cast(&data_type.body);
+        }
+        match self {
+            &DataType::Array(ref self_subtype) => {
+                if let &DataType::Array(ref subtype) = target {
+                    return self_subtype.can_cast(&*subtype);
+                }
+            }
+            &DataType::Compound(ref self_subtype) => {
+                if let &DataType::Compound(ref subtype) = target {
+                    return self_subtype.can_cast(&*subtype);
+                }
+            }
+            &DataType::Primitive(ref self_subtype) => {
+                if let &DataType::Primitive(ref subtype) = target {
+                    return self_subtype.can_cast(&*subtype);
+                }
+            }
+            &DataType::Reference(ref reference) => {
+                let guard = reference.read();
+                let data_type = match guard.get_data_type() {
+                    Some(data_type) => data_type,
+                    None => return false,
+                };
+                return data_type.body.can_cast(target);
+            }
+            &DataType::Void => return *target == DataType::Void,
+        }
+        false
+    }
+}
+
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &DataType::Array(ref subtype) => write!(f, "[{}]", subtype),
+            &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
+                let mut d = f.debug_struct("");
+                for (name, field) in fields.iter() {
+                    d.field(&name, &field.field_type);
+                }
+                d.finish()
+            }
+            &DataType::Compound(CompoundDataType::Tuple(ref components)) => {
+                let mut d = f.debug_tuple("");
+                for component in components.iter() {
+                    d.field(&component.field_type);
+                }
+                d.finish()
+            }
+            &DataType::Primitive(ref primitive) => write!(f, "{}", primitive),
+            &DataType::Reference(ref refer) => {
+                let reference = refer.read();
+                match reference.get_data_type() {
+                    Some(def) => write!(f, "{}", def.body),
+                    None => write!(f, "<not a type>"),
+                }
+            }
+            &DataType::Void => write!(f, "!"),
+        }
     }
 }
