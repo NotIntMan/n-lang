@@ -3,6 +3,7 @@ use helpers::{
     Resolve,
     SyncRef,
 };
+use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use language::{
     Expression,
@@ -11,8 +12,8 @@ use language::{
     DataTypeAST,
     Deleting,
     Inserting,
+    FunctionVariable,
     FunctionVariableScope,
-    TableDefinition,
     Selection,
     Updating,
 };
@@ -66,10 +67,12 @@ pub enum StatementSource {
 //    Selection(Selection<'source>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StatementResultType {
-    Data(DataType),
-    Table(TableDefinition),
+impl StatementSource {
+    pub fn type_of(&self) -> &DataType {
+        match self {
+            &StatementSource::Expression(ref expr) => &expr.data_type,
+        }
+    }
 }
 
 //impl<'source> IntoStatic for StatementSource<'source> {
@@ -83,7 +86,7 @@ pub enum StatementResultType {
 //}
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum StatementAST<'source> {
+pub enum StatementASTBody<'source> {
     Nothing,
     VariableDefinition {
         name: Identifier<'source>,
@@ -127,8 +130,8 @@ pub enum StatementAST<'source> {
     },
 }
 
-impl<'source> Default for StatementAST<'source> {
-    fn default() -> Self { StatementAST::Nothing }
+impl<'source> Default for StatementASTBody<'source> {
+    fn default() -> Self { StatementASTBody::Nothing }
 }
 
 //impl<'source> IntoStatic for Statement<'source> {
@@ -168,28 +171,72 @@ impl<'source> Default for StatementAST<'source> {
 //    }
 //}
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct StatementAST<'source> {
+    pub body: StatementASTBody<'source>,
+    pub pos: ItemPosition,
+}
+
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> {
     type Result = Statement;
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        match self {
-            &StatementAST::Nothing => Ok(Statement::Nothing),
-            &StatementAST::VariableDefinition { ref name, ref data_type, ref default_value } => {
+        match &self.body {
+            &StatementASTBody::Nothing => Ok(Statement::Nothing),
+            &StatementASTBody::VariableDefinition { ref name, ref data_type, ref default_value } => {
                 let data_type = data_type.resolve(&ctx.context().module())?;
-                let data_type = match default_value {
-                    // TODO Typeof expression/selection
-                    &Some(ref _expr) => unimplemented!(),
-                    &None => data_type.map(|t| StatementResultType::Data(t)),
+                let default_value: Option<StatementSource> = default_value.resolve(ctx)?;
+                let data_type = match data_type {
+                    Some(data_type) => {
+                        if let &Some(ref default_value) = &default_value {
+                            let default_value_type = default_value.type_of();
+                            if !default_value_type.can_cast(&data_type) {
+                                return Err(vec![SemanticError::cannot_cast_type(
+                                    self.pos,
+                                    data_type,
+                                    default_value_type.clone(),
+                                )]);
+                            }
+                        }
+                        Some(data_type)
+                    }
+                    None => {
+                        match &default_value {
+                            &Some(ref default_value) => Some(default_value.type_of().clone()),
+                            &None => None,
+                        }
+                    }
                 };
-                ctx.new_variable(name.item_pos(), name.to_string(), data_type)
+                let var = ctx.new_variable(name.item_pos(), name.to_string(), data_type)
                     .map_err(|e| vec![e])?;
-                Ok(Statement::Nothing)
+                let stmt = match default_value {
+                    Some(source) => Statement::VariableAssignment {
+                        var,
+                        source,
+                    },
+                    None => Statement::Nothing,
+                };
+                Ok(stmt)
             }
             _ => unimplemented!()
         }
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Nothing,
+    VariableAssignment {
+        var: SyncRef<FunctionVariable>,
+        source: StatementSource,
+    },
+}
+
+impl Statement {
+    pub fn has_side_effects(&self) -> bool {
+        match self {
+            &Statement::Nothing => false,
+            &Statement::VariableAssignment { var: _, source: _ } => false,
+        }
+    }
 }
