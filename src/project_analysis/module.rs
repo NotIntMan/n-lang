@@ -51,7 +51,11 @@ impl UnresolvedModule {
             Err(errors) => return Err(
                 errors.extract_into_vec()
                     .into_iter()
-                    .map(|error| SemanticError::parser_error(error))
+                    .map(|error| {
+                        let mut error = SemanticError::parser_error(error);
+                        error.set_text(text.clone());
+                        error
+                    })
                     .collect()
             ),
         };
@@ -190,6 +194,8 @@ impl SyncRef<Module> {
     pub fn inject_import_module(&self, module: SyncRef<Module>) {
         self.write().inject_import_module(module)
     }
+    #[inline]
+    pub fn project(&self) -> SyncRef<ProjectContext> { self.read().project.clone() }
 }
 
 impl fmt::Debug for Module {

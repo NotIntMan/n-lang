@@ -8,6 +8,13 @@ use helpers::{
     Resolve,
     SyncRef,
 };
+use lexeme_scanner::ItemPosition;
+use language::{
+    BinaryOperator,
+    DataType,
+    PostfixUnaryOperator,
+    PrefixUnaryOperator,
+};
 use project_analysis::{
     Item,
     Module,
@@ -153,6 +160,15 @@ impl SyncRef<ProjectContext> {
             path.pop_left();
         }
         module.get_item(path, &mut Vec::new())
+    }
+    pub fn resolve_binary_operation(&self, pos: ItemPosition, _operator: BinaryOperator, _left: &DataType, _right: &DataType) -> Result<DataType, SemanticError> {
+        return Err(SemanticError::not_supported_yet(pos, "infix binary operations"));
+    }
+    pub fn resolve_postfix_unary_operation(&self, pos: ItemPosition, _operator: PostfixUnaryOperator, _sub: &DataType) -> Result<DataType, SemanticError> {
+        return Err(SemanticError::not_supported_yet(pos, "postfix unary operations"));
+    }
+    pub fn resolve_prefix_unary_operation(&self, pos: ItemPosition, _operator: PrefixUnaryOperator, _sub: &DataType) -> Result<DataType, SemanticError> {
+        return Err(SemanticError::not_supported_yet(pos, "prefix unary operations"));
     }
 }
 

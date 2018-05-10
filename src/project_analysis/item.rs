@@ -11,8 +11,9 @@ use helpers::{
 //    Identifier,
 //    StaticIdentifier,
 //};
-use language::modules::{
+use language::{
     DataTypeDefinition,
+    FunctionDefinition,
 //    ExternalItemImport,
 //    ModuleDefinitionItem,
 ////    ModuleDefinitionValue,
@@ -28,12 +29,12 @@ use language::modules::{
 //
 use project_analysis::Module;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     body: ItemBody,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ItemBody {
     DataType {
         def: DataTypeDefinition,
@@ -49,10 +50,13 @@ pub enum ItemBody {
     ModuleReference {
         module: SyncRef<Module>,
     },
-//    Table {
+    //    Table {
 //        def: TableDefinition<'static>,
 //        primary_key: Result<ItemRef, SemanticError>,
 //    },
+    Function {
+        def: FunctionDefinition,
+    },
 }
 
 impl Item {
@@ -65,6 +69,10 @@ impl Item {
         Item { body: ItemBody::ModuleReference { module } }
     }
     #[inline]
+    pub fn function(def: FunctionDefinition) -> Self {
+        Item { body: ItemBody::Function { def } }
+    }
+    #[inline]
     pub fn get_type(&self) -> SemanticItemType {
         match &self.body {
             &ItemBody::DataType { def: _ } => SemanticItemType::DataType,
@@ -72,6 +80,7 @@ impl Item {
 //            &ItemBody::ImportItem { name: _, original_name: _, ref item } => item.get_type(),
             &ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
 //            &ItemBody::Table { def: _, primary_key: _ } => SemanticItemType::Table,
+            &ItemBody::Function { def: _ } => SemanticItemType::Function,
         }
     }
     #[inline]
@@ -88,20 +97,27 @@ impl Item {
             _ => None,
         }
     }
+    #[inline]
+    pub fn get_function(&self) -> Option<&FunctionDefinition> {
+        match &self.body {
+            &ItemBody::Function { ref def } => Some(def),
+            _ => None,
+        }
+    }
 }
 
 impl SyncRef<Item> {
     pub fn get_item(&self, path: Path, search_route: &mut Vec<SyncRef<Module>>) -> Option<Self> {
+        if path.is_empty() {
+            return Some(self.clone());
+        }
         let item = self.read();
         match &item.body {
-            &ItemBody::DataType { def: _ } => {
-                if path.is_empty() {
-                    return Some(self.clone());
-                }
-            }
+            &ItemBody::DataType { def: _ } => {}
             &ItemBody::ModuleReference { ref module } => {
                 return module.get_item(path, search_route);
             }
+            &ItemBody::Function { def: _ } => {}
         }
         None
     }
@@ -326,9 +342,9 @@ pub enum SemanticItemType {
     Field,
     DataType,
     Module,
-//    UnresolvedImport,
-Table,
+    Table,
     Variable,
+    Function,
 }
 
 impl SemanticItemType {
@@ -338,9 +354,9 @@ impl SemanticItemType {
             &SemanticItemType::Field => "field",
             &SemanticItemType::DataType => "data type",
             &SemanticItemType::Module => "module",
-//            &SemanticItemType::UnresolvedImport => "unresolved import",
             &SemanticItemType::Table => "table",
             &SemanticItemType::Variable => "variable",
+            &SemanticItemType::Function => "function",
         }
     }
 }
