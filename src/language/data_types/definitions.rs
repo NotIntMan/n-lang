@@ -109,13 +109,13 @@ impl fmt::Display for NumberType {
             }
             &NumberType::Boolean => write!(f, "boolean"),
             &NumberType::Integer { ref size, ref unsigned, ref zerofill } => {
-                if *unsigned { write!(f, "unsigned")?; }
-                if *zerofill { write!(f, "zerofill")?; }
+                if *unsigned { write!(f, "unsigned ")?; }
+                if *zerofill { write!(f, "zerofill ")?; }
                 write!(f, "integer({})", size)
             }
             &NumberType::Decimal { ref size, ref unsigned, ref zerofill } => {
-                if *unsigned { write!(f, "unsigned")?; }
-                if *zerofill { write!(f, "zerofill")?; }
+                if *unsigned { write!(f, "unsigned ")?; }
+                if *zerofill { write!(f, "zerofill ")?; }
                 write!(f, "decimal")?;
                 if let &Some((ref size_a, ref size_b)) = size {
                     write!(f, "({}", size_a)?;
