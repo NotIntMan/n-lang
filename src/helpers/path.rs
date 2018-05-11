@@ -170,6 +170,15 @@ impl<'a> Path<'a> {
             shrink_point -= 1;
         }
     }
+    pub fn the_only(self) -> Option<&'a str> {
+        let mut components = self.components();
+        let result = components.next()?;
+        if components.next().is_none() {
+            Some(result)
+        } else {
+            None
+        }
+    }
 }
 
 impl<'a> fmt::Debug for Path<'a> {
