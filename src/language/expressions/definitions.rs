@@ -69,7 +69,12 @@ impl LiteralType {
                     };
 
                     let size = if log2 > 0.0 {
-                        if log2 > f64::from(U8MAX) { U8MAX } else { log2 as u8 }
+                        if log2 >= f64::from(U8MAX) {
+                            U8MAX
+                        } else {
+                            let log2 = log2 as u8;
+                            if negative { log2 + 1 } else { log2 }
+                        }
                     } else { 0 };
                     DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
                         size,
