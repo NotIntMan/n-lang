@@ -21,7 +21,12 @@ ParserErrorItem,
 ParserErrorKind,
 };
 //use language::others::write_path;
-use language::DataType;
+use language::{
+    DataType,
+    BinaryOperator,
+    PostfixUnaryOperator,
+    PrefixUnaryOperator,
+};
 use project_analysis::{
     SemanticItemType,
     Text,
@@ -70,6 +75,22 @@ pub enum SemanticErrorKind {
         source: DataType,
         target: DataType,
     },
+    BinaryOperationCannotBePerformed {
+        operator: BinaryOperator,
+        left: DataType,
+        right: DataType,
+    },
+    PostfixUnaryOperationCannotBePerformed {
+        operator: PostfixUnaryOperator,
+        input: DataType,
+    },
+    PrefixUnaryOperationCannotBePerformed {
+        operator: PrefixUnaryOperator,
+        input: DataType,
+    },
+    NotAllowedHere {
+        feature: &'static str,
+    },
 }
 
 impl Default for SemanticErrorKind {
@@ -109,6 +130,10 @@ impl fmt::Display for SemanticErrorKind {
             &SemanticErrorKind::NotSupportedYet { ref feature } => write!(f, "{} is not supported yet", feature),
             &SemanticErrorKind::WrongArgumentsCount { ref expected, ref got } => write!(f, "expected {} arguments, got {}", expected, got),
             &SemanticErrorKind::CannotCastType { ref source, ref target } => write!(f, "cannot cast type {} to {}", source, target),
+            &SemanticErrorKind::BinaryOperationCannotBePerformed { ref operator, ref left, ref right } => write!(f, "operation \"{}\" cannot be performed on {} and {}", operator, left, right),
+            &SemanticErrorKind::PostfixUnaryOperationCannotBePerformed { ref operator, ref input } => write!(f, "operation \"{}\" cannot be performed on {}", operator, input),
+            &SemanticErrorKind::PrefixUnaryOperationCannotBePerformed { ref operator, ref input } => write!(f, "operation \"{}\" cannot be performed on {}", operator, input),
+            &SemanticErrorKind::NotAllowedHere { ref feature } => write!(f, "{} is not allowed here", feature),
         }
     }
 }
@@ -198,6 +223,23 @@ impl SemanticError {
     pub fn cannot_cast_type(pos: ItemPosition, source: DataType, target: DataType) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::CannotCastType { source, target }, text: None }
     }
+    #[inline]
+    pub fn binary_operation_cannot_be_performed(pos: ItemPosition, operator: BinaryOperator, left: DataType, right: DataType) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::BinaryOperationCannotBePerformed { operator, left, right }, text: None }
+    }
+    #[inline]
+    pub fn postfix_unary_operation_cannot_be_performed(pos: ItemPosition, operator: PostfixUnaryOperator, input: DataType) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::PostfixUnaryOperationCannotBePerformed { operator, input }, text: None }
+    }
+    #[inline]
+    pub fn prefix_unary_operation_cannot_be_performed(pos: ItemPosition, operator: PrefixUnaryOperator, input: DataType) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::PrefixUnaryOperationCannotBePerformed { operator, input }, text: None }
+    }
+    #[inline]
+    pub fn not_allowed_here(pos: ItemPosition, feature: &'static str) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::NotAllowedHere { feature }, text: None }
+    }
+    #[inline]
     pub fn set_text(&mut self, text: Arc<Text>) {
         self.text = Some(text);
     }
