@@ -1,4 +1,6 @@
 use std::u8::MAX as U8MAX;
+use std::fmt;
+use std::cmp;
 //use helpers::IntoStatic;
 use helpers::{
     PathBuf,
@@ -186,6 +188,44 @@ pub enum BinaryOperator {
     Interval,
 }
 
+impl BinaryOperator {
+    pub fn get_description(&self) -> &'static str {
+        match *self {
+            BinaryOperator::Or => "or",
+            BinaryOperator::XOr => "exclusive or",
+            BinaryOperator::And => "and",
+            BinaryOperator::BitOr => "bit or",
+            BinaryOperator::BitXOr => "bit exclusive or",
+            BinaryOperator::BitAnd => "bit and",
+            BinaryOperator::ShiftLeft => "shift left",
+            BinaryOperator::ShiftRight => "shift right",
+            BinaryOperator::IsIn => "is in",
+            BinaryOperator::Equals => "equals",
+            BinaryOperator::MoreThanOrEquals => "more than or equals",
+            BinaryOperator::MoreThan => "more than",
+            BinaryOperator::LessThanOrEquals => "less than or equals",
+            BinaryOperator::LessThan => "less than",
+            BinaryOperator::Like => "like",
+            BinaryOperator::SoundsLike => "sounds like",
+            BinaryOperator::RegExp => "reg exp",
+            BinaryOperator::Plus => "plus",
+            BinaryOperator::Minus => "minus",
+            BinaryOperator::Times => "times",
+            BinaryOperator::Divide => "divide",
+            BinaryOperator::Mod => "mod",
+            BinaryOperator::Div => "div",
+            BinaryOperator::Pow => "pow",
+            BinaryOperator::Interval => "interval",
+        }
+    }
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.get_description())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrefixUnaryOperator {
     // Logical operators
@@ -203,12 +243,51 @@ pub enum PrefixUnaryOperator {
     Exists,
 }
 
+impl PrefixUnaryOperator {
+    pub fn get_description(&self) -> &'static str {
+        match *self {
+            PrefixUnaryOperator::Not => "not",
+            PrefixUnaryOperator::All => "all",
+            PrefixUnaryOperator::Any => "any",
+            PrefixUnaryOperator::Plus => "plus",
+            PrefixUnaryOperator::Minus => "minus",
+            PrefixUnaryOperator::Tilde => "tilde",
+            PrefixUnaryOperator::Binary => "binary",
+            PrefixUnaryOperator::Row => "row",
+            PrefixUnaryOperator::Exists => "exists",
+        }
+    }
+}
+
+impl fmt::Display for PrefixUnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.get_description())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PostfixUnaryOperator {
     IsNull,
     IsTrue,
     IsFalse,
     IsUnknown,
+}
+
+impl PostfixUnaryOperator {
+    pub fn get_description(&self) -> &'static str {
+        match *self {
+            PostfixUnaryOperator::IsNull => "is null",
+            PostfixUnaryOperator::IsTrue => "is true",
+            PostfixUnaryOperator::IsFalse => "is false",
+            PostfixUnaryOperator::IsUnknown => "is unknown",
+        }
+    }
+}
+
+impl fmt::Display for PostfixUnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.get_description())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -318,163 +397,405 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for ExpressionAST<'source>
     type Result = Expression;
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        let result = match &self.body {
+        match &self.body {
             &ExpressionASTBody::Literal(ref lit) => {
-                let literal: Literal = lit.clone().into();
-                let data_type = literal.literal_type.type_of(self.pos)
-                    .map_err(|e| vec![e])?;
-                Expression {
-                    body: ExpressionBody::Literal(literal),
-                    pos: self.pos,
-                    data_type,
-                }
+                Expression::literal(self.pos, lit)
+                    .map_err(|e| vec![e])
             }
             &ExpressionASTBody::Reference(ref ident) => {
-                let var = scope.access_to_variable(ident.item_pos(), ident.text())
-                    .map_err(|e| vec![e])?;
-                let data_type = var.property_type(&ItemPath {
-                    pos: self.pos,
-                    path: PathBuf::empty(),
-                })
-                    .map_err(|e| vec![e])?;
-                Expression {
-                    body: ExpressionBody::Variable(var),
-                    pos: self.pos,
-                    data_type,
-                }
+                Expression::variable(scope, self.pos, ident)
+                    .map_err(|e| vec![e])
             }
             &ExpressionASTBody::BinaryOperation(ref left, op, ref right) => {
-                let (left, right) = (left, right).resolve(scope)?;
-                let data_type = scope.project()
-                    .resolve_binary_operation(self.pos, op, &left.data_type, &right.data_type)
-                    .map_err(|e| vec![e])?;
-                Expression {
-                    body: ExpressionBody::BinaryOperation(left, op, right),
-                    pos: self.pos,
-                    data_type,
-                }
-            }
-            &ExpressionASTBody::PrefixUnaryOperation(op, ref expr) => {
-                let expr = expr.resolve(scope)?;
-                let data_type = scope.project()
-                    .resolve_prefix_unary_operation(self.pos, op, &expr.data_type)
-                    .map_err(|e| vec![e])?;
-                Expression {
-                    body: ExpressionBody::PrefixUnaryOperation(op, expr),
-                    pos: self.pos,
-                    data_type,
-                }
+                Expression::binary_operation(scope, self.pos, op, left, right)
             }
             &ExpressionASTBody::PostfixUnaryOperation(op, ref expr) => {
-                let expr = expr.resolve(scope)?;
-                let data_type = scope.project()
-                    .resolve_postfix_unary_operation(self.pos, op, &expr.data_type)
-                    .map_err(|e| vec![e])?;
-                Expression {
-                    body: ExpressionBody::PostfixUnaryOperation(op, expr),
-                    pos: self.pos,
-                    data_type,
-                }
+                Expression::postfix_unary_operation(scope, self.pos, op, expr)
+            }
+            &ExpressionASTBody::PrefixUnaryOperation(op, ref expr) => {
+                Expression::prefix_unary_operation(scope, self.pos, op, expr)
             }
             &ExpressionASTBody::PropertyAccess(ref expr, ref path) => {
-                let expr = expr.resolve(scope)?;
-                let data_type = expr.data_type.property_type(self.pos, path.path.as_path())
-                    .map_err(|e| vec![e])?;
-                let path = path.clone();
-                Expression {
-                    body: ExpressionBody::PropertyAccess(expr, path),
-                    pos: self.pos,
-                    data_type,
-                }
+                Expression::property_access(scope, self.pos, expr, path)
             }
             &ExpressionASTBody::Set(ref components) => {
-                let components = components.resolve(scope)?;
-                let fields: Vec<Field> = components.iter()
-                    .map(|expr| {
-                        let field_type = expr.data_type.clone();
-                        Field {
-                            attributes: Vec::new(),
-                            field_type,
-                            position: self.pos,
-                        }
-                    })
-                    .collect();
-                let data_type = DataType::Compound(CompoundDataType::Tuple(fields));
-                Expression {
-                    body: ExpressionBody::Set(components),
-                    pos: self.pos,
-                    data_type,
-                }
+                Expression::set(scope, self.pos, components)
             }
             &ExpressionASTBody::FunctionCall(ref function, ref arguments) => {
-                let module = scope.context().module();
-                let function_item = match module.get_item(function.path.as_path(), &mut Vec::new()) {
-                    Some(item) => item,
-                    None => return Err(vec![SemanticError::unresolved_item(
-                        function.pos,
-                        function.path.clone(),
-                    )]),
-                };
-                let arguments: Vec<Expression> = arguments.resolve(scope)?;
-                let data_type = {
-                    let function_guard = function_item.read();
-                    let function = match function_guard.get_function() {
-                        Some(func) => func,
-                        None => return Err(vec![SemanticError::expected_item_of_another_type(
-                            self.pos,
-                            SemanticItemType::Function,
-                            function_guard.get_type(),
-                        )]),
-                    };
-
-                    if arguments.len() != function.arguments.len() {
-                        return Err(vec![SemanticError::wrong_arguments_count(
-                            self.pos,
-                            function.arguments.len(),
-                            arguments.len(),
-                        )]);
-                    }
-
-                    for (i, argument) in arguments.iter().enumerate() {
-                        let (_, target_data_type) = function.arguments.get_index(i)
-                            .expect("The argument can not cease to exist immediately after checking the length of the collection");
-                        if !argument.data_type.can_cast(target_data_type) {
-                            return Err(vec![SemanticError::cannot_cast_type(
-                                self.pos,
-                                argument.data_type.clone(),
-                                target_data_type.clone(),
-                            )]);
-                        }
-                    }
-
-                    function.result.clone()
-                };
-                Expression {
-                    body: ExpressionBody::FunctionCall(function_item, arguments),
-                    pos: self.pos,
-                    data_type,
-                }
+                Expression::function_call(scope, self.pos, function, arguments)
             }
-        };
-        Ok(result)
+        }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ExpressionBody {
     Literal(Literal),
     Variable(SyncRef<FunctionVariable>),
     BinaryOperation(Box<Expression>, BinaryOperator, Box<Expression>),
-    PrefixUnaryOperation(PrefixUnaryOperator, Box<Expression>),
     PostfixUnaryOperation(PostfixUnaryOperator, Box<Expression>),
+    PrefixUnaryOperation(PrefixUnaryOperator, Box<Expression>),
     PropertyAccess(Box<Expression>, ItemPath),
     Set(Vec<Expression>),
     FunctionCall(SyncRef<Item>, Vec<Expression>),
+    StdFunctionCall(String, Vec<Expression>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl ExpressionBody {
+    pub fn can_be_selected_by_aggregation_query(&self, aggregates: &Vec<Expression>) -> bool {
+        match self {
+            ExpressionBody::Literal(_) => true,
+            ExpressionBody::Variable(_) => false,
+            ExpressionBody::BinaryOperation(left, _, right) => {
+                left.can_be_selected_by_aggregation_query(aggregates)
+                    && right.can_be_selected_by_aggregation_query(aggregates)
+            }
+            ExpressionBody::PostfixUnaryOperation(_, expr) => {
+                expr.can_be_selected_by_aggregation_query(aggregates)
+            }
+            ExpressionBody::PrefixUnaryOperation(_, expr) => {
+                expr.can_be_selected_by_aggregation_query(aggregates)
+            }
+            ExpressionBody::PropertyAccess(expr, _) => {
+                expr.can_be_selected_by_aggregation_query(aggregates)
+            }
+            ExpressionBody::Set(expressions) => {
+                expressions.iter()
+                    .all(|expr| expr.can_be_selected_by_aggregation_query(aggregates))
+            }
+            ExpressionBody::FunctionCall(_, expressions) => {
+                expressions.iter()
+                    .all(|expr| expr.can_be_selected_by_aggregation_query(aggregates))
+            }
+            ExpressionBody::StdFunctionCall(_, expressions) => {
+                expressions.iter()
+                    .all(|expr| expr.can_be_selected_by_aggregation_query(aggregates))
+            }
+        }
+    }
+}
+
+impl cmp::PartialEq for ExpressionBody {
+    fn eq(&self, other: &ExpressionBody) -> bool {
+        match &self {
+            ExpressionBody::Literal(lit) => {
+                if let ExpressionBody::Literal(other_lit) = other {
+                    return lit == other_lit;
+                }
+            }
+            ExpressionBody::Variable(var) => {
+                if let ExpressionBody::Variable(other_var) = other {
+                    return var.is_same_ref(other_var);
+                }
+            }
+            ExpressionBody::BinaryOperation(left, op, right) => {
+                if let ExpressionBody::BinaryOperation(other_left, other_op, other_right) = other {
+                    return (op == other_op) && left.eq(other_left) && right.eq(other_right);
+                }
+            }
+            ExpressionBody::PostfixUnaryOperation(op, expr) => {
+                if let ExpressionBody::PostfixUnaryOperation(other_op, other_expr) = other {
+                    return (op == other_op) && expr.eq(other_expr);
+                }
+            }
+            ExpressionBody::PrefixUnaryOperation(op, expr) => {
+                if let ExpressionBody::PrefixUnaryOperation(other_op, other_expr) = other {
+                    return (op == other_op) && expr.eq(other_expr);
+                }
+            }
+            ExpressionBody::PropertyAccess(expr, prop) => {
+                if let ExpressionBody::PropertyAccess(other_expr, other_prop) = other {
+                    return (prop.path == other_prop.path) && expr.eq(other_expr);
+                }
+            }
+            ExpressionBody::Set(expressions) => {
+                if let ExpressionBody::Set(other_expressions) = other {
+                    return expressions == other_expressions;
+                }
+            }
+            ExpressionBody::FunctionCall(function, arguments) => {
+                if let ExpressionBody::FunctionCall(other_function, other_arguments) = other {
+                    return function.is_same_ref(other_function)
+                        &&
+                        (arguments == other_arguments);
+                }
+            }
+            ExpressionBody::StdFunctionCall(function, arguments) => {
+                if let ExpressionBody::StdFunctionCall(other_function, other_arguments) = other {
+                    return (function == other_function)
+                        &&
+                        (arguments == other_arguments);
+                }
+            }
+        }
+        false
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Expression {
     pub body: ExpressionBody,
     pub pos: ItemPosition,
     pub data_type: DataType,
+}
+
+impl Expression {
+    pub fn literal(pos: ItemPosition, lit: &LiteralAST) -> Result<Self, SemanticError> {
+        let literal: Literal = lit.clone().into();
+        let data_type = literal.literal_type.type_of(pos)?;
+        Ok(Expression {
+            body: ExpressionBody::Literal(literal),
+            pos,
+            data_type,
+        })
+    }
+    pub fn variable(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        ident: &Identifier,
+    ) -> Result<Self, SemanticError> {
+        let var = scope.access_to_variable(ident.item_pos(), ident.text())?;
+        let data_type = var.property_type(&ItemPath { pos, path: PathBuf::empty() })?;
+        Ok(Expression {
+            body: ExpressionBody::Variable(var),
+            pos,
+            data_type,
+        })
+    }
+    pub fn binary_operation(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        op: BinaryOperator,
+        left: &Box<ExpressionAST>,
+        right: &Box<ExpressionAST>,
+    ) -> Result<Self, Vec<SemanticError>>
+    {
+        let (left, right) = (left, right).resolve(scope)?;
+        let data_type = scope.project()
+            .resolve_binary_operation(pos, op, &left.data_type, &right.data_type)
+            .map_err(|e| vec![e])?
+            .output;
+        Ok(Expression {
+            body: ExpressionBody::BinaryOperation(left, op, right),
+            pos,
+            data_type,
+        })
+    }
+    pub fn postfix_unary_operation(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        op: PostfixUnaryOperator,
+        expr: &Box<ExpressionAST>,
+    ) -> Result<Self, Vec<SemanticError>>
+    {
+        let expr = expr.resolve(scope)?;
+        let data_type = scope.project()
+            .resolve_postfix_unary_operation(pos, op, &expr.data_type)
+            .map_err(|e| vec![e])?
+            .output;
+        Ok(Expression {
+            body: ExpressionBody::PostfixUnaryOperation(op, expr),
+            pos,
+            data_type,
+        })
+    }
+    pub fn prefix_unary_operation(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        op: PrefixUnaryOperator,
+        expr: &Box<ExpressionAST>,
+    ) -> Result<Self, Vec<SemanticError>>
+    {
+        let expr = expr.resolve(scope)?;
+        let data_type = scope.project()
+            .resolve_prefix_unary_operation(pos, op, &expr.data_type)
+            .map_err(|e| vec![e])?
+            .output;
+        Ok(Expression {
+            body: ExpressionBody::PrefixUnaryOperation(op, expr),
+            pos,
+            data_type,
+        })
+    }
+    pub fn property_access(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        expr: &Box<ExpressionAST>,
+        path: &ItemPath,
+    ) -> Result<Self, Vec<SemanticError>>
+    {
+        let expr = expr.resolve(scope)?;
+        let data_type = expr.data_type.property_type(pos, path.path.as_path())
+            .map_err(|e| vec![e])?;
+        let path = path.clone();
+        Ok(Expression {
+            body: ExpressionBody::PropertyAccess(expr, path),
+            pos,
+            data_type,
+        })
+    }
+    pub fn set(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        components: &Vec<ExpressionAST>,
+    ) -> Result<Self, Vec<SemanticError>>
+    {
+        let components = components.resolve(scope)?;
+        let fields: Vec<Field> = components.iter()
+            .map(|expr| {
+                let field_type = expr.data_type.clone();
+                let position = expr.pos;
+                Field {
+                    attributes: Vec::new(),
+                    field_type,
+                    position,
+                }
+            })
+            .collect();
+        let data_type = DataType::Compound(CompoundDataType::Tuple(fields));
+        Ok(Expression {
+            body: ExpressionBody::Set(components),
+            pos,
+            data_type,
+        })
+    }
+    pub fn function_call(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        function: &ItemPath,
+        arguments: &Vec<ExpressionAST>,
+    ) -> Result<Self, Vec<SemanticError>>
+    {
+        let module = scope.context().module();
+        let arguments: Vec<Expression> = arguments.resolve(scope)?;
+        let function_item = match module.get_item(function.path.as_path(), &mut Vec::new()) {
+            Some(item) => item,
+            None => {
+                return match function.path.as_path().the_only() {
+                    Some(name) => {
+                        Expression::std_function_call(scope, pos, name, arguments)
+                            .map_err(|e| vec![e])
+                    }
+                    None => Err(vec![SemanticError::unresolved_item(
+                        function.pos,
+                        function.path.clone(),
+                    )]),
+                };
+            }
+        };
+
+        let data_type = {
+            let function_guard = function_item.read();
+            let function = match function_guard.get_function() {
+                Some(func) => func,
+                None => return Err(vec![SemanticError::expected_item_of_another_type(
+                    pos,
+                    SemanticItemType::Function,
+                    function_guard.get_type(),
+                )]),
+            };
+
+            if scope.is_lite_weight() && function.has_side_effects {
+                return Err(vec![SemanticError::not_allowed_here(
+                    pos,
+                    "function with possible side-effects",
+                )]);
+            }
+
+            if arguments.len() != function.arguments.len() {
+                return Err(vec![SemanticError::wrong_arguments_count(
+                    pos,
+                    function.arguments.len(),
+                    arguments.len(),
+                )]);
+            }
+
+            for (i, argument) in arguments.iter().enumerate() {
+                let (_, target_data_type) = function.arguments.get_index(i)
+                    .expect("The argument can not cease to exist immediately after checking the length of the collection");
+                if !argument.data_type.can_cast(target_data_type) {
+                    return Err(vec![SemanticError::cannot_cast_type(
+                        argument.pos,
+                        argument.data_type.clone(),
+                        target_data_type.clone(),
+                    )]);
+                }
+            }
+
+            function.result.clone()
+        };
+        Ok(Expression {
+            body: ExpressionBody::FunctionCall(function_item, arguments),
+            pos,
+            data_type,
+        })
+    }
+    pub fn std_function_call(
+        scope: &SyncRef<FunctionVariableScope>,
+        pos: ItemPosition,
+        name: &str,
+        arguments: Vec<Expression>,
+    ) -> Result<Self, SemanticError> {
+        let function = match scope.project().resolve_stdlib_function(name) {
+            Some(f) => f,
+            None => {
+                let mut path = PathBuf::empty();
+                path.push(name);
+                return Err(SemanticError::unresolved_item(pos, path));
+            }
+        };
+
+        if scope.is_lite_weight() && function.has_side_effects {
+            return Err(SemanticError::not_allowed_here(
+                pos,
+                "function with possible side-effects",
+            ));
+        }
+
+        if !scope.is_aggregate() && function.is_aggregate {
+            return Err(SemanticError::not_allowed_here(
+                pos,
+                "aggregate functions",
+            ));
+        }
+
+        if arguments.len() != function.arguments.len() {
+            return Err(SemanticError::wrong_arguments_count(
+                pos,
+                function.arguments.len(),
+                arguments.len(),
+            ));
+        }
+
+        for (i, argument) in arguments.iter().enumerate() {
+            let target_data_type = function.arguments.get(i)
+                .expect("The argument can not cease to exist immediately after checking the length of the collection");
+            if !argument.data_type.can_cast(target_data_type) {
+                return Err(SemanticError::cannot_cast_type(
+                    argument.pos,
+                    argument.data_type.clone(),
+                    target_data_type.clone(),
+                ));
+            }
+        }
+
+        Ok(Expression {
+            body: ExpressionBody::StdFunctionCall(name.to_string(), arguments),
+            pos,
+            data_type: function.output,
+        })
+    }
+    #[inline]
+    pub fn can_be_selected_by_aggregation_query(&self, aggregates: &Vec<Expression>) -> bool {
+        aggregates.contains(self)
+            || self.body.can_be_selected_by_aggregation_query(aggregates)
+    }
+}
+
+impl cmp::PartialEq for Expression {
+    fn eq(&self, other: &Expression) -> bool {
+        (self.data_type == other.data_type)
+            &&
+            (self.body == other.body)
+    }
 }

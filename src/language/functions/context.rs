@@ -7,6 +7,7 @@ use lexeme_scanner::ItemPosition;
 use language::{
     ItemPath,
     DataType,
+    Expression,
 };
 use project_analysis::{
     Module,
@@ -51,6 +52,8 @@ pub struct FunctionVariableScope {
     parent: Option<ID>,
     context: SyncRef<FunctionContext>,
     variables: Vec<SyncRef<FunctionVariable>>,
+    is_aggregate: bool,
+    is_lite_weight: bool,
 }
 
 impl FunctionVariableScope {
@@ -61,14 +64,34 @@ impl FunctionVariableScope {
             parent,
             context,
             variables: Vec::new(),
+            is_aggregate: false,
+            is_lite_weight: false,
         })
     }
 }
 
 impl SyncRef<FunctionVariableScope> {
-    pub fn child(&self) -> Self {
+    fn _child(&self, is_aggregate_overload: bool, is_lite_weight_overload: bool) -> Self {
         let scope = self.read();
-        scope.context.new_scope(Some(scope.id))
+        let result = scope.context.new_scope(Some(scope.id));
+        {
+            let mut child = result.write();
+            child.is_aggregate = is_aggregate_overload || scope.is_aggregate;
+            child.is_lite_weight = is_lite_weight_overload || scope.is_lite_weight;
+        }
+        result
+    }
+    #[inline]
+    pub fn child(&self) -> Self {
+        self._child(false, false)
+    }
+    #[inline]
+    pub fn aggregate_child(&self) -> Self {
+        self._child(true, false)
+    }
+    #[inline]
+    pub fn lite_weight_child(&self) -> Self {
+        self._child(false, true)
     }
     pub fn get_variable(&self, name: &str) -> Option<SyncRef<FunctionVariable>> {
         let scope = self.read();
@@ -108,6 +131,14 @@ impl SyncRef<FunctionVariableScope> {
     pub fn module(&self) -> SyncRef<Module> { self.context().module() }
     #[inline]
     pub fn project(&self) -> SyncRef<ProjectContext> { self.module().project() }
+    #[inline]
+    pub fn is_aggregate(&self) -> bool {
+        self.read().is_aggregate
+    }
+    #[inline]
+    pub fn is_lite_weight(&self) -> bool {
+        self.read().is_lite_weight
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

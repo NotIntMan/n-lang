@@ -121,14 +121,6 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
 
         let body = self.body.resolve(&root)?;
 
-        // TODO Разработать критерий определения функции как аггрегатной.
-        let is_aggregate = match &body {
-            &FunctionBody::External => {
-                find_attribute(&ctx.1, "aggregate").is_some()
-            },
-            _ => false,
-        };
-
         let has_side_effects = match &body {
             &FunctionBody::External => {
                 find_attribute(&ctx.1, "no_side_effects").is_none()
@@ -144,7 +136,6 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
             result,
             body,
             context,
-            is_aggregate,
             has_side_effects,
         })
     }
@@ -157,6 +148,5 @@ pub struct FunctionDefinition {
     pub result: DataType,
     pub body: FunctionBody,
     pub context: SyncRef<FunctionContext>,
-    pub is_aggregate: bool,
     pub has_side_effects: bool,
 }
