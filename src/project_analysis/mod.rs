@@ -46,3 +46,7 @@ pub use self::new_resolve::*;
 pub mod project_context;
 
 pub use self::project_context::*;
+
+pub mod stdlib;
+
+pub use self::stdlib::*;
