@@ -193,8 +193,8 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                             if !default_value_type.can_cast(&data_type) {
                                 return Err(vec![SemanticError::cannot_cast_type(
                                     self.pos,
-                                    data_type,
                                     default_value_type.clone(),
+                                    data_type,
                                 )]);
                             }
                         }
