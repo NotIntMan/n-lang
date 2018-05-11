@@ -326,7 +326,7 @@ pub fn special_number_literal<'token, 'source>(input: &'token [Token<'source>], 
                         }
                     }
                     if let Some(v) = spec.radix {
-                        if !v.contains(radix) {
+                        if !v.contains(&radix) {
                             return input.err(ParserErrorKind::expected_got(
                                 ParserErrorTokenInfo::from_desc("number literal with a specific radix"),
                                 ParserErrorTokenInfo::from_kind_and_desc(TokenKindLess::NumberLiteral, output.text),
