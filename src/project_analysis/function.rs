@@ -7,7 +7,6 @@ use lexeme_scanner::ItemPosition;
 use language::{
     ItemPath,
     DataType,
-    Expression,
 };
 use project_analysis::{
     Module,

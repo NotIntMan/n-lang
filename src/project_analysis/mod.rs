@@ -16,37 +16,32 @@
 */
 
 pub mod project;
-
 pub use self::project::*;
 
 pub mod error;
-
 pub use self::error::*;
 
 pub mod resolve;
-
 pub use self::resolve::*;
 
 pub mod source;
-
 pub use self::source::*;
 
 pub mod module;
-
 pub use self::module::*;
 
 pub mod item;
-
 pub use self::item::*;
 
 pub mod new_resolve;
-
 pub use self::new_resolve::*;
 
 pub mod project_context;
-
 pub use self::project_context::*;
 
 pub mod stdlib;
-
 pub use self::stdlib::*;
+
+pub mod function;
+
+pub use self::function::*;

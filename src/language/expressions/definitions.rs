@@ -18,14 +18,14 @@ use language::{
     DataType,
     Field,
     ItemPath,
-    FunctionVariableScope,
-    FunctionVariable,
     NumberType,
     PrimitiveDataType,
     StringType,
 };
 use project_analysis::{
     Item,
+    FunctionVariableScope,
+    FunctionVariable,
     SemanticItemType,
     SemanticError,
 };

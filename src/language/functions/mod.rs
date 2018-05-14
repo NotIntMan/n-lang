@@ -24,8 +24,6 @@
 
 pub mod definitions;
 pub mod rules;
-pub mod context;
 
 pub use self::definitions::*;
 pub use self::rules::*;
-pub use self::context::*;

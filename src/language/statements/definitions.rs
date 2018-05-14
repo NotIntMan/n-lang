@@ -12,12 +12,14 @@ use language::{
     DataTypeAST,
     Deleting,
     Inserting,
-    FunctionVariable,
-    FunctionVariableScope,
     Selection,
     Updating,
 };
-use project_analysis::SemanticError;
+use project_analysis::{
+    FunctionVariable,
+    FunctionVariableScope,
+    SemanticError,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CycleType<'source> {

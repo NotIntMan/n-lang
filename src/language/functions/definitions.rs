@@ -11,12 +11,12 @@ use language::{
     DataType,
     DataTypeAST,
     find_attribute,
-    FunctionContext,
-    FunctionVariableScope,
     Statement,
     StatementAST,
 };
 use project_analysis::{
+    FunctionContext,
+    FunctionVariableScope,
     Module,
     SemanticError,
     SemanticItemType,
