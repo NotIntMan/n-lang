@@ -44,7 +44,7 @@ impl UnresolvedModule {
         let source = Box::leak(text.text.clone().into_boxed_str());
         let tokens = match Scanner::scan(source) {
             Ok(tokens) => tokens,
-            Err(error) => return Err(vec![SemanticError::scanner_error(error)]),
+            Err(error) => return SemanticError::scanner_error(error).into_err_vec(),
         };
         let items = match parse(tokens.as_slice(), module) {
             Ok(items) => items,

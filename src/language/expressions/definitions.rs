@@ -676,10 +676,11 @@ impl Expression {
                         Expression::std_function_call(scope, pos, name, arguments)
                             .map_err(|e| vec![e])
                     }
-                    None => Err(vec![SemanticError::unresolved_item(
+                    None => SemanticError::unresolved_item(
                         function.pos,
                         function.path.clone(),
-                    )]),
+                    )
+                        .into_err_vec(),
                 };
             }
         };
@@ -688,37 +689,41 @@ impl Expression {
             let function_guard = function_item.read();
             let function = match function_guard.get_function() {
                 Some(func) => func,
-                None => return Err(vec![SemanticError::expected_item_of_another_type(
+                None => return SemanticError::expected_item_of_another_type(
                     pos,
                     SemanticItemType::Function,
                     function_guard.get_type(),
-                )]),
+                )
+                    .into_err_vec(),
             };
 
             if scope.is_lite_weight() && function.is_lite_weight {
-                return Err(vec![SemanticError::not_allowed_here(
+                return SemanticError::not_allowed_here(
                     pos,
                     "not lite-weight functions",
-                )]);
+                )
+                    .into_err_vec();
             }
 
             if arguments.len() != function.arguments.len() {
-                return Err(vec![SemanticError::wrong_arguments_count(
+                return SemanticError::wrong_arguments_count(
                     pos,
                     function.arguments.len(),
                     arguments.len(),
-                )]);
+                )
+                    .into_err_vec();
             }
 
             for (i, argument) in arguments.iter().enumerate() {
                 let (_, target_data_type) = function.arguments.get_index(i)
                     .expect("The argument can not cease to exist immediately after checking the length of the collection");
                 if !argument.data_type.can_cast(target_data_type) {
-                    return Err(vec![SemanticError::cannot_cast_type(
+                    return SemanticError::cannot_cast_type(
                         argument.pos,
                         argument.data_type.clone(),
                         target_data_type.clone(),
-                    )]);
+                    )
+                        .into_err_vec();
                 }
             }
 

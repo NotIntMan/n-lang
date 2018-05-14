@@ -193,11 +193,12 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                         if let &Some(ref default_value) = &default_value {
                             let default_value_type = default_value.type_of();
                             if !default_value_type.can_cast(&data_type) {
-                                return Err(vec![SemanticError::cannot_cast_type(
+                                return SemanticError::cannot_cast_type(
                                     self.pos,
                                     default_value_type.clone(),
                                     data_type,
-                                )]);
+                                )
+                                    .into_err_vec();
                             }
                         }
                         Some(data_type)

@@ -83,11 +83,12 @@ impl<'source> Resolve<SyncRef<Module>> for TableDefinitionAST<'source> {
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
         let body = match as_unique_identifier(self.body.clone()) {
             Ok(map) => map,
-            Err(name) => return Err(vec![SemanticError::duplicate_definition(
+            Err(name) => return SemanticError::duplicate_definition(
                 name.item_pos(),
                 name.text().to_string(),
                 SemanticItemType::Field,
-            )]),
+            )
+                .into_err_vec(),
         }
             .resolve(ctx)?;
         Ok(TableDefinition {
@@ -347,7 +348,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for ModuleD
                 let mut item_path = path.path.as_path();
                 let item = match ctx.0.resolve_import(item_path) {
                     Some(item) => item,
-                    None => return Err(vec![SemanticError::unresolved_item(path.pos, path.path.clone())]),
+                    None => return SemanticError::unresolved_item(path.pos, path.path.clone()).into_err_vec(),
                 };
                 if *tail == ExternalItemTailAST::Asterisk {
                     let item = item.read();
@@ -355,11 +356,12 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for ModuleD
                         Some(module) => {
                             ctx.0.inject_import_module(module.clone());
                         }
-                        None => return Err(vec![SemanticError::expected_item_of_another_type(
+                        None => return SemanticError::expected_item_of_another_type(
                             path.pos,
                             SemanticItemType::Module,
                             item.get_type(),
-                        )]),
+                        )
+                            .into_err_vec(),
                     }
                 }
                 Ok(item)

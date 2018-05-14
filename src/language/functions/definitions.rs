@@ -94,11 +94,12 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
     fn resolve(&self, ctx: &(SyncRef<Module>, Vec<AttributeAST<'source>>)) -> Result<Self::Result, Vec<Self::Error>> {
         let arguments = match as_unique_identifier(self.arguments.clone()) {
             Ok(map) => map.resolve(&ctx.0)?,
-            Err(name) => return Err(vec![SemanticError::duplicate_definition(
+            Err(name) => return SemanticError::duplicate_definition(
                 name.item_pos(),
                 name.text().to_string(),
                 SemanticItemType::Variable,
-            )])
+            )
+                .into_err_vec()
         };
         let result = match &self.result {
             &Some(ref data_type) => data_type.resolve(&ctx.0)?,

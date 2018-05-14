@@ -528,11 +528,12 @@ impl<'source> Resolve<SyncRef<Module>> for CompoundDataTypeAST<'source> {
             &CompoundDataTypeAST::Structure(ref fields) => Ok(CompoundDataType::Structure(
                 match as_unique_identifier(fields.clone()) {
                     Ok(map) => map.resolve(ctx)?,
-                    Err(name) => return Err(vec![SemanticError::duplicate_definition(
+                    Err(name) => return SemanticError::duplicate_definition(
                         name.item_pos(),
                         name.text().to_string(),
                         SemanticItemType::Field,
-                    )])
+                    )
+                        .into_err_vec()
                 }
             )),
             &CompoundDataTypeAST::Tuple(ref fields) => Ok(CompoundDataType::Tuple(fields.resolve(ctx)?)),
@@ -699,15 +700,16 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
             &DataTypeAST::Reference(ref path) => {
                 let item = match ctx.get_item(path.path.as_path(), &mut vec![]) {
                     Some(item) => item,
-                    None => return Err(vec![SemanticError::unresolved_item(path.pos, path.path.clone())]),
+                    None => return SemanticError::unresolved_item(path.pos, path.path.clone()).into_err_vec(),
                 };
                 let item_type = item.get_type();
                 if item_type != SemanticItemType::DataType {
-                    return Err(vec![SemanticError::expected_item_of_another_type(
+                    return SemanticError::expected_item_of_another_type(
                         path.pos,
                         SemanticItemType::DataType,
                         item_type,
-                    )]);
+                    )
+                        .into_err_vec();
                 }
                 Ok(DataType::Reference(item))
             }

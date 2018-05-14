@@ -243,6 +243,10 @@ impl SemanticError {
     pub fn set_text(&mut self, text: Arc<Text>) {
         self.text = Some(text);
     }
+    #[inline]
+    pub fn into_err_vec<T>(self) -> Result<T, Vec<Self>> {
+        Err(vec![self])
+    }
 }
 
 impl fmt::Display for SemanticError {
