@@ -14,32 +14,32 @@ use language::{
 };
 use super::*;
 
-parser_rule!(join_condition(i) -> JoinCondition<'source> {
+parser_rule!(join_condition(i) -> JoinConditionAST<'source> {
     alt!(i,
         do_parse!(
             apply!(keyword, "on") >>
             x: expression >>
-            (JoinCondition::Expression(x))
+            (JoinConditionAST::Expression(x))
         )
         | do_parse!(
             apply!(keyword, "using") >>
             apply!(symbols, "(") >>
             fields: apply!(comma_list, property_path) >>
             apply!(symbols, ")") >>
-            (JoinCondition::Using(fields))
+            (JoinConditionAST::Using(fields))
         )
     )
 });
 
-parser_rule!(table(i) -> DataSource<'source> {
+parser_rule!(table(i) -> DataSourceAST<'source> {
     do_parse!(i,
         name: module_path >>
         alias: opt!(not_keyword_identifier) >>
-        (DataSource::Table { name, alias })
+        (DataSourceAST::Table { name, alias })
     )
 });
 
-parser_rule!(join_source(i) -> DataSource<'source> {
+parser_rule!(join_source(i) -> DataSourceAST<'source> {
     alt!(i,
         table
         | do_parse!(
@@ -54,12 +54,12 @@ parser_rule!(join_source(i) -> DataSource<'source> {
             apply!(symbols, ")") >>
             opt!(apply!(keyword, "as")) >>
             alias: not_keyword_identifier >>
-            (DataSource::Selection { query: Box::new(query), alias })
+            (DataSourceAST::Selection { query: Box::new(query), alias })
         )
     )
 });
 
-type JoinTail<'source> = (JoinType, Option<JoinCondition<'source>>, DataSource<'source>);
+type JoinTail<'source> = (JoinType, Option<JoinConditionAST<'source>>, DataSourceAST<'source>);
 parser_rule!(join_tail(i) -> JoinTail<'source> {
     alt!(i,
         do_parse!(
@@ -68,7 +68,7 @@ parser_rule!(join_tail(i) -> JoinTail<'source> {
             opt!(apply!(keyword, "outer")) >>
             apply!(keyword, "join") >>
             source: join_source >>
-            ((JoinType::Left, Some(JoinCondition::Natural), source))
+            ((JoinType::Left, Some(JoinConditionAST::Natural), source))
         )
         | do_parse!(
             apply!(keyword, "left") >>
@@ -84,7 +84,7 @@ parser_rule!(join_tail(i) -> JoinTail<'source> {
             opt!(apply!(keyword, "outer")) >>
             apply!(keyword, "join") >>
             source: join_source >>
-            ((JoinType::Right, Some(JoinCondition::Natural), source))
+            ((JoinType::Right, Some(JoinConditionAST::Natural), source))
         )
         | do_parse!(
             apply!(keyword, "right") >>
@@ -100,7 +100,7 @@ parser_rule!(join_tail(i) -> JoinTail<'source> {
             opt!(apply!(keyword, "outer")) >>
             apply!(keyword, "join") >>
             source: join_source >>
-            ((JoinType::Full, Some(JoinCondition::Natural), source))
+            ((JoinType::Full, Some(JoinConditionAST::Natural), source))
         )
         | do_parse!(
             apply!(keyword, "full") >>
@@ -131,9 +131,9 @@ parser_rule!(join_tail(i) -> JoinTail<'source> {
     )
 });
 
-fn fold_join<'source>(mut origin: DataSource<'source>, tails: Vec<JoinTail<'source>>) -> DataSource<'source> {
+fn fold_join<'source>(mut origin: DataSourceAST<'source>, tails: Vec<JoinTail<'source>>) -> DataSourceAST<'source> {
     for (join_type, condition, right) in tails {
-        origin = DataSource::Join {
+        origin = DataSourceAST::Join {
             join_type,
             condition,
             left: Box::new(origin),
@@ -144,7 +144,7 @@ fn fold_join<'source>(mut origin: DataSource<'source>, tails: Vec<JoinTail<'sour
 }
 
 /// Функция, выполняющая разбор источника данных запроса (таблиц и их объединений)
-pub fn data_source<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataSource<'source>> {
+pub fn data_source<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataSourceAST<'source>> {
     do_parse!(input,
         origin: join_source >>
         tails: many0!(join_tail) >>
