@@ -695,10 +695,10 @@ impl Expression {
                 )]),
             };
 
-            if scope.is_lite_weight() && function.has_side_effects {
+            if scope.is_lite_weight() && function.is_lite_weight {
                 return Err(vec![SemanticError::not_allowed_here(
                     pos,
-                    "function with possible side-effects",
+                    "not lite-weight functions",
                 )]);
             }
 
@@ -745,10 +745,10 @@ impl Expression {
             }
         };
 
-        if scope.is_lite_weight() && function.has_side_effects {
+        if scope.is_lite_weight() && function.is_lite_weight {
             return Err(SemanticError::not_allowed_here(
                 pos,
-                "function with possible side-effects",
+                "not lite-weight functions",
             ));
         }
 

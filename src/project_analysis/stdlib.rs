@@ -144,7 +144,7 @@ pub struct StdLibFunction {
     pub arguments: Vec<DataType>,
     pub output: DataType,
     pub is_aggregate: bool,
-    pub has_side_effects: bool,
+    pub is_lite_weight: bool,
 }
 
 impl StdLibFunction {
@@ -155,7 +155,7 @@ impl StdLibFunction {
             arguments: Vec::new(),
             output: DataType::Void,
             is_aggregate: false,
-            has_side_effects: true,
+            is_lite_weight: true,
         }
     }
     #[inline]
@@ -169,13 +169,13 @@ impl StdLibFunction {
         self
     }
     #[inline]
-    pub fn without_side_effects(mut self) -> Self {
-        self.has_side_effects = false;
+    pub fn lite_weight(mut self) -> Self {
+        self.is_lite_weight = false;
         self
     }
     #[inline]
     pub fn aggregate(mut self) -> Self {
         self.is_aggregate = true;
-        self.without_side_effects()
+        self.lite_weight()
     }
 }

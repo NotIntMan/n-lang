@@ -121,12 +121,12 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
 
         let body = self.body.resolve(&root)?;
 
-        let has_side_effects = match &body {
+        let is_lite_weight = match &body {
             &FunctionBody::External => {
-                find_attribute(&ctx.1, "no_side_effects").is_none()
+                find_attribute(&ctx.1, "is_lite_weight").is_some()
             }
             &FunctionBody::Implementation(ref stmt) => {
-                stmt.has_side_effects()
+                stmt.is_lite_weight()
             }
         };
 
@@ -136,7 +136,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
             result,
             body,
             context,
-            has_side_effects,
+            is_lite_weight,
         })
     }
 }
@@ -148,5 +148,5 @@ pub struct FunctionDefinition {
     pub result: DataType,
     pub body: FunctionBody,
     pub context: SyncRef<FunctionContext>,
-    pub has_side_effects: bool,
+    pub is_lite_weight: bool,
 }

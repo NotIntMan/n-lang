@@ -235,10 +235,10 @@ pub enum Statement {
 }
 
 impl Statement {
-    pub fn has_side_effects(&self) -> bool {
+    pub fn is_lite_weight(&self) -> bool {
         match self {
-            &Statement::Nothing => false,
-            &Statement::VariableAssignment { var: _, source: _ } => false,
+            &Statement::Nothing => true,
+            &Statement::VariableAssignment { var: _, source: _ } => true,
         }
     }
 }
