@@ -42,7 +42,7 @@ parser_rule!(select_cache(i) -> bool {
     )
 });
 
-parser_rule!(select_expression(i) -> SelectionExpression<'source> {
+parser_rule!(select_expression(i) -> SelectionExpressionAST<'source> {
     do_parse!(i,
         expr: expression >>
         alias: opt!(do_parse!(
@@ -50,14 +50,14 @@ parser_rule!(select_expression(i) -> SelectionExpression<'source> {
             name: identifier >>
             (name)
         )) >>
-        (SelectionExpression { expr, alias })
+        (SelectionExpressionAST { expr, alias })
     )
 });
 
-parser_rule!(select_result(i) -> SelectionResult<'source> {
+parser_rule!(select_result(i) -> SelectionResultAST<'source> {
     alt!(i,
-        apply!(symbols, "*") => { |_| SelectionResult::All }
-        | apply!(comma_list, select_expression) => { |x| SelectionResult::Some(x) }
+        apply!(symbols, "*") => { |_| SelectionResultAST::All }
+        | apply!(comma_list, select_expression) => { |x| SelectionResultAST::Some(x) }
     )
 });
 
@@ -78,15 +78,15 @@ parser_rule!(select_sorting_order(i) -> SelectionSortingOrder {
     )
 });
 
-parser_rule!(select_sorting_item(i) -> SelectionSortingItem<'source> {
+parser_rule!(select_sorting_item(i) -> SelectionSortingItemAST<'source> {
     do_parse!(i,
         expr: expression >>
         order: select_sorting_order >>
-        (SelectionSortingItem { expr, order })
+        (SelectionSortingItemAST { expr, order })
     )
 });
 
-parser_rule!(pub select_sorting(i, prefix_keyword_text: &'source str) -> Vec<SelectionSortingItem<'source>> {
+parser_rule!(pub select_sorting(i, prefix_keyword_text: &'source str) -> Vec<SelectionSortingItemAST<'source>> {
     do_parse!(i,
         apply!(keyword, prefix_keyword_text) >>
         apply!(keyword, "by") >>
@@ -95,7 +95,7 @@ parser_rule!(pub select_sorting(i, prefix_keyword_text: &'source str) -> Vec<Sel
     )
 });
 
-parser_rule!(select_group_by_clause(i) -> SelectionGroupByClause<'source> {
+parser_rule!(select_group_by_clause(i) -> SelectionGroupByClauseAST<'source> {
     do_parse!(i,
         sorting: apply!(select_sorting, "group") >>
         with_rollup: opt!(do_parse!(
@@ -103,7 +103,7 @@ parser_rule!(select_group_by_clause(i) -> SelectionGroupByClause<'source> {
             apply!(keyword, "rollup") >>
             (())
         )) >>
-        (SelectionGroupByClause { sorting, with_rollup: with_rollup.is_some() })
+        (SelectionGroupByClauseAST { sorting, with_rollup: with_rollup.is_some() })
     )
 });
 
@@ -129,7 +129,7 @@ parser_rule!(selection_limit(i) -> SelectionLimit {
 });
 
 /// Функция, выполняющая разбор запроса выборки
-pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Selection<'source>> {
+pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, SelectionAST<'source>> {
     do_parse!(input,
         apply!(keyword, "select") >>
         distinct: select_distincty >>
@@ -145,7 +145,7 @@ pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         having_clause: opt!(apply!(select_condition, "having")) >>
         order_by_clause: opt!(apply!(select_sorting, "order")) >>
         limit_clause: opt!(selection_limit) >>
-        (Selection {
+        (SelectionAST {
             distinct,
             high_priority: high_priority.is_some(),
             straight_join: straight_join.is_some(),

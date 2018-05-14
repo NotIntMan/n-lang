@@ -1,8 +1,19 @@
 //use helpers::IntoStatic;
+use helpers::{
+    Resolve,
+    SyncRef,
+};
 use parser_basics::Identifier;
 use language::{
     DataSource,
+    DataSourceAST,
+    DataType,
+    Expression,
     ExpressionAST,
+};
+use project_analysis::{
+    FunctionVariableScope,
+    SemanticError,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,9 +25,25 @@ pub enum SelectionResultSize {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SelectionExpression<'source> {
+pub struct SelectionExpressionAST<'source> {
     pub expr: ExpressionAST<'source>,
     pub alias: Option<Identifier<'source>>,
+}
+
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionExpressionAST<'source> {
+    type Result = SelectionExpression;
+    type Error = SemanticError;
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let expr = self.expr.resolve(scope)?;
+        let alias = match &self.alias {
+            Some(ident) => Some(ident.to_string()),
+            None => None,
+        };
+        Ok(SelectionExpression {
+            expr,
+            alias,
+        })
+    }
 }
 
 //impl<'source> IntoStatic for SelectionExpression<'source> {
@@ -31,9 +58,16 @@ pub struct SelectionExpression<'source> {
 //}
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SelectionResult<'source> {
+pub struct SelectionExpression {
+    // TODO Проверка на то, что все SelectionExpression имеют alias, либо все его не имеют для детерминированности определения выходного типа
+    pub expr: Expression,
+    pub alias: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SelectionResultAST<'source> {
     All,
-    Some(Vec<SelectionExpression<'source>>),
+    Some(Vec<SelectionExpressionAST<'source>>),
 }
 
 //impl<'source> IntoStatic for SelectionResult<'source> {
@@ -46,6 +80,26 @@ pub enum SelectionResult<'source> {
 //    }
 //}
 
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionResultAST<'source> {
+    type Result = SelectionResult;
+    type Error = SemanticError;
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let result = match self {
+            SelectionResultAST::All => SelectionResult::All,
+            SelectionResultAST::Some(vec) => SelectionResult::Some(
+                vec.resolve(scope)?
+            ),
+        };
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SelectionResult {
+    All,
+    Some(Vec<SelectionExpression>),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectionSortingOrder {
     Asc,
@@ -53,7 +107,7 @@ pub enum SelectionSortingOrder {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SelectionSortingItem<'source> {
+pub struct SelectionSortingItemAST<'source> {
     pub expr: ExpressionAST<'source>,
     pub order: SelectionSortingOrder,
 }
@@ -69,9 +123,27 @@ pub struct SelectionSortingItem<'source> {
 //    }
 //}
 
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionSortingItemAST<'source> {
+    type Result = SelectionSortingItem;
+    type Error = SemanticError;
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let expr = self.expr.resolve(scope)?;
+        Ok(SelectionSortingItem {
+            expr,
+            order: self.order,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct SelectionGroupByClause<'source> {
-    pub sorting: Vec<SelectionSortingItem<'source>>,
+pub struct SelectionSortingItem {
+    pub expr: Expression,
+    pub order: SelectionSortingOrder,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectionGroupByClauseAST<'source> {
+    pub sorting: Vec<SelectionSortingItemAST<'source>>,
     pub with_rollup: bool,
 }
 
@@ -86,6 +158,24 @@ pub struct SelectionGroupByClause<'source> {
 //    }
 //}
 
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionGroupByClauseAST<'source> {
+    type Result = SelectionGroupByClause;
+    type Error = SemanticError;
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let sorting = self.sorting.resolve(scope)?;
+        Ok(SelectionGroupByClause {
+            sorting,
+            with_rollup: self.with_rollup,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectionGroupByClause {
+    pub sorting: Vec<SelectionSortingItem>,
+    pub with_rollup: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SelectionLimit {
     pub offset: Option<u32>,
@@ -93,18 +183,18 @@ pub struct SelectionLimit {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Selection<'source> {
+pub struct SelectionAST<'source> {
     pub distinct: bool,
     pub high_priority: bool,
     pub straight_join: bool,
     pub result_size: SelectionResultSize,
     pub cache: bool,
-    pub result: SelectionResult<'source>,
-    pub source: DataSource<'source>,
+    pub result: SelectionResultAST<'source>,
+    pub source: DataSourceAST<'source>,
     pub where_clause: Option<ExpressionAST<'source>>,
-    pub group_by_clause: Option<SelectionGroupByClause<'source>>,
+    pub group_by_clause: Option<SelectionGroupByClauseAST<'source>>,
     pub having_clause: Option<ExpressionAST<'source>>,
-    pub order_by_clause: Option<Vec<SelectionSortingItem<'source>>>,
+    pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
     pub limit_clause: Option<SelectionLimit>,
 }
 
@@ -141,3 +231,29 @@ pub struct Selection<'source> {
 //        }
 //    }
 //}
+
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> {
+    type Result = Selection;
+    type Error = SemanticError;
+    fn resolve(&self, _scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Selection {
+    pub distinct: bool,
+    pub high_priority: bool,
+    pub straight_join: bool,
+    pub result_size: SelectionResultSize,
+    pub cache: bool,
+    pub result: SelectionResult,
+    pub source: DataSource,
+    pub where_clause: Option<Expression>,
+    pub group_by_clause: Option<SelectionGroupByClause>,
+    pub having_clause: Option<Expression>,
+    pub order_by_clause: Option<Vec<SelectionSortingItem>>,
+    pub limit_clause: Option<SelectionLimit>,
+    pub result_data_type: DataType,
+}
+//TODO Typeof selection
