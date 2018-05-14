@@ -78,32 +78,39 @@ impl Item {
     #[inline]
     pub fn get_type(&self) -> SemanticItemType {
         match &self.body {
-            &ItemBody::DataType { def: _ } => SemanticItemType::DataType,
-//            &ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
-//            &ItemBody::ImportItem { name: _, original_name: _, ref item } => item.get_type(),
-            &ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
-            &ItemBody::Table { def: _ } => SemanticItemType::Table,
-            &ItemBody::Function { def: _ } => SemanticItemType::Function,
+            ItemBody::DataType { def: _ } => SemanticItemType::DataType,
+//            ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
+//            ItemBody::ImportItem { name: _, original_name: _, ref item } => item.get_type(),
+            ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
+            ItemBody::Table { def: _ } => SemanticItemType::Table,
+            ItemBody::Function { def: _ } => SemanticItemType::Function,
         }
     }
     #[inline]
     pub fn get_data_type(&self) -> Option<&DataTypeDefinition> {
         match &self.body {
-            &ItemBody::DataType { ref def } => Some(def),
+            ItemBody::DataType { def } => Some(def),
             _ => None,
         }
     }
     #[inline]
     pub fn get_module_ref(&self) -> Option<&SyncRef<Module>> {
         match &self.body {
-            &ItemBody::ModuleReference { ref module } => Some(module),
+            ItemBody::ModuleReference { module } => Some(module),
             _ => None,
         }
     }
     #[inline]
     pub fn get_function(&self) -> Option<&FunctionDefinition> {
         match &self.body {
-            &ItemBody::Function { ref def } => Some(def),
+            ItemBody::Function { def } => Some(def),
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn get_table(&self) -> Option<&TableDefinition> {
+        match &self.body {
+            ItemBody::Table { def } => Some(def),
             _ => None,
         }
     }

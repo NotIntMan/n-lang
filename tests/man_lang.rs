@@ -244,7 +244,7 @@ fn simple_join_parses_correctly() {
     });
 }
 
-fn assert_table(source: &DataSource, table_name: &str, table_alias: Option<&str>) {
+fn assert_table(source: &DataSourceAST, table_name: &str, table_alias: Option<&str>) {
     match_it!(source, &DataSource::Table { ref name, ref alias } => {
             assert_eq!(*name, vec![table_name]);
             assert_eq!(*alias, table_alias.map(Identifier::new));
@@ -260,7 +260,7 @@ fn simple_selection_parses_correctly() {
     assert_eq!(query.straight_join, false);
     assert_eq!(query.result_size, SelectionResultSize::Usual);
     assert_eq!(query.cache, false);
-    assert_eq!(query.result, SelectionResult::All);
+    assert_eq!(query.result, SelectionResultAST::All);
     assert_table(&query.source, "foo", None);
     assert_eq!(query.where_clause, None);
     assert_eq!(query.group_by_clause, None);
@@ -278,7 +278,7 @@ fn simple_selection_with_flags_parses_correctly() {
     assert_eq!(query.straight_join, true);
     assert_eq!(query.result_size, SelectionResultSize::Big);
     assert_eq!(query.cache, true);
-    assert_eq!(query.result, SelectionResult::All);
+    assert_eq!(query.result, SelectionResultAST::All);
     assert_table(&query.source, "foo", None);
     assert_eq!(query.where_clause, None);
     assert_eq!(query.group_by_clause, None);
@@ -296,7 +296,7 @@ fn simple_selection_with_filtering_parses_correctly() {
     assert_eq!(query.straight_join, false);
     assert_eq!(query.result_size, SelectionResultSize::Usual);
     assert_eq!(query.cache, false);
-    assert_eq!(query.result, SelectionResult::All);
+    assert_eq!(query.result, SelectionResultAST::All);
     assert_table(&query.source, "foo", None);
     query.where_clause
         .expect("Where clause should contain an expression")
@@ -307,7 +307,7 @@ fn simple_selection_with_filtering_parses_correctly() {
     assert_eq!(query.limit_clause, None);
 }
 
-fn assert_selection_sorting_items(items: &Vec<SelectionSortingItem>, pattern: Vec<(&str, SelectionSortingOrder)>) {
+fn assert_selection_sorting_items(items: &Vec<SelectionSortingItemAST>, pattern: Vec<(&str, SelectionSortingOrder)>) {
     let mut pattern_iterator = pattern.iter();
     for item in items {
         let &(expression_text, order) = pattern_iterator.next()
@@ -317,7 +317,7 @@ fn assert_selection_sorting_items(items: &Vec<SelectionSortingItem>, pattern: Ve
     }
 }
 
-fn assert_selection_result(items: &SelectionResult, pattern: Vec<(&str, Option<&str>)>) {
+fn assert_selection_result(items: &SelectionResultAST, pattern: Vec<(&str, Option<&str>)>) {
     match_it!(items, &SelectionResult::Some(ref items) => {
             let mut pattern_iter = pattern.iter();
             for item in items {
@@ -329,7 +329,7 @@ fn assert_selection_result(items: &SelectionResult, pattern: Vec<(&str, Option<&
         });
 }
 
-fn assert_selection_group_by_clause(clause: &SelectionGroupByClause, pattern: Vec<(&str, SelectionSortingOrder)>, with_rollup: bool) {
+fn assert_selection_group_by_clause(clause: &SelectionGroupByClauseAST, pattern: Vec<(&str, SelectionSortingOrder)>, with_rollup: bool) {
     assert_eq!(clause.with_rollup, with_rollup);
     assert_selection_sorting_items(&clause.sorting, pattern);
 }

@@ -12,7 +12,7 @@ use language::{
     DataTypeAST,
     Deleting,
     Inserting,
-    Selection,
+    SelectionAST,
     Updating,
 };
 use project_analysis::{
@@ -48,7 +48,7 @@ pub enum CycleControlOperator {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatementSourceAST<'source> {
     Expression(ExpressionAST<'source>),
-    Selection(Selection<'source>),
+    Selection(SelectionAST<'source>),
 }
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementSourceAST<'source> {
@@ -56,8 +56,11 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementSourceAST<'so
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
         let result = match self {
-            &StatementSourceAST::Expression(ref expr) => StatementSource::Expression(expr.resolve(scope)?),
-            _ => unimplemented!(),
+            StatementSourceAST::Expression(expr) => StatementSource::Expression(expr.resolve(scope)?),
+            StatementSourceAST::Selection(select) => {
+                let _select = select.resolve(scope)?;
+                unimplemented!()
+            }
         };
         Ok(result)
     }

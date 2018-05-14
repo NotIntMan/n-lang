@@ -1,11 +1,11 @@
 use helpers::Assertion;
 //use helpers::IntoStatic;
 use language::{
-    DataSource,
+    DataSourceAST,
     ExpressionAST,
     ItemPath,
-    Selection,
-    SelectionSortingItem,
+    SelectionAST,
+    SelectionSortingItemAST,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -68,10 +68,10 @@ impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignme
 pub struct Updating<'source> {
     pub low_priority: bool,
     pub ignore: bool,
-    pub source: DataSource<'source>,
+    pub source: DataSourceAST<'source>,
     pub assignments: Vec<UpdatingAssignment<'source>>,
     pub where_clause: Option<ExpressionAST<'source>>,
-    pub order_by_clause: Option<Vec<SelectionSortingItem<'source>>>,
+    pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
     pub limit_clause: Option<u32>,
 }
 
@@ -118,7 +118,7 @@ pub enum InsertingSource<'source> {
     },
     Selection {
         properties: Option<Vec<ItemPath>>,
-        query: Selection<'source>,
+        query: SelectionAST<'source>,
     },
 }
 
@@ -145,7 +145,7 @@ pub enum InsertingSource<'source> {
 pub struct Inserting<'source> {
     pub priority: InsertingPriority,
     pub ignore: bool,
-    pub target: DataSource<'source>,
+    pub target: DataSourceAST<'source>,
     pub source: InsertingSource<'source>,
     pub on_duplicate_key_update: Option<Vec<UpdatingAssignment<'source>>>,
 }
@@ -175,9 +175,9 @@ pub struct Deleting<'source> {
     pub low_priority: bool,
     pub quick: bool,
     pub ignore: bool,
-    pub source: DataSource<'source>,
+    pub source: DataSourceAST<'source>,
     pub where_clause: Option<ExpressionAST<'source>>,
-    pub order_by_clause: Option<Vec<SelectionSortingItem<'source>>>,
+    pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
     pub limit_clause: Option<u32>,
 }
 

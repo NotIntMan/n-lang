@@ -10,7 +10,7 @@ use parser_basics::Identifier;
 use language::{
     Attribute,
     AttributeAST,
-//    CompoundDataType,
+    CompoundDataType,
     DataTypeAST,
     DataType,
     FieldAST,
@@ -99,13 +99,6 @@ impl<'source> Resolve<SyncRef<Module>> for TableDefinitionAST<'source> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct TableDefinition {
-    pub name: String,
-    pub pos: ItemPosition,
-    pub body: IndexMap<String, Field>,
-}
-
 impl<'source> TableDefinitionAST<'source> {
 //    pub fn make_primary_key(&self) -> Result<ItemRef, SemanticError> {
 //        let fields = {
@@ -163,6 +156,20 @@ impl<'source> TableDefinitionAST<'source> {
 //        self.body.try_resolve(context)
 //    }
 //}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableDefinition {
+    pub name: String,
+    pub pos: ItemPosition,
+    pub body: IndexMap<String, Field>,
+}
+
+impl TableDefinition {
+    #[inline]
+    pub fn make_entity_type(&self) -> DataType {
+        DataType::Compound(CompoundDataType::Structure(self.body.clone()))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExternalItemTailAST<'source> {

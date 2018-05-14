@@ -63,7 +63,7 @@ fn do_it() {
             }
 
             fn alpha() {
-                let a: small integer := abs(2 + -3);
+                let a := SELECT * FROM Waves;
             }
         ",
     );

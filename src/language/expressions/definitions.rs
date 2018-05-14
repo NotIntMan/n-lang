@@ -442,6 +442,7 @@ pub enum ExpressionBody {
 }
 
 impl ExpressionBody {
+    // TODO Переделать это. Выражение вида max(min(2+2)) легко ломает эту логику.
     pub fn can_be_selected_by_aggregation_query(&self, aggregates: &Vec<Expression>) -> bool {
         match self {
             ExpressionBody::Literal(_) => true,
