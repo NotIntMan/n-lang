@@ -1,8 +1,10 @@
 use indexmap::IndexMap;
 //use helpers::IntoStatic;
-use helpers::Resolve;
-//use helpers::as_unique_identifier;
-use helpers::SyncRef;
+use helpers::{
+    as_unique_identifier,
+    Resolve,
+    SyncRef,
+};
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use language::{
@@ -76,25 +78,23 @@ pub struct TableDefinitionAST<'source> {
 }
 
 impl<'source> Resolve<SyncRef<Module>> for TableDefinitionAST<'source> {
-    type Result = SyncRef<Item>;
+    type Result = TableDefinition;
     type Error = SemanticError;
-    fn resolve(&self, _ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
-//        let body = match as_unique_identifier(self.body.clone()) {
-//            Ok(map) => map,
-//            Err(name) => return Err(vec![SemanticError::duplicate_definition(
-//                name.item_pos(),
-//                name.text().to_string(),
-//                SemanticItemType::Field,
-//            )]),
-//        }
-//            .resolve(ctx)?;
-//        let name = self.name.to_string();
-//        Ok(TableDefinition {
-//            name: self.name.to_string(),
-//            pos: self.pos,
-//            body,
-//        });
-        unimplemented!()
+    fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
+        let body = match as_unique_identifier(self.body.clone()) {
+            Ok(map) => map,
+            Err(name) => return Err(vec![SemanticError::duplicate_definition(
+                name.item_pos(),
+                name.text().to_string(),
+                SemanticItemType::Field,
+            )]),
+        }
+            .resolve(ctx)?;
+        Ok(TableDefinition {
+            name: self.name.to_string(),
+            pos: self.pos,
+            body,
+        })
     }
 }
 
@@ -312,8 +312,8 @@ pub enum ModuleDefinitionValueAST<'source> {
 impl<'source> ModuleDefinitionValueAST<'source> {
     pub fn name(&'source self) -> &'source str {
         match self {
-            &ModuleDefinitionValueAST::DataType(ref def) => def.name.text(),
-            &ModuleDefinitionValueAST::Import(ref def) => {
+            ModuleDefinitionValueAST::DataType(def) => def.name.text(),
+            ModuleDefinitionValueAST::Import(def) => {
                 match &def.tail {
                     &ExternalItemTailAST::None | &ExternalItemTailAST::Asterisk => {
                         def.path.path.as_path()
@@ -325,7 +325,8 @@ impl<'source> ModuleDefinitionValueAST<'source> {
                     }
                 }
             }
-            &ModuleDefinitionValueAST::Function(ref def) => def.name.text(),
+            ModuleDefinitionValueAST::Function(def) => def.name.text(),
+            ModuleDefinitionValueAST::Table(def) => def.name.text(),
             _ => unimplemented!(),
         }
     }
@@ -337,11 +338,11 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for ModuleD
     #[allow(unused_assignments)]
     fn resolve(&self, ctx: &(SyncRef<Module>, Vec<AttributeAST<'source>>)) -> Result<Self::Result, Vec<Self::Error>> {
         match self {
-            &ModuleDefinitionValueAST::DataType(ref def) => {
+            ModuleDefinitionValueAST::DataType(def) => {
                 Ok(SyncRef::new(def.resolve(&ctx.0)?))
             }
-            &ModuleDefinitionValueAST::Import(
-                ExternalItemImportAST { ref path, ref tail }
+            ModuleDefinitionValueAST::Import(
+                ExternalItemImportAST { path, tail }
             ) => {
                 let mut item_path = path.path.as_path();
                 let item = match ctx.0.resolve_import(item_path) {
@@ -363,9 +364,13 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for ModuleD
                 }
                 Ok(item)
             }
-            &ModuleDefinitionValueAST::Function(ref def) => {
+            ModuleDefinitionValueAST::Function(def) => {
                 let def = def.resolve(ctx)?;
                 Ok(SyncRef::new(Item::function(def)))
+            }
+            ModuleDefinitionValueAST::Table(def) => {
+                let def = def.resolve(&ctx.0)?;
+                Ok(SyncRef::new(Item::table(def)))
             }
             _ => unimplemented!(),
         }

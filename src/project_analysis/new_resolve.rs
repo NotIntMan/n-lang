@@ -55,6 +55,13 @@ fn do_it() {
         "\
             pub struct Complex(double, double)
 
+            table Waves {
+                #[primary_key]
+                #[auto_increment]
+                id: unsigned integer,
+                signal: Complex,
+            }
+
             fn alpha() {
                 let a: small integer := abs(2 + -3);
             }

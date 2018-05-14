@@ -17,7 +17,7 @@ use language::{
 //    ExternalItemImport,
 //    ModuleDefinitionItem,
 ////    ModuleDefinitionValue,
-//    TableDefinition,
+    TableDefinition,
 };
 //use language::others::StaticPath;
 //use super::resolve::{
@@ -50,10 +50,9 @@ pub enum ItemBody {
     ModuleReference {
         module: SyncRef<Module>,
     },
-    //    Table {
-//        def: TableDefinition<'static>,
-//        primary_key: Result<ItemRef, SemanticError>,
-//    },
+    Table {
+        def: TableDefinition,
+    },
     Function {
         def: FunctionDefinition,
     },
@@ -73,13 +72,17 @@ impl Item {
         Item { body: ItemBody::Function { def } }
     }
     #[inline]
+    pub fn table(def: TableDefinition) -> Self {
+        Item { body: ItemBody::Table { def } }
+    }
+    #[inline]
     pub fn get_type(&self) -> SemanticItemType {
         match &self.body {
             &ItemBody::DataType { def: _ } => SemanticItemType::DataType,
 //            &ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
 //            &ItemBody::ImportItem { name: _, original_name: _, ref item } => item.get_type(),
             &ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
-//            &ItemBody::Table { def: _, primary_key: _ } => SemanticItemType::Table,
+            &ItemBody::Table { def: _ } => SemanticItemType::Table,
             &ItemBody::Function { def: _ } => SemanticItemType::Function,
         }
     }
@@ -113,11 +116,12 @@ impl SyncRef<Item> {
         }
         let item = self.read();
         match &item.body {
-            &ItemBody::DataType { def: _ } => {}
-            &ItemBody::ModuleReference { ref module } => {
+            ItemBody::DataType { def: _ } => {}
+            ItemBody::ModuleReference { ref module } => {
                 return module.get_item(path, search_route);
             }
-            &ItemBody::Function { def: _ } => {}
+            ItemBody::Function { def: _ } => {}
+            ItemBody::Table { def: _ } => {}
         }
         None
     }
