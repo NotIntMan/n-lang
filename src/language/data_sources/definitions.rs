@@ -121,8 +121,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                         let var_data_type = var.property_type(&ItemPath {
                             pos,
                             path: PathBuf::empty(),
-                        })
-                            .map_err(|e| vec![e])?;
+                        })?;
                         let entity_type = match var_data_type {
                             DataType::Array(entity_type) => *entity_type,
                             _ => return SemanticError::not_allowed_here(pos, "not array variable").into_err_vec(),
@@ -131,8 +130,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                             Some(alias) => alias.text(),
                             None => name,
                         };
-                        scope.new_variable(pos, new_var_name.to_string(), Some(entity_type))
-                            .map_err(|e| vec![e])?;
+                        scope.new_variable(pos, new_var_name.to_string(), Some(entity_type))?;
                         return Ok(DataSource::Variable { var });
                     }
                 }
@@ -152,8 +150,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                                         pos,
                                         new_var_name.to_string(),
                                         Some(table.make_entity_type()),
-                                    )
-                                        .map_err(|e| vec![e])?;
+                                    )?;
                                 }
                                 None => return SemanticError::expected_item_of_another_type(
                                     name.pos,

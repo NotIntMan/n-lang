@@ -573,8 +573,7 @@ impl Expression {
     {
         let (left, right) = (left, right).resolve(scope)?;
         let data_type = scope.project()
-            .resolve_binary_operation(pos, op, &left.data_type, &right.data_type)
-            .map_err(|e| vec![e])?
+            .resolve_binary_operation(pos, op, &left.data_type, &right.data_type)?
             .output;
         Ok(Expression {
             body: ExpressionBody::BinaryOperation(left, op, right),
@@ -591,8 +590,7 @@ impl Expression {
     {
         let expr = expr.resolve(scope)?;
         let data_type = scope.project()
-            .resolve_postfix_unary_operation(pos, op, &expr.data_type)
-            .map_err(|e| vec![e])?
+            .resolve_postfix_unary_operation(pos, op, &expr.data_type)?
             .output;
         Ok(Expression {
             body: ExpressionBody::PostfixUnaryOperation(op, expr),
@@ -609,8 +607,7 @@ impl Expression {
     {
         let expr = expr.resolve(scope)?;
         let data_type = scope.project()
-            .resolve_prefix_unary_operation(pos, op, &expr.data_type)
-            .map_err(|e| vec![e])?
+            .resolve_prefix_unary_operation(pos, op, &expr.data_type)?
             .output;
         Ok(Expression {
             body: ExpressionBody::PrefixUnaryOperation(op, expr),
@@ -626,8 +623,7 @@ impl Expression {
     ) -> Result<Self, Vec<SemanticError>>
     {
         let expr = expr.resolve(scope)?;
-        let data_type = expr.data_type.property_type(pos, path.path.as_path())
-            .map_err(|e| vec![e])?;
+        let data_type = expr.data_type.property_type(pos, path.path.as_path())?;
         let path = path.clone();
         Ok(Expression {
             body: ExpressionBody::PropertyAccess(expr, path),

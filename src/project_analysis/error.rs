@@ -300,6 +300,13 @@ impl fmt::Display for SemanticError {
     }
 }
 
+impl From<SemanticError> for Vec<SemanticError> {
+    #[inline]
+    fn from(e: SemanticError) -> Self {
+        vec![e]
+    }
+}
+
 //impl Appendable for SemanticError {
 //    fn append(&mut self, other: Self) -> Option<Self> {
 //        let SemanticError { pos, kind, text } = other;

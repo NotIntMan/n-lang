@@ -213,8 +213,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                         }
                     }
                 };
-                let var = ctx.new_variable(name.item_pos(), name.to_string(), data_type)
-                    .map_err(|e| vec![e])?;
+                let var = ctx.new_variable(name.item_pos(), name.to_string(), data_type)?;
                 let stmt = match default_value {
                     Some(source) => Statement::VariableAssignment {
                         var,
