@@ -236,6 +236,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
     type Result = Selection;
     type Error = SemanticError;
     fn resolve(&self, _scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        //TODO Typeof selection
         unimplemented!()
     }
 }
@@ -256,4 +257,3 @@ pub struct Selection {
     pub limit_clause: Option<SelectionLimit>,
     pub result_data_type: DataType,
 }
-//TODO Typeof selection
