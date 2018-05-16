@@ -1,6 +1,7 @@
 use std::u8::MAX as U8MAX;
 use std::fmt;
 use std::cmp;
+use std::sync::Arc;
 //use helpers::IntoStatic;
 use helpers::{
     PathBuf,
@@ -574,7 +575,8 @@ impl Expression {
         let (left, right) = (left, right).resolve(scope)?;
         let data_type = scope.project()
             .resolve_binary_operation(pos, op, &left.data_type, &right.data_type)?
-            .output;
+            .output
+            .clone();
         Ok(Expression {
             body: ExpressionBody::BinaryOperation(left, op, right),
             pos,
@@ -591,7 +593,8 @@ impl Expression {
         let expr = expr.resolve(scope)?;
         let data_type = scope.project()
             .resolve_postfix_unary_operation(pos, op, &expr.data_type)?
-            .output;
+            .output
+            .clone();
         Ok(Expression {
             body: ExpressionBody::PostfixUnaryOperation(op, expr),
             pos,
@@ -608,7 +611,8 @@ impl Expression {
         let expr = expr.resolve(scope)?;
         let data_type = scope.project()
             .resolve_prefix_unary_operation(pos, op, &expr.data_type)?
-            .output;
+            .output
+            .clone();
         Ok(Expression {
             body: ExpressionBody::PrefixUnaryOperation(op, expr),
             pos,
@@ -649,7 +653,7 @@ impl Expression {
                 }
             })
             .collect();
-        let data_type = DataType::Compound(CompoundDataType::Tuple(fields));
+        let data_type = DataType::Compound(CompoundDataType::Tuple(Arc::new(fields)));
         Ok(Expression {
             body: ExpressionBody::Set(components),
             pos,
@@ -784,7 +788,7 @@ impl Expression {
         Ok(Expression {
             body: ExpressionBody::StdFunctionCall(name.to_string(), arguments),
             pos,
-            data_type: function.output,
+            data_type: function.output.clone(),
         })
     }
     #[inline]

@@ -1,4 +1,5 @@
 use std::mem::replace;
+use std::sync::Arc;
 use indexmap::IndexMap;
 use helpers::{
     Path,
@@ -168,26 +169,26 @@ impl SyncRef<ProjectContext> {
         }
         module.get_item(path, &mut Vec::new())
     }
-    pub fn resolve_binary_operation(&self, pos: ItemPosition, operator: BinaryOperator, left: &DataType, right: &DataType) -> Result<StdLibBinaryOperation, SemanticError> {
+    pub fn resolve_binary_operation(&self, pos: ItemPosition, operator: BinaryOperator, left: &DataType, right: &DataType) -> Result<Arc<StdLibBinaryOperation>, SemanticError> {
         match self.read().stdlib.resolve_binary_operation(operator, left, right) {
             Some(op) => Ok(op),
             None => Err(SemanticError::binary_operation_cannot_be_performed(pos, operator, left.clone(), right.clone())),
         }
     }
-    pub fn resolve_postfix_unary_operation(&self, pos: ItemPosition, operator: PostfixUnaryOperator, input: &DataType) -> Result<StdLibPostfixUnaryOperation, SemanticError> {
+    pub fn resolve_postfix_unary_operation(&self, pos: ItemPosition, operator: PostfixUnaryOperator, input: &DataType) -> Result<Arc<StdLibPostfixUnaryOperation>, SemanticError> {
         match self.read().stdlib.resolve_postfix_unary_operation(operator, input) {
             Some(op) => Ok(op),
             None => Err(SemanticError::postfix_unary_operation_cannot_be_performed(pos, operator, input.clone())),
         }
     }
-    pub fn resolve_prefix_unary_operation(&self, pos: ItemPosition, operator: PrefixUnaryOperator, input: &DataType) -> Result<StdLibPrefixUnaryOperation, SemanticError> {
+    pub fn resolve_prefix_unary_operation(&self, pos: ItemPosition, operator: PrefixUnaryOperator, input: &DataType) -> Result<Arc<StdLibPrefixUnaryOperation>, SemanticError> {
         match self.read().stdlib.resolve_prefix_unary_operation(operator, input) {
             Some(op) => Ok(op),
             None => Err(SemanticError::prefix_unary_operation_cannot_be_performed(pos, operator, input.clone())),
         }
     }
     #[inline]
-    pub fn resolve_stdlib_function(&self, name: &str) -> Option<StdLibFunction> {
+    pub fn resolve_stdlib_function(&self, name: &str) -> Option<Arc<StdLibFunction>> {
         self.read().stdlib.resolve_function(name)
     }
 }

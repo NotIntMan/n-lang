@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use indexmap::IndexMap;
 //use helpers::IntoStatic;
 use helpers::{
@@ -82,19 +83,19 @@ impl<'source> Resolve<SyncRef<Module>> for TableDefinitionAST<'source> {
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
         let body = match as_unique_identifier(self.body.clone()) {
-            Ok(map) => map,
+            Ok(map) => Arc::new(map.resolve(ctx)?),
             Err(name) => return SemanticError::duplicate_definition(
                 name.item_pos(),
                 name.text().to_string(),
                 SemanticItemType::Field,
             )
                 .into_err_vec(),
-        }
-            .resolve(ctx)?;
+        };
         Ok(TableDefinition {
             name: self.name.to_string(),
             pos: self.pos,
             body,
+            entity: None,
         })
     }
 }
@@ -161,13 +162,22 @@ impl<'source> TableDefinitionAST<'source> {
 pub struct TableDefinition {
     pub name: String,
     pub pos: ItemPosition,
-    pub body: IndexMap<String, Field>,
+    pub body: Arc<IndexMap<String, Field>>,
+    pub entity: Option<DataType>,
 }
 
 impl TableDefinition {
     #[inline]
-    pub fn make_entity_type(&self) -> DataType {
-        DataType::Compound(CompoundDataType::Structure(self.body.clone()))
+    pub fn make_entity_type(&mut self) -> DataType {
+        let result;
+        self.entity = match &self.entity {
+            Some(data_type) => return data_type.clone(),
+            None => {
+                result = DataType::Compound(CompoundDataType::Structure(self.body.clone()));
+                Some(result.clone())
+            },
+        };
+        result
     }
 }
 

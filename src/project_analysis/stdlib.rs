@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use helpers::SyncRef;
 use language::{
     BinaryOperator,
@@ -25,21 +26,21 @@ impl StdLib {
     }
     #[inline]
     pub fn reg_postfix_unary_operation(&mut self, operation: StdLibPostfixUnaryOperation) {
-        self.reg_element(StdLibElement::PostfixUnaryOperation(operation))
+        self.reg_element(StdLibElement::PostfixUnaryOperation(Arc::new(operation)))
     }
     #[inline]
     pub fn reg_prefix_unary_operation(&mut self, operation: StdLibPrefixUnaryOperation) {
-        self.reg_element(StdLibElement::PrefixUnaryOperation(operation))
+        self.reg_element(StdLibElement::PrefixUnaryOperation(Arc::new(operation)))
     }
     #[inline]
     pub fn reg_binary_operation(&mut self, operation: StdLibBinaryOperation) {
-        self.reg_element(StdLibElement::BinaryOperation(operation))
+        self.reg_element(StdLibElement::BinaryOperation(Arc::new(operation)))
     }
     #[inline]
     pub fn reg_function(&mut self, function: StdLibFunction) {
-        self.reg_element(StdLibElement::Function(function))
+        self.reg_element(StdLibElement::Function(Arc::new(function)))
     }
-    pub fn resolve_postfix_unary_operation(&self, operator: PostfixUnaryOperator, input: &DataType) -> Option<&StdLibPostfixUnaryOperation> {
+    pub fn resolve_postfix_unary_operation(&self, operator: PostfixUnaryOperator, input: &DataType) -> Option<&Arc<StdLibPostfixUnaryOperation>> {
         for element in self.elements.iter() {
             if let &StdLibElement::PostfixUnaryOperation(ref op) = element {
                 if (op.operator == operator) && input.can_cast(&op.input) {
@@ -49,7 +50,7 @@ impl StdLib {
         }
         None
     }
-    pub fn resolve_prefix_unary_operation(&self, operator: PrefixUnaryOperator, input: &DataType) -> Option<&StdLibPrefixUnaryOperation> {
+    pub fn resolve_prefix_unary_operation(&self, operator: PrefixUnaryOperator, input: &DataType) -> Option<&Arc<StdLibPrefixUnaryOperation>> {
         for element in self.elements.iter() {
             if let &StdLibElement::PrefixUnaryOperation(ref op) = element {
                 if (op.operator == operator) && input.can_cast(&op.input) {
@@ -59,7 +60,7 @@ impl StdLib {
         }
         None
     }
-    pub fn resolve_binary_operation(&self, operator: BinaryOperator, left: &DataType, right: &DataType) -> Option<&StdLibBinaryOperation> {
+    pub fn resolve_binary_operation(&self, operator: BinaryOperator, left: &DataType, right: &DataType) -> Option<&Arc<StdLibBinaryOperation>> {
         for element in self.elements.iter() {
             if let &StdLibElement::BinaryOperation(ref op) = element {
                 if (op.operator == operator) && left.can_cast(&op.left) && right.can_cast(&op.right) {
@@ -69,7 +70,7 @@ impl StdLib {
         }
         None
     }
-    pub fn resolve_function(&self, name: &str) -> Option<&StdLibFunction> {
+    pub fn resolve_function(&self, name: &str) -> Option<&Arc<StdLibFunction>> {
         for element in self.elements.iter() {
             if let &StdLibElement::Function(ref function) = element {
                 if function.name == name {
@@ -83,25 +84,25 @@ impl StdLib {
 
 impl SyncRef<StdLib> {
     #[inline]
-    pub fn resolve_postfix_unary_operation(&self, operator: PostfixUnaryOperator, input: &DataType) -> Option<StdLibPostfixUnaryOperation> {
+    pub fn resolve_postfix_unary_operation(&self, operator: PostfixUnaryOperator, input: &DataType) -> Option<Arc<StdLibPostfixUnaryOperation>> {
         self.read()
             .resolve_postfix_unary_operation(operator, input)
             .cloned()
     }
     #[inline]
-    pub fn resolve_prefix_unary_operation(&self, operator: PrefixUnaryOperator, input: &DataType) -> Option<StdLibPrefixUnaryOperation> {
+    pub fn resolve_prefix_unary_operation(&self, operator: PrefixUnaryOperator, input: &DataType) -> Option<Arc<StdLibPrefixUnaryOperation>> {
         self.read()
             .resolve_prefix_unary_operation(operator, input)
             .cloned()
     }
     #[inline]
-    pub fn resolve_binary_operation(&self, operator: BinaryOperator, left: &DataType, right: &DataType) -> Option<StdLibBinaryOperation> {
+    pub fn resolve_binary_operation(&self, operator: BinaryOperator, left: &DataType, right: &DataType) -> Option<Arc<StdLibBinaryOperation>> {
         self.read()
             .resolve_binary_operation(operator, left, right)
             .cloned()
     }
     #[inline]
-    pub fn resolve_function(&self, name: &str) -> Option<StdLibFunction> {
+    pub fn resolve_function(&self, name: &str) -> Option<Arc<StdLibFunction>> {
         self.read()
             .resolve_function(name)
             .cloned()
@@ -110,10 +111,10 @@ impl SyncRef<StdLib> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StdLibElement {
-    PostfixUnaryOperation(StdLibPostfixUnaryOperation),
-    PrefixUnaryOperation(StdLibPrefixUnaryOperation),
-    BinaryOperation(StdLibBinaryOperation),
-    Function(StdLibFunction),
+    PostfixUnaryOperation(Arc<StdLibPostfixUnaryOperation>),
+    PrefixUnaryOperation(Arc<StdLibPrefixUnaryOperation>),
+    BinaryOperation(Arc<StdLibBinaryOperation>),
+    Function(Arc<StdLibFunction>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -123,11 +124,33 @@ pub struct StdLibPostfixUnaryOperation {
     pub output: DataType,
 }
 
+impl StdLibPostfixUnaryOperation {
+    #[inline]
+    pub fn new(operator: PostfixUnaryOperator, input: DataType, output: DataType) -> Self {
+        StdLibPostfixUnaryOperation {
+            operator,
+            input,
+            output,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StdLibPrefixUnaryOperation {
     pub operator: PrefixUnaryOperator,
     pub input: DataType,
     pub output: DataType,
+}
+
+impl StdLibPrefixUnaryOperation {
+    #[inline]
+    pub fn new(operator: PrefixUnaryOperator, input: DataType, output: DataType) -> Self {
+        StdLibPrefixUnaryOperation {
+            operator,
+            input,
+            output,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -136,6 +159,18 @@ pub struct StdLibBinaryOperation {
     pub left: DataType,
     pub right: DataType,
     pub output: DataType,
+}
+
+impl StdLibBinaryOperation {
+    #[inline]
+    pub fn new(operator: BinaryOperator, left: DataType, right: DataType, output: DataType) -> Self {
+        StdLibBinaryOperation {
+            operator,
+            left,
+            right,
+            output,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

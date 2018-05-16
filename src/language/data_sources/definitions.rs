@@ -123,7 +123,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                             path: PathBuf::empty(),
                         })?;
                         let entity_type = match var_data_type {
-                            DataType::Array(entity_type) => *entity_type,
+                            DataType::Array(entity_type) => (*entity_type).clone(),
                             _ => return SemanticError::not_allowed_here(pos, "not array variable").into_err_vec(),
                         };
                         let new_var_name = match alias {
@@ -137,8 +137,9 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                 match scope.module().get_item(name.path.as_path(), &mut Vec::new()) {
                     Some(item) => {
                         {
-                            let item = item.read();
-                            match item.get_table() {
+                            let mut item = item.write();
+                            let item_type = item.get_type();
+                            match item.get_table_mut() {
                                 Some(table) => {
                                     let new_var_name = match alias {
                                         Some(alias) => alias.text(),
@@ -155,7 +156,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                                 None => return SemanticError::expected_item_of_another_type(
                                     name.pos,
                                     SemanticItemType::Table,
-                                    item.get_type(),
+                                    item_type,
                                 )
                                     .into_err_vec(),
                             }
@@ -172,8 +173,12 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                 Ok(DataSource::Join { join_type: *join_type, condition, left, right })
             }
             DataSourceAST::Selection { query, alias } => {
-                let _query = query.resolve(scope)?;
-                let _alias = alias.to_string();
+                let query: Box<Selection> = query.resolve(scope)?;
+                scope.new_variable(
+                    alias.item_pos(),
+                    alias.to_string(),
+                    Some(query.result_data_type.clone()),
+                )?;
                 //TODO Переменная типа typeof selection
                 unimplemented!()
             }

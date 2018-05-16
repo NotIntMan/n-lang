@@ -2,6 +2,7 @@
 
 use std::mem::replace;
 use std::fmt;
+use std::sync::Arc;
 use indexmap::IndexMap;
 use helpers::Assertion;
 //use helpers::IntoStatic;
@@ -440,8 +441,8 @@ pub enum CompoundDataTypeAST<'source> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum CompoundDataType {
-    Structure(IndexMap<String, Field>),
-    Tuple(Vec<Field>),
+    Structure(Arc<IndexMap<String, Field>>),
+    Tuple(Arc<Vec<Field>>),
 }
 
 impl CompoundDataType {
@@ -527,7 +528,7 @@ impl<'source> Resolve<SyncRef<Module>> for CompoundDataTypeAST<'source> {
         match self {
             &CompoundDataTypeAST::Structure(ref fields) => Ok(CompoundDataType::Structure(
                 match as_unique_identifier(fields.clone()) {
-                    Ok(map) => map.resolve(ctx)?,
+                    Ok(map) => Arc::new(map.resolve(ctx)?),
                     Err(name) => return SemanticError::duplicate_definition(
                         name.item_pos(),
                         name.text().to_string(),
@@ -536,7 +537,7 @@ impl<'source> Resolve<SyncRef<Module>> for CompoundDataTypeAST<'source> {
                         .into_err_vec()
                 }
             )),
-            &CompoundDataTypeAST::Tuple(ref fields) => Ok(CompoundDataType::Tuple(fields.resolve(ctx)?)),
+            &CompoundDataTypeAST::Tuple(ref fields) => Ok(CompoundDataType::Tuple(Arc::new(fields.resolve(ctx)?))),
         }
     }
 }
@@ -719,7 +720,7 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DataType {
-    Array(Box<DataType>),
+    Array(Arc<DataType>),
     Compound(CompoundDataType),
     Primitive(PrimitiveDataType),
     Reference(SyncRef<Item>),
@@ -734,19 +735,19 @@ impl DataType {
             None => return Ok(self.clone()),
         };
         match self {
-            &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
+            DataType::Compound(CompoundDataType::Structure(fields)) => {
                 if let Some(field) = fields.get(field_name) {
                     return field.field_type.property_type(pos, path);
                 }
             }
-            &DataType::Compound(CompoundDataType::Tuple(ref fields)) => {
+            DataType::Compound(CompoundDataType::Tuple(fields)) => {
                 if let Some(component) = parse_index(field_name) {
                     if let Some(field) = fields.get(component) {
                         return field.field_type.property_type(pos, path);
                     }
                 }
             }
-            &DataType::Reference(ref item) => {
+            DataType::Reference(item) => {
                 let item = item.read();
                 if let Some(data_type) = item.get_data_type() {
                     return data_type.body.property_type(pos, prop);

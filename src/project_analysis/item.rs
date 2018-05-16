@@ -114,6 +114,13 @@ impl Item {
             _ => None,
         }
     }
+    #[inline]
+    pub fn get_table_mut(&mut self) -> Option<&mut TableDefinition> {
+        match &mut self.body {
+            ItemBody::Table { def } => Some(def),
+            _ => None,
+        }
+    }
 }
 
 impl SyncRef<Item> {
