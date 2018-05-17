@@ -59,35 +59,35 @@ impl<T> Lazy for Option<T> {
     }
 }
 
-#[cfg(test)]
-struct SuperLazy {
-    a: Option<u32>,
-    b: Option<u32>,
-}
-
-#[cfg(test)]
-impl SuperLazy {
-    #[inline]
-    fn new() -> Self {
-        SuperLazy {
-            a: None,
-            b: None,
-        }
-    }
-    #[inline]
-    fn get_a(&mut self) -> &mut u32 {
-        self.a.init_if_not(|| 0)
-    }
-    #[inline]
-    fn get_b(&mut self) -> &mut u32 {
-//        self.b.init_if_not(|| self.get_a().clone())
-        unimplemented!()
-    }
-}
-
-#[test]
-fn a() {
-    let mut s = SuperLazy::new();
-    *s.get_a() += 20;
-    assert_eq!(*s.get_b(), 20);
-}
+//#[cfg(test)]
+//struct SuperLazy {
+//    a: Option<u32>,
+//    b: Option<u32>,
+//}
+//
+//#[cfg(test)]
+//impl SuperLazy {
+//    #[inline]
+//    fn new() -> Self {
+//        SuperLazy {
+//            a: None,
+//            b: None,
+//        }
+//    }
+//    #[inline]
+//    fn get_a(&mut self) -> &mut u32 {
+//        self.a.init_if_not(|| 0)
+//    }
+//    #[inline]
+//    fn get_b(&mut self) -> &mut u32 {
+////        self.b.init_if_not(|| self.get_a().clone())
+//        unimplemented!()
+//    }
+//}
+//
+//#[test]
+//fn a() {
+//    let mut s = SuperLazy::new();
+//    *s.get_a() += 20;
+//    assert_eq!(*s.get_b(), 20);
+//}
