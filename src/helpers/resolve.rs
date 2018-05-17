@@ -7,9 +7,16 @@ pub trait Resolve<Context = ()>: Sized {
     type Error;
     fn resolve(&self, ctx: &Context) -> Result<Self::Result, Vec<Self::Error>>;
 
-    fn map<F, R>(self, mapper: F) -> Map<Self, F>
-        where F: Fn(Self::Result, &Context) -> R,
-    { Map { resolver: self, mapper } }
+    #[inline]
+    fn accumulative_resolve(&self, ctx: &Context, acc: &mut Vec<Self::Error>) -> Option<Self::Result> {
+        match self.resolve(ctx) {
+            Ok(result) => Some(result),
+            Err(mut errors) => {
+                acc.append(&mut errors);
+                None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -23,24 +30,6 @@ impl<C, T> Resolve<C> for Value<T>
     #[inline]
     fn resolve(&self, _ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
         Ok(self.0.clone())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Map<T, F> {
-    resolver: T,
-    mapper: F,
-}
-
-impl<C, T, F, R> Resolve<C> for Map<T, F>
-    where
-        T: Resolve<C>,
-        F: Fn(T::Result, &C) -> R,
-{
-    type Result = R;
-    type Error = T::Error;
-    fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
-        Ok((self.mapper)(self.resolver.resolve(ctx)?, ctx))
     }
 }
 
