@@ -87,6 +87,17 @@ pub enum SemanticErrorKind {
     NotAllowedHere {
         feature: &'static str,
     },
+    NotAllowedInside {
+        feature: &'static str,
+        output_feature: &'static str,
+    },
+    ExpectedExpressionOfAnotherType {
+        expected: DataType,
+        got: DataType,
+    },
+    CannotModifyReadOnlyVariable {
+        name: String,
+    },
 }
 
 impl Default for SemanticErrorKind {
@@ -98,25 +109,28 @@ impl Default for SemanticErrorKind {
 impl fmt::Display for SemanticErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &SemanticErrorKind::Empty => write!(f, "empty error"),
-            &SemanticErrorKind::UnresolvedItem { ref path } => write!(f, "unresolved item {}", path.data),
-            &SemanticErrorKind::SuperOfRoot => write!(f, "cannot get 'super' of root module"),
-            &SemanticErrorKind::ItemNameNotSpecified => write!(f, "name of using item should be specified"),
-            &SemanticErrorKind::DuplicateDefinition { ref name, item_type } => write!(f, "there is already declared {} name {}", item_type, name),
-            &SemanticErrorKind::ScannerError { ref kind } => write!(f, "{}", kind),
-            &SemanticErrorKind::ParserError { ref kind } => write!(f, "{}", kind),
-            &SemanticErrorKind::ExpectedItemOfAnotherType { ref expected, ref got } => write!(f, "{} expected here, got {}", expected, got),
-            &SemanticErrorKind::EmptyPrimaryKey => write!(f, "empty primary key"),
-            &SemanticErrorKind::NotInScope { ref name } => write!(f, "{} is not in the scope", name),
-            &SemanticErrorKind::WrongProperty { ref property } => write!(f, "property {} is not in the scope", property),
-            &SemanticErrorKind::VariableTypeIsUnknown { ref name } => write!(f, "type of variable {} is unknown", name),
-            &SemanticErrorKind::NotSupportedYet { ref feature } => write!(f, "{} is not supported yet", feature),
-            &SemanticErrorKind::WrongArgumentsCount { ref expected, ref got } => write!(f, "expected {} arguments, got {}", expected, got),
-            &SemanticErrorKind::CannotCastType { ref source, ref target } => write!(f, "cannot cast type {} to {}", source, target),
-            &SemanticErrorKind::BinaryOperationCannotBePerformed { ref operator, ref left, ref right } => write!(f, "operation \"{}\" cannot be performed on {} and {}", operator, left, right),
-            &SemanticErrorKind::PostfixUnaryOperationCannotBePerformed { ref operator, ref input } => write!(f, "operation \"{}\" cannot be performed on {}", operator, input),
-            &SemanticErrorKind::PrefixUnaryOperationCannotBePerformed { ref operator, ref input } => write!(f, "operation \"{}\" cannot be performed on {}", operator, input),
-            &SemanticErrorKind::NotAllowedHere { ref feature } => write!(f, "{} is not allowed here", feature),
+            SemanticErrorKind::Empty => write!(f, "empty error"),
+            SemanticErrorKind::UnresolvedItem { path } => write!(f, "unresolved item {}", path.data),
+            SemanticErrorKind::SuperOfRoot => write!(f, "cannot get 'super' of root module"),
+            SemanticErrorKind::ItemNameNotSpecified => write!(f, "name of using item should be specified"),
+            SemanticErrorKind::DuplicateDefinition { name, item_type } => write!(f, "there is already declared {} name {}", item_type, name),
+            SemanticErrorKind::ScannerError { kind } => write!(f, "{}", kind),
+            SemanticErrorKind::ParserError { kind } => write!(f, "{}", kind),
+            SemanticErrorKind::ExpectedItemOfAnotherType { expected, got } => write!(f, "{} expected here, got {}", expected, got),
+            SemanticErrorKind::EmptyPrimaryKey => write!(f, "empty primary key"),
+            SemanticErrorKind::NotInScope { name } => write!(f, "{} is not in the scope", name),
+            SemanticErrorKind::WrongProperty { property } => write!(f, "property {} is not in the scope", property),
+            SemanticErrorKind::VariableTypeIsUnknown { name } => write!(f, "type of variable {} is unknown", name),
+            SemanticErrorKind::NotSupportedYet { feature } => write!(f, "{} is not supported yet", feature),
+            SemanticErrorKind::WrongArgumentsCount { expected, got } => write!(f, "expected {} arguments, got {}", expected, got),
+            SemanticErrorKind::CannotCastType { source, target } => write!(f, "cannot cast type {} to {}", source, target),
+            SemanticErrorKind::BinaryOperationCannotBePerformed { operator, left, right } => write!(f, "operation \"{}\" cannot be performed on {} and {}", operator, left, right),
+            SemanticErrorKind::PostfixUnaryOperationCannotBePerformed { operator, input } => write!(f, "operation \"{}\" cannot be performed on {}", operator, input),
+            SemanticErrorKind::PrefixUnaryOperationCannotBePerformed { operator, input } => write!(f, "operation \"{}\" cannot be performed on {}", operator, input),
+            SemanticErrorKind::NotAllowedHere { feature } => write!(f, "{} is not allowed here", feature),
+            SemanticErrorKind::NotAllowedInside { feature, output_feature } => write!(f, "{} is not allowed inside {}", feature, output_feature),
+            SemanticErrorKind::ExpectedExpressionOfAnotherType { expected, got } => write!(f, "expected expression of type {}, got {}", expected, got),
+            SemanticErrorKind::CannotModifyReadOnlyVariable { name } => write!(f, "can't modify read-only variable {}", name),
         }
     }
 }
@@ -221,6 +235,18 @@ impl SemanticError {
     #[inline]
     pub fn not_allowed_here(pos: ItemPosition, feature: &'static str) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::NotAllowedHere { feature }, text: None }
+    }
+    #[inline]
+    pub fn not_allowed_inside(pos: ItemPosition, feature: &'static str, output_feature: &'static str) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::NotAllowedInside { feature, output_feature }, text: None }
+    }
+    #[inline]
+    pub fn expected_expression_of_another_type(pos: ItemPosition, expected: DataType, got: DataType) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::ExpectedExpressionOfAnotherType { expected, got }, text: None }
+    }
+    #[inline]
+    pub fn cannot_modify_readonly_variable(pos: ItemPosition, name: String) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::CannotModifyReadOnlyVariable { name }, text: None }
     }
     #[inline]
     pub fn set_text(&mut self, text: Arc<Text>) {

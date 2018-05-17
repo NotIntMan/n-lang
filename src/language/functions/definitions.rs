@@ -80,8 +80,9 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
             let &(ident, _) = self.arguments.iter()
                 .find(|&&(ref ident, _)| ident.text() == name)
                 .expect("The argument has already been preprocessed and its name can not not exist in the input data");
-            if let Err(error) = root.new_variable(ident.item_pos(), name.to_string(), Some(data_type.clone())) {
-                errors.push(error);
+            match root.new_variable(ident.item_pos(), name.to_string(), Some(data_type.clone())) {
+                Ok(var) => var.make_read_only(),
+                Err(error) => errors.push(error),
             }
         }
 

@@ -28,6 +28,7 @@ use project_analysis::{
     FunctionVariable,
     SemanticItemType,
     SemanticError,
+    StdLibFunction,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -410,42 +411,7 @@ pub enum ExpressionBody {
     PropertyAccess(Box<Expression>, ItemPath),
     Set(Vec<Expression>),
     FunctionCall(SyncRef<Item>, Vec<Expression>),
-    StdFunctionCall(String, Vec<Expression>),
-}
-
-impl ExpressionBody {
-    // TODO Переделать это. Выражение вида max(min(2+2)) легко ломает эту логику.
-    pub fn can_be_selected_by_aggregation_query(&self, aggregates: &Vec<Expression>) -> bool {
-        match self {
-            ExpressionBody::Literal(_) => true,
-            ExpressionBody::Variable(_) => false,
-            ExpressionBody::BinaryOperation(left, _, right) => {
-                left.can_be_selected_by_aggregation_query(aggregates)
-                    && right.can_be_selected_by_aggregation_query(aggregates)
-            }
-            ExpressionBody::PostfixUnaryOperation(_, expr) => {
-                expr.can_be_selected_by_aggregation_query(aggregates)
-            }
-            ExpressionBody::PrefixUnaryOperation(_, expr) => {
-                expr.can_be_selected_by_aggregation_query(aggregates)
-            }
-            ExpressionBody::PropertyAccess(expr, _) => {
-                expr.can_be_selected_by_aggregation_query(aggregates)
-            }
-            ExpressionBody::Set(expressions) => {
-                expressions.iter()
-                    .all(|expr| expr.can_be_selected_by_aggregation_query(aggregates))
-            }
-            ExpressionBody::FunctionCall(_, expressions) => {
-                expressions.iter()
-                    .all(|expr| expr.can_be_selected_by_aggregation_query(aggregates))
-            }
-            ExpressionBody::StdFunctionCall(_, expressions) => {
-                expressions.iter()
-                    .all(|expr| expr.can_be_selected_by_aggregation_query(aggregates))
-            }
-        }
-    }
+    StdFunctionCall(Arc<StdLibFunction>, Vec<Expression>),
 }
 
 impl cmp::PartialEq for ExpressionBody {
@@ -529,11 +495,19 @@ impl Expression {
     ) -> Result<Self, SemanticError> {
         let var = scope.access_to_variable(ident.item_pos(), ident.text())?;
         let data_type = var.property_type(&ItemPath { pos, path: PathBuf::empty() })?;
-        Ok(Expression {
+        Ok(Expression::variable_access(var, pos, data_type))
+    }
+    #[inline]
+    pub fn variable_access(
+        var: SyncRef<FunctionVariable>,
+        pos: ItemPosition,
+        data_type: DataType,
+    ) -> Self {
+        Expression {
             body: ExpressionBody::Variable(var),
             pos,
             data_type,
-        })
+        }
     }
     pub fn binary_operation(
         scope: &SyncRef<FunctionVariableScope>,
@@ -616,11 +590,9 @@ impl Expression {
         let fields: Vec<Field> = components.iter()
             .map(|expr| {
                 let field_type = expr.data_type.clone();
-                let position = expr.pos;
                 Field {
                     attributes: Vec::new(),
                     field_type,
-                    position,
                 }
             })
             .collect();
@@ -689,14 +661,7 @@ impl Expression {
             for (i, argument) in arguments.iter().enumerate() {
                 let (_, target_data_type) = function.arguments.get_index(i)
                     .expect("The argument can not cease to exist immediately after checking the length of the collection");
-                if !argument.data_type.can_cast(target_data_type) {
-                    return SemanticError::cannot_cast_type(
-                        argument.pos,
-                        argument.data_type.clone(),
-                        target_data_type.clone(),
-                    )
-                        .into_err_vec();
-                }
+                argument.should_cast_to_type(target_data_type)?;
             }
 
             function.result.clone()
@@ -747,25 +712,151 @@ impl Expression {
         for (i, argument) in arguments.iter().enumerate() {
             let target_data_type = function.arguments.get(i)
                 .expect("The argument can not cease to exist immediately after checking the length of the collection");
-            if !argument.data_type.can_cast(target_data_type) {
-                return Err(SemanticError::cannot_cast_type(
-                    argument.pos,
-                    argument.data_type.clone(),
-                    target_data_type.clone(),
-                ));
-            }
+            argument.should_cast_to_type(target_data_type)?;
         }
 
+        let data_type = function.output.clone();
+
         Ok(Expression {
-            body: ExpressionBody::StdFunctionCall(name.to_string(), arguments),
+            body: ExpressionBody::StdFunctionCall(function, arguments),
             pos,
-            data_type: function.output.clone(),
+            data_type,
         })
     }
     #[inline]
-    pub fn can_be_selected_by_aggregation_query(&self, aggregates: &Vec<Expression>) -> bool {
-        aggregates.contains(self)
-            || self.body.can_be_selected_by_aggregation_query(aggregates)
+    pub fn can_expressions_be_selected_by_aggregation_query<'a, 'b>(
+        expressions: impl IntoIterator<Item=&'a Expression>,
+        aggregates: impl Clone + IntoIterator<Item=&'b Expression>,
+    ) -> Result<bool, Vec<SemanticError>> {
+        for expression in expressions {
+            if !expression.can_be_selected_by_aggregation_query(aggregates.clone())? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+    fn _is_in_aggregates<'a>(&self, aggregates: impl IntoIterator<Item=&'a Expression>) -> bool {
+        for aggregate in aggregates {
+            if self == aggregate {
+                return true;
+            }
+        }
+        false
+    }
+    pub fn can_be_selected_by_aggregation_query<'a>(&self, aggregates: impl Clone + IntoIterator<Item=&'a Expression>) -> Result<bool, Vec<SemanticError>> {
+        if self._is_in_aggregates(aggregates.clone()) {
+            return Ok(true);
+        }
+        match &self.body {
+            ExpressionBody::Literal(_) => Ok(true),
+            ExpressionBody::Variable(_) => Ok(false),
+            ExpressionBody::BinaryOperation(left, _, right) => {
+                Ok(
+                    left.can_be_selected_by_aggregation_query(aggregates.clone())?
+                        && right.can_be_selected_by_aggregation_query(aggregates)?
+                )
+            }
+            ExpressionBody::PostfixUnaryOperation(_, expr) => {
+                expr.can_be_selected_by_aggregation_query(aggregates)
+            }
+            ExpressionBody::PrefixUnaryOperation(_, expr) => {
+                expr.can_be_selected_by_aggregation_query(aggregates)
+            }
+            ExpressionBody::PropertyAccess(expr, _) => {
+                expr.can_be_selected_by_aggregation_query(aggregates)
+            }
+            ExpressionBody::Set(expressions) => {
+                Expression::can_expressions_be_selected_by_aggregation_query(expressions, aggregates)
+            }
+            ExpressionBody::FunctionCall(_, expressions) => {
+                Expression::can_expressions_be_selected_by_aggregation_query(expressions, aggregates)
+            }
+            ExpressionBody::StdFunctionCall(function, expressions) => {
+                if function.is_aggregate {
+                    let mut errors = Vec::new();
+                    for expression in expressions.iter() {
+                        if expression.is_aggregate() {
+                            errors.push(SemanticError::not_allowed_inside(
+                                expression.pos,
+                                "aggregate expressions",
+                                "aggregate function's argument",
+                            ));
+                        }
+                    }
+                    if !errors.is_empty() {
+                        return Err(errors);
+                    }
+                    Ok(true)
+                } else {
+                    Expression::can_expressions_be_selected_by_aggregation_query(expressions, aggregates)
+                }
+            }
+        }
+    }
+    #[inline]
+    pub fn is_aggregate(&self) -> bool {
+        match &self.body {
+            ExpressionBody::StdFunctionCall(function, _) => {
+                function.is_aggregate
+            }
+            _ => false,
+        }
+    }
+    pub fn can_be_named(&self) -> Option<String> {
+        match &self.body {
+            ExpressionBody::Variable(var) => {
+                Some(
+                    var.read()
+                        .name()
+                        .to_string()
+                )
+            }
+            ExpressionBody::PropertyAccess(_, path) => {
+                path.path.as_path()
+                    .pop_right()
+                    .map(str::to_string)
+            }
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn should_cast_to_type(&self, target: &DataType) -> Result<(), SemanticError> {
+        self.data_type.should_cast_to(self.pos, target)
+    }
+    pub fn is_lite_weight(&self) -> bool {
+        match &self.body {
+            ExpressionBody::Literal(_) => true,
+            ExpressionBody::Variable(_) => false,
+            ExpressionBody::BinaryOperation(left, _, right) => {
+                left.is_lite_weight() && right.is_lite_weight()
+            }
+            ExpressionBody::PostfixUnaryOperation(_, expr) => {
+                expr.is_lite_weight()
+            }
+            ExpressionBody::PrefixUnaryOperation(_, expr) => {
+                expr.is_lite_weight()
+            }
+            ExpressionBody::PropertyAccess(expr, _) => {
+                expr.is_lite_weight()
+            }
+            ExpressionBody::Set(expressions) => {
+                expressions.iter().all(|expr| expr.is_lite_weight())
+            }
+            ExpressionBody::FunctionCall(function, expressions) => {
+                let guard = function.read();
+                match guard.get_function() {
+                    Some(function) => {
+                        function.is_lite_weight
+                            && expressions.iter().all(|expr| expr.is_lite_weight())
+                    }
+                    None => false,
+                }
+            }
+            ExpressionBody::StdFunctionCall(function, expressions) => {
+                function.is_lite_weight
+                    && expressions.iter().all(|expr| expr.is_lite_weight())
+            }
+        }
     }
 }
 

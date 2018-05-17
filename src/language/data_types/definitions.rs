@@ -375,7 +375,6 @@ pub struct FieldAST<'source> {
 pub struct Field {
     pub attributes: Vec<Attribute>,
     pub field_type: DataType,
-    pub position: ItemPosition,
 }
 
 impl<'source> Assertion for FieldAST<'source> {
@@ -396,7 +395,6 @@ impl<'source> Resolve<SyncRef<Module>> for FieldAST<'source> {
         Ok(Field {
             attributes,
             field_type,
-            position: self.position,
         })
     }
 }
@@ -592,6 +590,8 @@ pub enum DataType {
     Void,
 }
 
+pub const BOOLEAN_TYPE: DataType = DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean));
+
 impl DataType {
     pub fn property_type(&self, pos: ItemPosition, prop: Path) -> Result<DataType, SemanticError> {
         let mut path = prop;
@@ -659,25 +659,45 @@ impl DataType {
         }
         false
     }
+    pub fn should_cast_to(&self, pos: ItemPosition, target: &DataType) -> Result<(), SemanticError> {
+        if self.can_cast(target) {
+            Ok(())
+        } else {
+            Err(SemanticError::cannot_cast_type(
+                pos,
+                self.clone(),
+                target.clone(),
+            ))
+        }
+    }
 }
 
+//TODO Переделать это. Compound(Structure({"id": Field { attributes: [Attribute { name: "primary_key", arguments... - это не описание типа.
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &DataType::Array(ref subtype) => write!(f, "[{}]", subtype),
             &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
-                let mut d = f.debug_struct("");
-                for (name, field) in fields.iter() {
-                    d.field(&name, &field.field_type);
+                write!(f, "{{")?;
+                let mut fields = fields.iter();
+                if let Some((name, field)) = fields.next() {
+                    write!(f, "{}: {}", name, field.field_type)?;
                 }
-                d.finish()
+                for (name, field) in fields {
+                    write!(f, ", {}: {}", name, field.field_type)?;
+                }
+                write!(f, "}}")
             }
             &DataType::Compound(CompoundDataType::Tuple(ref components)) => {
-                let mut d = f.debug_tuple("");
-                for component in components.iter() {
-                    d.field(&component.field_type);
+                write!(f, "(")?;
+                let mut components = components.iter();
+                if let Some(component) = components.next() {
+                    write!(f, "{}", component.field_type)?;
                 }
-                d.finish()
+                for component in components {
+                    write!(f, ", {}", component.field_type)?;
+                }
+                write!(f, ")")
             }
             &DataType::Primitive(ref primitive) => write!(f, "{}", primitive),
             &DataType::Reference(ref refer) => {

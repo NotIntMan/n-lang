@@ -3,10 +3,12 @@ use parser_basics::{
     comma_list,
     identifier,
 //    Identifier,
+    item_position,
     keyword,
     none,
     ParserResult,
     symbols,
+    symbol_position,
     u32_literal,
 };
 use language::{
@@ -56,16 +58,26 @@ parser_rule!(select_expression(i) -> SelectionExpressionAST<'source> {
 
 parser_rule!(select_result(i) -> SelectionResultAST<'source> {
     alt!(i,
-        apply!(symbols, "*") => { |_| SelectionResultAST::All }
+        do_parse!(
+            begin: symbol_position >>
+            apply!(symbols, "*") >>
+            pos: apply!(item_position, begin) >>
+            (SelectionResultAST::All(pos))
+        )
         | apply!(comma_list, select_expression) => { |x| SelectionResultAST::Some(x) }
     )
 });
 
 parser_rule!(pub select_condition(i, prefix_keyword_text: &'source str) -> ExpressionAST<'source> {
     do_parse!(i,
+        begin: symbol_position >>
         apply!(keyword, prefix_keyword_text) >>
         expr: expression >>
-        (expr)
+        ({
+            let mut expr = expr;
+            expr.pos.begin = begin;
+            expr
+        })
     )
 });
 
@@ -97,13 +109,15 @@ parser_rule!(pub select_sorting(i, prefix_keyword_text: &'source str) -> Vec<Sel
 
 parser_rule!(select_group_by_clause(i) -> SelectionGroupByClauseAST<'source> {
     do_parse!(i,
+        begin: symbol_position >>
         sorting: apply!(select_sorting, "group") >>
         with_rollup: opt!(do_parse!(
             apply!(keyword, "with") >>
             apply!(keyword, "rollup") >>
             (())
         )) >>
-        (SelectionGroupByClauseAST { sorting, with_rollup: with_rollup.is_some() })
+        pos: apply!(item_position, begin) >>
+        (SelectionGroupByClauseAST { sorting, with_rollup: with_rollup.is_some(), pos })
     )
 });
 

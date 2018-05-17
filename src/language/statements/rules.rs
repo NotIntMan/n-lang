@@ -1,4 +1,3 @@
-use helpers::extract;
 use lexeme_scanner::Token;
 use parser_basics::{
     identifier,
@@ -14,6 +13,7 @@ use language::{
     deleting,
     expression,
     inserting,
+    property_path,
     selection,
     updating,
 };
@@ -50,11 +50,11 @@ parser_rule!(variable_definition(i) -> StatementASTBody<'source> {
 
 parser_rule!(variable_assignment(i) -> StatementASTBody<'source> {
     do_parse!(i,
-        name: identifier >>
+        path: property_path >>
         apply!(symbols, ":=") >>
         source: stmt_source >>
         (StatementASTBody::VariableAssignment {
-            name,
+            path,
             source,
         })
     )
@@ -83,7 +83,7 @@ parser_rule!(simple_cycle(i) -> StatementASTBody<'source> {
         apply!(keyword, "loop") >>
         body: map!(block, |stmt| Box::new(stmt)) >>
         (StatementASTBody::Cycle {
-            cycle_type: CycleType::Simple,
+            cycle_type: CycleTypeAST::Simple,
             body,
         })
     )
@@ -95,7 +95,7 @@ parser_rule!(pre_predicated_cycle(i) -> StatementASTBody<'source> {
         predicate: expression >>
         body: map!(block, |stmt| Box::new(stmt)) >>
         (StatementASTBody::Cycle {
-            cycle_type: CycleType::PrePredicated(predicate),
+            cycle_type: CycleTypeAST::PrePredicated(predicate),
             body,
         })
     )
@@ -108,7 +108,7 @@ parser_rule!(post_predicated_cycle(i) -> StatementASTBody<'source> {
         apply!(keyword, "while") >>
         predicate: expression >>
         (StatementASTBody::Cycle {
-            cycle_type: CycleType::PostPredicated(predicate),
+            cycle_type: CycleTypeAST::PostPredicated(predicate),
             body,
         })
     )
@@ -145,17 +145,7 @@ parser_rule!(pub block(i) -> StatementAST<'source> {
         statements: apply!(list, statement, prepare!(symbols(";"))) >>
         apply!(symbols, "}") >>
         pos: apply!(item_position, begin) >>
-        ({
-            let body = match statements.len() {
-                0 => StatementASTBody::Nothing,
-                1 => {
-                    let mut statements = statements;
-                    extract(&mut statements[0]).body
-                },
-                _ => StatementASTBody::Block { statements },
-            };
-            StatementAST { body, pos }
-        })
+        (StatementAST { body: StatementASTBody::Block { statements }, pos })
     )
 });
 

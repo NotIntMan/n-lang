@@ -139,14 +139,15 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                 Ok(DataSource::Join { join_type: *join_type, condition, left, right })
             }
             DataSourceAST::Selection { query, alias } => {
-                let query: Box<Selection> = query.resolve(scope)?;
+                let scope = scope.parent()
+                    .expect("Sub-selection cannot resolve on scope without parent (because of isolated scope reasons)");
+                let query: Box<Selection> = query.resolve(&scope)?;
                 scope.new_variable(
                     alias.item_pos(),
                     alias.to_string(),
                     Some(query.result_data_type.clone()),
                 )?;
-                //TODO Переменная типа typeof selection
-                unimplemented!()
+                Ok(DataSource::Selection { query, alias: alias.to_string() })
             }
         }
     }

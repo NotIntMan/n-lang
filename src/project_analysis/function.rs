@@ -20,28 +20,56 @@ pub struct FunctionVariable {
     name: String,
     pos: ItemPosition,
     data_type: Option<DataType>,
+    is_read_only: bool,
 }
 
 impl FunctionVariable {
     #[inline]
-    fn new(pos: ItemPosition, name: String, data_type: Option<DataType>) -> SyncRef<Self> {
+    fn new(pos: ItemPosition, name: String, data_type: Option<DataType>, is_read_only: bool) -> SyncRef<Self> {
         SyncRef::new(FunctionVariable {
             name,
             pos,
             data_type,
+            is_read_only,
         })
+    }
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+    #[inline]
+    pub fn data_type(&self) -> Option<&DataType> {
+        match &self.data_type {
+            Some(data_type) => Some(data_type),
+            None => None,
+        }
     }
 }
 
 impl SyncRef<FunctionVariable> {
+    pub fn data_type(&self, pos: ItemPosition) -> Result<DataType, SemanticError> {
+        match self.read().data_type() {
+            Some(var_type) => Ok(var_type.clone()),
+            None => Err(SemanticError::variable_type_is_unknown(pos, self.read().name.clone())),
+        }
+    }
     pub fn property_type(&self, property_path: &ItemPath) -> Result<DataType, SemanticError> {
-        let var = self.read();
-        let var_type = match &var.data_type {
-            &Some(ref var_type) => var_type,
-            &None => return Err(SemanticError::variable_type_is_unknown(property_path.pos, var.name.clone())),
-        };
-        let result = var_type.property_type(property_path.pos, property_path.path.as_path())?;
-        Ok(result)
+        Ok(
+            self.data_type(property_path.pos)?
+                .property_type(property_path.pos, property_path.path.as_path())?
+        )
+    }
+    #[inline]
+    pub fn replace_data_type(&self, data_type: DataType) {
+        self.write().data_type = Some(data_type);
+    }
+    #[inline]
+    pub fn is_read_only(&self) -> bool {
+        self.read().is_read_only
+    }
+    #[inline]
+    pub fn make_read_only(&self) {
+        self.write().is_read_only = true
     }
 }
 
@@ -66,6 +94,13 @@ impl FunctionVariableScope {
             is_aggregate: false,
             is_lite_weight: false,
         })
+    }
+    pub fn variables(&self) -> &[SyncRef<FunctionVariable>] {
+        self.variables.as_slice()
+    }
+    pub fn find_variable(&self, name: &str) -> Option<&SyncRef<FunctionVariable>> {
+        self.variables.iter()
+            .find(|v| v.read().name() == name)
     }
 }
 
@@ -92,20 +127,16 @@ impl SyncRef<FunctionVariableScope> {
     pub fn lite_weight_child(&self) -> Self {
         self._child(false, true)
     }
-    pub fn get_variable(&self, name: &str) -> Option<SyncRef<FunctionVariable>> {
+    #[inline]
+    pub fn parent(&self) -> Option<SyncRef<FunctionVariableScope>> {
         let scope = self.read();
-        {
-            let found_in_self = scope.variables.iter()
-                .find(|v| {
-                    let var = v.read();
-                    var.name == name
-                });
-            if let Some(var) = found_in_self {
-                return Some(var.clone());
-            }
+        scope.context.get_scope(scope.parent?)
+    }
+    pub fn get_variable(&self, name: &str) -> Option<SyncRef<FunctionVariable>> {
+        if let Some(var) = self.read().find_variable(name) {
+            return Some(var.clone());
         }
-        scope.context
-            .get_scope(scope.parent?)?
+        self.parent()?
             .get_variable(name)
     }
     pub fn access_to_variable(&self, pos: ItemPosition, name: &str) -> Result<SyncRef<FunctionVariable>, SemanticError> {
@@ -115,10 +146,10 @@ impl SyncRef<FunctionVariableScope> {
         }
     }
     pub fn new_variable(&self, pos: ItemPosition, name: String, data_type: Option<DataType>) -> Result<SyncRef<FunctionVariable>, SemanticError> {
-        if self.get_variable(name.as_str()).is_some() {
+        if self.read().find_variable(name.as_str()).is_some() {
             return Err(SemanticError::duplicate_definition(pos, name, SemanticItemType::Variable));
         }
-        let var = FunctionVariable::new(pos, name, data_type);
+        let var = FunctionVariable::new(pos, name, data_type, false);
         self.write().variables.push(var.clone());
         Ok(var)
     }
