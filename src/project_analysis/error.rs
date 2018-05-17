@@ -1,8 +1,6 @@
-//use std::mem::replace;
 use std::fmt;
 use std::cmp::max;
 use std::sync::Arc;
-//use helpers::Appendable;
 use helpers::{
     decimal_unsigned_length,
     IntoStatic,
@@ -16,11 +14,9 @@ use lexeme_scanner::{
     ScannerErrorKind,
 };
 use parser_basics::{
-//    StaticIdentifier,
-ParserErrorItem,
-ParserErrorKind,
+    ParserErrorItem,
+    ParserErrorKind,
 };
-//use language::others::write_path;
 use language::{
     DataType,
     BinaryOperator,
@@ -98,19 +94,6 @@ impl Default for SemanticErrorKind {
         SemanticErrorKind::Empty
     }
 }
-
-//impl Appendable for SemanticErrorKind {
-//    fn append(&mut self, other: Self) -> Option<Self> {
-//        if (*self == other) || (other == SemanticErrorKind::Empty) {
-//            return None;
-//        }
-//        if *self == SemanticErrorKind::Empty {
-//            replace(self, other);
-//            return None;
-//        }
-//        Some(other)
-//    }
-//}
 
 impl fmt::Display for SemanticErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -306,17 +289,3 @@ impl From<SemanticError> for Vec<SemanticError> {
         vec![e]
     }
 }
-
-//impl Appendable for SemanticError {
-//    fn append(&mut self, other: Self) -> Option<Self> {
-//        let SemanticError { pos, kind, text } = other;
-//        if self.pos != pos
-//            ||
-//            self.text != text
-//            {
-//                return Some(SemanticError { pos, kind, text });
-//            }
-//        self.kind.append(kind)
-//            .map(move |kind| SemanticError { pos, kind, text })
-//    }
-//}

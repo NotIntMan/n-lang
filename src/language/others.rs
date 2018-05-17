@@ -1,5 +1,4 @@
 use std::fmt;
-//use helpers::IntoStatic;
 use helpers::{
     Path,
     PathBuf,
@@ -43,17 +42,6 @@ impl ItemPath {
     }
 }
 
-//impl<'source> IntoStatic for Path<'source> {
-//    type Result = StaticPath;
-//    fn into_static(self) -> StaticPath {
-//        let Path { pos, path } = self;
-//        Path {
-//            pos,
-//            path: path.into_static(),
-//        }
-//    }
-//}
-
 impl PartialEq for ItemPath {
     #[inline]
     fn eq(&self, other: &ItemPath) -> bool {
@@ -67,32 +55,6 @@ impl PartialEq for ItemPath {
             (self.path != other.path)
     }
 }
-
-//impl<'target, T> PartialEq<&'target [T]> for ItemPath
-//    where T: PartialEq<Identifier<'source>> {
-//    #[inline]
-//    fn eq(&self, other: &&'target [T]) -> bool {
-//        (*other).eq(self.path.as_slice())
-//    }
-//
-//    #[inline]
-//    fn ne(&self, other: &&'target [T]) -> bool {
-//        (*other).ne(self.path.as_slice())
-//    }
-//}
-//
-//impl<'source, T> PartialEq<Vec<T>> for ItemPath
-//    where T: PartialEq<Identifier<'source>> {
-//    #[inline]
-//    fn eq(&self, other: &Vec<T>) -> bool {
-//        other.eq(&self.path)
-//    }
-//
-//    #[inline]
-//    fn ne(&self, other: &Vec<T>) -> bool {
-//        other.ne(&self.path)
-//    }
-//}
 
 /// Реализует разбор "пути" элементов, разделённых делителем. Отличается от списка тем, что не позволяет "замыкающий делитель".
 pub fn path<'token, 'source>(input: &'token [Token<'source>], delimiter: &'source str) -> ParserResult<'token, 'source, ItemPath> {

@@ -2,8 +2,6 @@ use std::sync::Arc;
 use std::fmt;
 use std::cmp;
 use indexmap::IndexMap;
-//use helpers::Group;
-//use helpers::ReEntrantRWLock;
 use helpers::{
     Path,
     PathBuf,
@@ -17,7 +15,6 @@ use language::modules::{
     ModuleDefinitionItem,
     ModuleDefinitionItemAST,
 };
-//use language::others::StaticPath;
 use project_analysis::{
     Item,
     Text,
@@ -26,12 +23,6 @@ use project_analysis::{
     ProjectContext,
 };
 
-//use super::item::{
-//    ItemBody,
-//    ItemRef,
-//};
-//use super::error::SemanticError;
-//
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnresolvedModule {
     text: Arc<Text>,
@@ -225,83 +216,3 @@ impl cmp::PartialEq for Module {
 }
 
 impl cmp::Eq for Module {}
-
-//#[derive(Debug, Clone, PartialEq, Eq)]
-//pub struct ModuleRef(pub Arc<ReEntrantRWLock<Module>>);
-//
-//impl Module {
-//    pub fn try_parse(text: Arc<Text>) -> Result<ModuleRef, Group<SemanticError>> {
-//        let tokens = match Scanner::scan(&text.text) {
-//            Ok(tokens) => tokens,
-//            Err(error) => return Err(Group::One(SemanticError::scanner_error(error))),
-//        };
-//        match parse(&tokens, module) {
-//            Ok(items) => Ok(Module::from_def(text.clone(), items)),
-//            Err(error_group) => Err(Group::new(
-//                error_group.extract_into_vec().into_iter()
-//                    .map(|item| SemanticError::parser_error(item))
-//                    .collect()
-//            )),
-//        }
-//    }
-//    pub fn from_def(text: Arc<Text>, items: Vec<ModuleDefinitionItem>) -> ModuleRef {
-//        let module_ref = ModuleRef(Arc::new(ReEntrantRWLock::new(Module {
-//            text,
-//            items: Vec::with_capacity(items.len()),
-//            injected_dependencies: Vec::new(),
-//        })));
-//        {
-//            let mut module = module_ref.0.write();
-//            for item in items {
-//                module.items.push(ItemRef::from_def(item))
-//            }
-//        }
-//        module_ref
-//    }
-//    pub fn items(&self) -> &[ItemRef] {
-//        &self.items
-//    }
-//    pub fn text(&self) -> Arc<Text> {
-//        self.text.clone()
-//    }
-//}
-//
-//impl ModuleRef {
-//    pub fn put_dependency(&self, path: StaticPath, dependency: &ModuleRef, errors: &mut Vec<SemanticError>) -> bool {
-//        let module = self.0.read();
-//        if module.injected_dependencies.contains(&path) {
-//            return false;
-//        }
-//        println!("Putting {:?} into module {:?}", path.path, module.text.name);
-//        for item in module.items.iter() {
-//            match item.put_dependency(&path, dependency) {
-//                Ok(()) => {}
-//                Err(err) => errors.push(err),
-//            }
-//        }
-//        {
-//            let mut module = self.0.write();
-//            module.injected_dependencies.push(path);
-//        }
-//        true
-//    }
-//    pub fn find_item(&self, name: &[Identifier]) -> Option<ItemRef> {
-//        let module = self.0.read();
-//        println!("Finding item {:?} in module {:?}", name, module.text.name);
-//        if name.is_empty() {
-//            return Some(ItemRef::from_body(ItemBody::ModuleReference { module: self.clone() }));
-//        }
-//        for item in module.items.iter() {
-//            if let Some(item_ref) = item.find_item(name) {
-//                return Some(item_ref);
-//            }
-//        }
-//        None
-//    }
-//}
-//
-//#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-//pub struct ModuleId {
-//    pub module_id: usize,
-//}
-//

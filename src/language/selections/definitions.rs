@@ -46,17 +46,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionExpressionAST
     }
 }
 
-//impl<'source> IntoStatic for SelectionExpression<'source> {
-//    type Result = SelectionExpression<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let SelectionExpression { expr, alias } = self;
-//        SelectionExpression {
-//            expr: expr.into_static(),
-//            alias: alias.into_static(),
-//        }
-//    }
-//}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionExpression {
     // TODO Проверка на то, что все SelectionExpression имеют alias, либо все его не имеют для детерминированности определения выходного типа
@@ -69,16 +58,6 @@ pub enum SelectionResultAST<'source> {
     All,
     Some(Vec<SelectionExpressionAST<'source>>),
 }
-
-//impl<'source> IntoStatic for SelectionResult<'source> {
-//    type Result = SelectionResult<'static>;
-//    fn into_static(self) -> Self::Result {
-//        match self {
-//            SelectionResult::All => SelectionResult::All,
-//            SelectionResult::Some(expressions) => SelectionResult::Some(expressions.into_static()),
-//        }
-//    }
-//}
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionResultAST<'source> {
     type Result = SelectionResult;
@@ -112,17 +91,6 @@ pub struct SelectionSortingItemAST<'source> {
     pub order: SelectionSortingOrder,
 }
 
-//impl<'source> IntoStatic for SelectionSortingItem<'source> {
-//    type Result = SelectionSortingItem<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let SelectionSortingItem { expr, order } = self;
-//        SelectionSortingItem {
-//            expr: expr.into_static(),
-//            order,
-//        }
-//    }
-//}
-
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionSortingItemAST<'source> {
     type Result = SelectionSortingItem;
     type Error = SemanticError;
@@ -146,17 +114,6 @@ pub struct SelectionGroupByClauseAST<'source> {
     pub sorting: Vec<SelectionSortingItemAST<'source>>,
     pub with_rollup: bool,
 }
-
-//impl<'source> IntoStatic for SelectionGroupByClause<'source> {
-//    type Result = SelectionGroupByClause<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let SelectionGroupByClause { sorting, with_rollup } = self;
-//        SelectionGroupByClause {
-//            sorting: sorting.into_static(),
-//            with_rollup,
-//        }
-//    }
-//}
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionGroupByClauseAST<'source> {
     type Result = SelectionGroupByClause;
@@ -197,40 +154,6 @@ pub struct SelectionAST<'source> {
     pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
     pub limit_clause: Option<SelectionLimit>,
 }
-
-//impl<'source> IntoStatic for Selection<'source> {
-//    type Result = Selection<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let Selection {
-//            distinct,
-//            high_priority,
-//            straight_join,
-//            result_size,
-//            cache,
-//            result,
-//            source,
-//            where_clause,
-//            group_by_clause,
-//            having_clause,
-//            order_by_clause,
-//            limit_clause,
-//        } = self;
-//        Selection {
-//            distinct,
-//            high_priority,
-//            straight_join,
-//            result_size,
-//            cache,
-//            result: result.into_static(),
-//            source: source.into_static(),
-//            where_clause: where_clause.into_static(),
-//            group_by_clause: group_by_clause.into_static(),
-//            having_clause: having_clause.into_static(),
-//            order_by_clause: order_by_clause.into_static(),
-//            limit_clause,
-//        }
-//    }
-//}
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> {
     type Result = Selection;

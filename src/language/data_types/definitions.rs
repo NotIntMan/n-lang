@@ -5,7 +5,6 @@ use std::fmt;
 use std::sync::Arc;
 use indexmap::IndexMap;
 use helpers::Assertion;
-//use helpers::IntoStatic;
 use helpers::{
     as_unique_identifier,
     Path,
@@ -16,10 +15,6 @@ use helpers::{
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use language::ItemPath;
-//use project_analysis::resolve::{
-//    SemanticResolve,
-//ResolveContext,
-//};
 use project_analysis::{
     Item,
     SemanticItemType,
@@ -369,17 +364,6 @@ pub fn find_attribute<'a, 'source>(attributes: &'a [AttributeAST<'source>], name
     None
 }
 
-//impl<'source> IntoStatic for Attribute<'source> {
-//    type Result = Attribute<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let Attribute { name, arguments } = self;
-//        Attribute {
-//            name: name.into_static(),
-//            arguments: arguments.into_static(),
-//        }
-//    }
-//}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct FieldAST<'source> {
     pub attributes: Vec<AttributeAST<'source>>,
@@ -416,22 +400,6 @@ impl<'source> Resolve<SyncRef<Module>> for FieldAST<'source> {
         })
     }
 }
-
-//impl<'source> IntoStatic for Field<'source> {
-//    type Result = Field<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let Field {
-//            attributes,
-//            field_type,
-//            position,
-//        } = self;
-//        Field {
-//            attributes: attributes.into_static(),
-//            field_type: field_type.into_static(),
-//            position,
-//        }
-//    }
-//}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CompoundDataTypeAST<'source> {
@@ -511,16 +479,6 @@ impl<'source> Assertion for CompoundDataTypeAST<'source> {
     }
 }
 
-//impl<'source> IntoStatic for CompoundDataType<'source> {
-//    type Result = CompoundDataType<'static>;
-//    fn into_static(self) -> Self::Result {
-//        match self {
-//            CompoundDataType::Structure(fields) => CompoundDataType::Structure(fields.into_static()),
-//            CompoundDataType::Tuple(fields) => CompoundDataType::Tuple(fields.into_static()),
-//        }
-//    }
-//}
-
 impl<'source> Resolve<SyncRef<Module>> for CompoundDataTypeAST<'source> {
     type Result = CompoundDataType;
     type Error = SemanticError;
@@ -597,99 +555,6 @@ impl<'a, 'source> Assertion<&'a str> for DataTypeAST<'source> {
         self.assert(*other)
     }
 }
-
-//impl SemanticResolve for DataType<'static> {
-//    fn is_resolved(&self, context: &ResolveContext) -> bool {
-//        match self {
-//            &DataType::Compound(CompoundDataType::Structure(ref fields)) => {
-//                fields.is_resolved(context)
-//            }
-//            &DataType::Compound(CompoundDataType::Tuple(ref fields)) => {
-//                fields.is_resolved(context)
-//            }
-//            &DataType::Primitive(_) => true,
-//            &DataType::Reference(_) => false,
-//            &DataType::ItemReference(ref item) => item.0.read().is_resolved(context),
-//        }
-//    }
-//    fn try_resolve(&mut self, context: &mut ResolveContext) {
-//        let mut new_value = None;
-//        match self {
-//            &mut DataType::Compound(CompoundDataType::Structure(ref mut fields)) => {
-//                fields.try_resolve(context);
-//            }
-//            &mut DataType::Compound(CompoundDataType::Tuple(ref mut fields)) => {
-//                fields.try_resolve(context);
-//            }
-//            &mut DataType::Primitive(_) => {}
-//            &mut DataType::Reference(ref path) => {
-//                match context.resolve_item(&path) {
-//                    Ok(dep_ref) => {
-//                        match dep_ref.assert_type(ItemType::DataType, path.pos) {
-//                            Ok(_) => new_value = Some(DataType::ItemReference(dep_ref)),
-//                            Err(err) => context.throw_error(err),
-//                        }
-//                    }
-//                    Err(err) => context.throw_error(err),
-//                }
-//            }
-//            &mut DataType::ItemReference(_) => {
-//                // TODO Item should be DataType
-//            }
-//        }
-//        if let Some(new_value) = new_value {
-//            replace(self, new_value);
-//        }
-//    }
-//}
-//
-//impl SemanticResolve for Vec<Field<'static>> {
-//    fn is_resolved(&self, context: &ResolveContext) -> bool {
-//        self.iter()
-//            .all(|item| item.field_type.is_resolved(context))
-//    }
-//    fn try_resolve(&mut self, context: &mut ResolveContext) {
-//        for field in self.iter_mut() {
-//            field.field_type.try_resolve(context);
-//        }
-//    }
-//}
-//
-//impl SemanticResolve for Vec<(Identifier<'static>, Field<'static>)> {
-//    fn is_resolved(&self, context: &ResolveContext) -> bool {
-//        self.iter()
-//            .all(|item| item.1.field_type.is_resolved(context))
-//    }
-//    fn try_resolve(&mut self, context: &mut ResolveContext) {
-//        // Имена полей структуры должны быть уникальными
-//        for (i, &(ref field_name, ref field)) in self.iter().enumerate() {
-//            for &(ref field_before_name, _) in self[..i].iter() {
-//                if field_before_name == field_name {
-//                    context.throw_error(SemanticError::duplicate_definition(
-//                        field.position,
-//                        (*field_before_name).clone(),
-//                        SemanticItemType::Field,
-//                    ));
-//                }
-//            }
-//        }
-//        for &mut (_, ref mut field) in self.iter_mut() {
-//            field.field_type.try_resolve(context);
-//        }
-//    }
-//}
-
-//impl<'source> IntoStatic for DataType<'source> {
-//    type Result = DataType<'static>;
-//    fn into_static(self) -> Self::Result {
-//        match self {
-//            DataType::Compound(data_type) => DataType::Compound(data_type.into_static()),
-//            DataType::Primitive(data_type) => DataType::Primitive(data_type),
-//            DataType::Reference(path) => DataType::Reference(path.into_static()),
-//            DataType::ItemReference(refer) => DataType::ItemReference(refer),
-//        }
-//    }
-//}
 
 impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
     type Result = DataType;

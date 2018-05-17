@@ -1,5 +1,4 @@
 use indexmap::IndexMap;
-//use helpers::IntoStatic;
 use helpers::{
     as_unique_identifier,
     Resolve,
@@ -20,8 +19,6 @@ use project_analysis::{
     Module,
     SemanticError,
     SemanticItemType,
-//    SemanticResolve,
-//    ResolveContext,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,16 +45,6 @@ pub enum FunctionBody {
     Implementation(Statement),
 }
 
-//impl<'source> IntoStatic for FunctionBody<'source> {
-//    type Result = FunctionBody<'static>;
-//    fn into_static(self) -> Self::Result {
-//        match self {
-//            FunctionBody::External => FunctionBody::External,
-//            FunctionBody::Implementation(stmt) => FunctionBody::Implementation(stmt.into_static()),
-//        }
-//    }
-//}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDefinitionAST<'source> {
     pub name: Identifier<'source>,
@@ -65,28 +52,6 @@ pub struct FunctionDefinitionAST<'source> {
     pub result: Option<DataTypeAST<'source>>,
     pub body: FunctionBodyAST<'source>,
 }
-
-//impl<'source> IntoStatic for FunctionDefinition<'source> {
-//    type Result = FunctionDefinition<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let FunctionDefinition { name, arguments, result, body } = self;
-//        FunctionDefinition {
-//            name: name.into_static(),
-//            arguments: arguments.into_static(),
-//            result: result.into_static(),
-//            body: body.into_static(),
-//        }
-//    }
-//}
-
-//impl SemanticResolve for FunctionDefinition<'static> {
-//    fn is_resolved(&self, _context: &ResolveContext) -> bool {
-//        unimplemented!()
-//    }
-//    fn try_resolve(&mut self, _context: &mut ResolveContext) {
-//        unimplemented!()
-//    }
-//}
 
 impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for FunctionDefinitionAST<'source> {
     type Result = FunctionDefinition;

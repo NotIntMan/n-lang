@@ -2,7 +2,6 @@ use std::u8::MAX as U8MAX;
 use std::fmt;
 use std::cmp;
 use std::sync::Arc;
-//use helpers::IntoStatic;
 use helpers::{
     PathBuf,
     Resolve,
@@ -141,18 +140,6 @@ pub struct Literal {
     pub text: String,
     pub pos: ItemPosition,
 }
-
-//impl<'source> IntoStatic for Literal<'source> {
-//    type Result = Literal<'static>;
-//    fn into_static(self) -> Self::Result {
-//        let Literal { literal_type, text, pos } = self;
-//        Literal {
-//            literal_type,
-//            text: text.into_static(),
-//            pos,
-//        }
-//    }
-//}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
@@ -377,22 +364,6 @@ impl<'a, 'source> Assertion<&'a str> for ExpressionAST<'source> {
         self.assert(*other)
     }
 }
-
-//impl<'source> IntoStatic for Expression<'source> {
-//    type Result = Expression<'static>;
-//    fn into_static(self) -> Self::Result {
-//        match self {
-//            Expression::Literal(value) => Expression::Literal(value.into_static()),
-//            Expression::Identifier(value) => Expression::Identifier(value.into_static()),
-//            Expression::BinaryOperation(left, op, right) => Expression::BinaryOperation(left.into_static(), op, right.into_static()),
-//            Expression::PrefixUnaryOperation(op, value) => Expression::PrefixUnaryOperation(op, value.into_static()),
-//            Expression::PostfixUnaryOperation(op, value) => Expression::PostfixUnaryOperation(op, value.into_static()),
-//            Expression::PropertyAccess(expr, path) => Expression::PropertyAccess(expr.into_static(), path.into_static()),
-//            Expression::Set(value) => Expression::Set(value.into_static()),
-//            Expression::FunctionCall(path, args) => Expression::FunctionCall(path.into_static(), args.into_static()),
-//        }
-//    }
-//}
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for ExpressionAST<'source> {
     type Result = Expression;
