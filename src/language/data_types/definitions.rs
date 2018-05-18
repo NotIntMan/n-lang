@@ -672,7 +672,6 @@ impl DataType {
     }
 }
 
-//TODO Переделать это. Compound(Structure({"id": Field { attributes: [Attribute { name: "primary_key", arguments... - это не описание типа.
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

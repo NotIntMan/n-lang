@@ -53,7 +53,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionExpressionAST
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionExpression {
-    // TODO Проверка на то, что все SelectionExpression имеют alias/имя, либо все его не имеют для детерминированности определения выходного типа
     pub expr: Expression,
     pub alias: Option<String>,
 }
@@ -235,6 +234,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
     type Error = SemanticError;
     fn resolve(&self, parent_scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
         //TODO Non-array result of SELECT ... LIMIT 1 or aggregate SELECT without GROUP BY
+        //TODO Moreover, result of SELECT ... LIMIT 1 must be nullable
         let scope = parent_scope.lite_weight_child();
         let aggregate_scope = scope.aggregate_child();
 

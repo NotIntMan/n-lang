@@ -43,9 +43,9 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for JoinConditionAST<'sour
 #[derive(Debug, Clone, PartialEq)]
 pub enum JoinCondition {
     Expression(Expression),
-    // TODO пециальная проверка синтаксиса JOIN ... USING (...)
+    // TODO Специальная проверка синтаксиса JOIN ... USING (...)
     Using(Vec<ItemPath>),
-    // TODO пециальная проверка синтаксиса JOIN ... NATURAL
+    // TODO Специальная проверка синтаксиса JOIN ... NATURAL
     Natural,
 }
 
