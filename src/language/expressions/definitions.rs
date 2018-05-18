@@ -300,48 +300,48 @@ pub struct ExpressionAST<'source> {
 impl<'source> Assertion for ExpressionAST<'source> {
     fn assert(&self, other: &Self) {
         match &self.body {
-            &ExpressionASTBody::Literal(ref lit_left) => {
-                if let &ExpressionASTBody::Literal(ref lit_right) = &other.body {
+            ExpressionASTBody::Literal(lit_left) => {
+                if let ExpressionASTBody::Literal(lit_right) = &other.body {
                     lit_left.assert(lit_right)
                 } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionASTBody::Reference(ref ident_left) => {
-                if let &ExpressionASTBody::Reference(ref ident_right) = &other.body {
+            ExpressionASTBody::Reference(ident_left) => {
+                if let ExpressionASTBody::Reference(ident_right) = &other.body {
                     assert_eq!(ident_left, ident_right);
                 } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionASTBody::BinaryOperation(ref left_left, ref left_op, ref left_right) => {
-                if let &ExpressionASTBody::BinaryOperation(ref right_left, ref right_op, ref right_right) = &other.body {
+            ExpressionASTBody::BinaryOperation(left_left, left_op, left_right) => {
+                if let ExpressionASTBody::BinaryOperation(right_left, right_op, right_right) = &other.body {
                     (*left_left).assert(&**right_left);
                     assert_eq!(left_op, right_op);
                     (*left_right).assert(&**right_right);
                 } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionASTBody::PrefixUnaryOperation(ref left_op, ref left) => {
-                if let &ExpressionASTBody::PrefixUnaryOperation(ref right_op, ref right) = &other.body {
+            ExpressionASTBody::PrefixUnaryOperation(left_op, left) => {
+                if let ExpressionASTBody::PrefixUnaryOperation(right_op, right) = &other.body {
                     assert_eq!(left_op, right_op);
                     (*left).assert(&**right);
                 } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionASTBody::PostfixUnaryOperation(ref left_op, ref left) => {
-                if let &ExpressionASTBody::PostfixUnaryOperation(ref right_op, ref right) = &other.body {
+            ExpressionASTBody::PostfixUnaryOperation(left_op, left) => {
+                if let ExpressionASTBody::PostfixUnaryOperation(right_op, right) = &other.body {
                     assert_eq!(left_op, right_op);
                     (*left).assert(&**right);
                 } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionASTBody::PropertyAccess(ref left, ref left_path) => {
-                if let &ExpressionASTBody::PropertyAccess(ref right, ref right_path) = &other.body {
+            ExpressionASTBody::PropertyAccess(left, left_path) => {
+                if let ExpressionASTBody::PropertyAccess(right, right_path) = &other.body {
                     assert_eq!(left_path.path, right_path.path);
                     (*left).assert(&**right);
                 } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionASTBody::Set(ref left_items) => {
-                if let &ExpressionASTBody::Set(ref right_items) = &other.body {
+            ExpressionASTBody::Set(left_items) => {
+                if let ExpressionASTBody::Set(right_items) = &other.body {
                     left_items.as_slice().assert(&right_items.as_slice());
                 } else { assert_eq!(self.body, other.body) }
             }
-            &ExpressionASTBody::FunctionCall(ref left_name, ref left_args) => {
-                if let &ExpressionASTBody::FunctionCall(ref right_name, ref right_args) = &other.body {
+            ExpressionASTBody::FunctionCall(left_name, left_args) => {
+                if let ExpressionASTBody::FunctionCall(right_name, right_args) = &other.body {
                     assert_eq!(left_name.path, right_name.path);
                     left_args.as_slice().assert(&right_args.as_slice());
                 } else { assert_eq!(self.body, other.body) }
@@ -371,30 +371,30 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for ExpressionAST<'source>
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
         match &self.body {
-            &ExpressionASTBody::Literal(ref lit) => {
+            ExpressionASTBody::Literal(lit) => {
                 Expression::literal(self.pos, lit)
                     .map_err(|e| vec![e])
             }
-            &ExpressionASTBody::Reference(ref ident) => {
+            ExpressionASTBody::Reference(ident) => {
                 Expression::variable(scope, self.pos, ident)
                     .map_err(|e| vec![e])
             }
-            &ExpressionASTBody::BinaryOperation(ref left, op, ref right) => {
-                Expression::binary_operation(scope, self.pos, op, left, right)
+            ExpressionASTBody::BinaryOperation(left, op, right) => {
+                Expression::binary_operation(scope, self.pos, *op, left, right)
             }
-            &ExpressionASTBody::PostfixUnaryOperation(op, ref expr) => {
-                Expression::postfix_unary_operation(scope, self.pos, op, expr)
+            ExpressionASTBody::PostfixUnaryOperation(op, expr) => {
+                Expression::postfix_unary_operation(scope, self.pos, *op, expr)
             }
-            &ExpressionASTBody::PrefixUnaryOperation(op, ref expr) => {
-                Expression::prefix_unary_operation(scope, self.pos, op, expr)
+            ExpressionASTBody::PrefixUnaryOperation(op, expr) => {
+                Expression::prefix_unary_operation(scope, self.pos, *op, expr)
             }
-            &ExpressionASTBody::PropertyAccess(ref expr, ref path) => {
+            ExpressionASTBody::PropertyAccess(expr, path) => {
                 Expression::property_access(scope, self.pos, expr, path)
             }
-            &ExpressionASTBody::Set(ref components) => {
+            ExpressionASTBody::Set(components) => {
                 Expression::set(scope, self.pos, components)
             }
-            &ExpressionASTBody::FunctionCall(ref function, ref arguments) => {
+            ExpressionASTBody::FunctionCall(function, arguments) => {
                 Expression::function_call(scope, self.pos, function, arguments)
             }
         }

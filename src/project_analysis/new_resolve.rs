@@ -71,6 +71,10 @@ fn do_it() {
         "\
             pub struct Complex(small integer, small integer)
 
+            pub struct IntC {
+                value: integer,
+            }
+
             table Waves {
                 #[primary_key]
                 #[auto_increment]
@@ -78,7 +82,7 @@ fn do_it() {
                 signal: Complex,
             }
 
-            fn alpha(x: boolean): integer {
+            fn alpha(x: boolean): IntC {
                 let a := SELECT
                         w.id,
                         max(w.signal.component0) as max_c0,
@@ -88,10 +92,13 @@ fn do_it() {
                     HAVING max(w.signal.component0) > 0
                 ;
                 let b := SELECT sum(a.max_c0), sum(a.max_c1) FROM a;
+                let result: IntC;
                 if x {
-                    return b.component0;
+                    result.value := b.component0;
+                    return result;
                 } else {
-                    return b.component1;
+                    result.value := b.component1;
+                    return result;
                 }
             }
         ",

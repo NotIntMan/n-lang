@@ -109,7 +109,7 @@ impl SyncRef<ProjectContext> {
         let mut result = Vec::new();
         for (module_path, module) in project.modules.iter_mut() {
             let new_state = match module {
-                &mut ResolutionModuleState::Unresolved(ref module) => {
+                ResolutionModuleState::Unresolved(module) => {
                     let mut project_context = (module_path.clone(), self.clone());
                     println!("Resolving module {:?}", *module_path.read());
                     match module.resolve(&mut project_context) {
@@ -142,7 +142,7 @@ impl SyncRef<ProjectContext> {
             let project = self.read();
             match project.get_module(path) {
                 Some(module_state) => match module_state {
-                    &ResolutionModuleState::Resolved(ref module) => return Some(module.clone()),
+                    ResolutionModuleState::Resolved(module) => return Some(module.clone()),
                     _ => return None,
                 }
                 _ => {}
@@ -214,7 +214,7 @@ impl<S: TextSource> Resolve<S> for SyncRef<ProjectContext> {
             let mut project = self.write();
             for (_, module) in project.modules.iter_mut() {
                 match module {
-                    &mut ResolutionModuleState::ParseFailed(ref mut parse_errors) => {
+                    ResolutionModuleState::ParseFailed(parse_errors) => {
                         errors.append(parse_errors);
                     }
                     _ => continue,
@@ -227,7 +227,7 @@ impl<S: TextSource> Resolve<S> for SyncRef<ProjectContext> {
 //            println!("Preparing Result::Ok of {:#?}", project.modules);
             for (path, module) in project.modules.iter() {
                 match module {
-                    &ResolutionModuleState::Resolved(ref module) => {
+                    ResolutionModuleState::Resolved(module) => {
                         result.insert(path.clone(), module.clone());
                     }
                     _ => {}

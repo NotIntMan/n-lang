@@ -38,9 +38,9 @@ impl<T> Group<T> {
     pub fn extract_into_vec(&self) -> Vec<T>
         where T: Clone {
         match self {
-            &Group::None => Vec::new(),
-            &Group::One(ref e) => vec![(*e).clone()],
-            &Group::Many(ref v) => v.clone(),
+            Group::None => Vec::new(),
+            Group::One(e) => vec![(*e).clone()],
+            Group::Many(v) => v.clone(),
         }
     }
     pub fn append_into_slice(target: &mut [T], mut source: T) -> Option<T>
@@ -66,12 +66,12 @@ impl<T> Group<T> {
     pub fn append_item(&mut self, item: T)
         where T: Appendable + Default {
         let new_value = match self {
-            &mut Group::None => Group::One(item),
-            &mut Group::One(ref mut self_item) => match self_item.append(item) {
+            Group::None => Group::One(item),
+            Group::One(self_item) => match self_item.append(item) {
                 Some(item) => Group::Many(vec![extract(self_item), item]),
                 None => return,
             },
-            &mut Group::Many(ref mut self_items) => {
+            Group::Many(self_items) => {
                 Group::append_or_push(self_items, item);
                 return;
             }
@@ -83,10 +83,10 @@ impl<T> Group<T> {
     pub fn append_group(&mut self, other: Self)
         where T: Appendable + Default {
         let result = match self {
-            &mut Group::None => {
+            Group::None => {
                 other
             }
-            &mut Group::One(ref mut self_item) => {
+            Group::One(self_item) => {
                 let new_vec = match other {
                     Group::None => {
                         return;
@@ -107,7 +107,7 @@ impl<T> Group<T> {
                 };
                 Group::Many(new_vec)
             }
-            &mut Group::Many(ref mut self_items) => {
+            Group::Many(self_items) => {
                 match other {
                     Group::None => {
                         return;

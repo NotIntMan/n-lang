@@ -42,7 +42,7 @@ impl StdLib {
     }
     pub fn resolve_postfix_unary_operation(&self, operator: PostfixUnaryOperator, input: &DataType) -> Option<&Arc<StdLibPostfixUnaryOperation>> {
         for element in self.elements.iter() {
-            if let &StdLibElement::PostfixUnaryOperation(ref op) = element {
+            if let StdLibElement::PostfixUnaryOperation(op) = element {
                 if (op.operator == operator) && input.can_cast(&op.input) {
                     return Some(op);
                 }
@@ -52,7 +52,7 @@ impl StdLib {
     }
     pub fn resolve_prefix_unary_operation(&self, operator: PrefixUnaryOperator, input: &DataType) -> Option<&Arc<StdLibPrefixUnaryOperation>> {
         for element in self.elements.iter() {
-            if let &StdLibElement::PrefixUnaryOperation(ref op) = element {
+            if let StdLibElement::PrefixUnaryOperation(op) = element {
                 if (op.operator == operator) && input.can_cast(&op.input) {
                     return Some(op);
                 }
@@ -62,7 +62,7 @@ impl StdLib {
     }
     pub fn resolve_binary_operation(&self, operator: BinaryOperator, left: &DataType, right: &DataType) -> Option<&Arc<StdLibBinaryOperation>> {
         for element in self.elements.iter() {
-            if let &StdLibElement::BinaryOperation(ref op) = element {
+            if let StdLibElement::BinaryOperation(op) = element {
                 if (op.operator == operator) && left.can_cast(&op.left) && right.can_cast(&op.right) {
                     return Some(op);
                 }
@@ -72,7 +72,7 @@ impl StdLib {
     }
     pub fn resolve_function(&self, name: &str) -> Option<&Arc<StdLibFunction>> {
         for element in self.elements.iter() {
-            if let &StdLibElement::Function(ref function) = element {
+            if let StdLibElement::Function(function) = element {
                 if function.name == name {
                     return Some(function);
                 }

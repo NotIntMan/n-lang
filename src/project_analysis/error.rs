@@ -273,13 +273,13 @@ impl SemanticError {
 impl fmt::Display for SemanticError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self.text {
-            &Some(ref arc) => writeln!(f, "  in {} on {}", &arc.name, self.pos.begin)?,
-            &None => writeln!(f, "  on {}", self.pos.begin)?,
+            Some(arc) => writeln!(f, "  in {} on {}", &arc.name, self.pos.begin)?,
+            None => writeln!(f, "  on {}", self.pos.begin)?,
         }
         writeln!(f, "  error: {}", self.kind)?;
         let text = match &self.text {
-            &Some(ref arc) => arc,
-            &None => return writeln!(f, "   | text is unspecified."),
+            Some(arc) => arc,
+            None => return writeln!(f, "   | text is unspecified."),
         };
         let lines = match self.pos.lines() {
             0 => return writeln!(f, "   | text is unspecified."),

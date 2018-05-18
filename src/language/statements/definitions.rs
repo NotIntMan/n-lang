@@ -10,12 +10,12 @@ use language::{
     ExpressionAST,
     DataType,
     DataTypeAST,
-    Deleting,
-    Inserting,
+    DeletingAST,
+    InsertingAST,
     ItemPath,
     Selection,
     SelectionAST,
-    Updating,
+    UpdatingAST,
 };
 use project_analysis::{
     FunctionVariable,
@@ -125,13 +125,13 @@ pub enum StatementASTBody<'source> {
         expression: ExpressionAST<'source>,
     },
     DeletingRequest {
-        request: Deleting<'source>,
+        request: DeletingAST<'source>,
     },
     InsertingRequest {
-        request: Inserting<'source>,
+        request: InsertingAST<'source>,
     },
     UpdatingRequest {
-        request: Updating<'source>,
+        request: UpdatingAST<'source>,
     },
 }
 
@@ -151,7 +151,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                 let default_value: Option<StatementSource> = default_value.resolve(ctx)?;
                 let data_type = match data_type {
                     Some(data_type) => {
-                        if let &Some(ref default_value) = &default_value {
+                        if let Some(default_value) = &default_value {
                             let default_value_type = default_value.type_of();
                             default_value_type.should_cast_to(self.pos, &data_type)?;
                         }
@@ -159,8 +159,8 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                     }
                     None => {
                         match &default_value {
-                            &Some(ref default_value) => Some(default_value.type_of().clone()),
-                            &None => None,
+                            Some(default_value) => Some(default_value.type_of().clone()),
+                            None => None,
                         }
                     }
                 };

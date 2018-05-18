@@ -153,12 +153,12 @@ impl<'source> ModuleDefinitionValueAST<'source> {
             ModuleDefinitionValueAST::DataType(def) => def.name.text(),
             ModuleDefinitionValueAST::Import(def) => {
                 match &def.tail {
-                    &ExternalItemTailAST::None | &ExternalItemTailAST::Asterisk => {
+                    ExternalItemTailAST::None | &ExternalItemTailAST::Asterisk => {
                         def.path.path.as_path()
                             .pop_right()
                             .expect("Import's path should not be empty!")
                     }
-                    &ExternalItemTailAST::Alias(ref alias) => {
+                    ExternalItemTailAST::Alias(alias) => {
                         alias.text()
                     }
                 }
@@ -237,7 +237,7 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionItemAST<'source> {
     type Result = ();
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
-        let ModuleDefinitionItemAST { ref public, ref position, ref attributes, ref value } = self;
+        let ModuleDefinitionItemAST { public, position, attributes, value } = self;
         let item = {
             let ctx = (ctx.clone(), attributes.clone());
             let value = value.resolve(&ctx)?;

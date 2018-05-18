@@ -123,8 +123,8 @@ impl<C, T> Resolve<C> for Option<T>
     #[inline]
     fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
         match self {
-            &Some(ref value) => Ok(Some(value.resolve(ctx)?)),
-            &None => Ok(None),
+            Some(value) => Ok(Some(value.resolve(ctx)?)),
+            None => Ok(None),
         }
     }
 }

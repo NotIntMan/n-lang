@@ -67,15 +67,15 @@ impl<'source> ParserErrorTokenInfo<'source> {
         }
         'out: loop {
             self.desc = match &self.desc {
-                &Some(ref desc) => {
-                    if let &Some(ref other_desc) = &other.desc {
+                Some(desc) => {
+                    if let Some(other_desc) = &other.desc {
                         if desc != other_desc {
                             break 'out;
                         }
                     }
                     return None;
                 }
-                &None => other.desc,
+                None => other.desc,
             };
             return None;
         }
@@ -86,15 +86,15 @@ impl<'source> ParserErrorTokenInfo<'source> {
 impl<'source> Display for ParserErrorTokenInfo<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
-            &ParserErrorTokenInfo { kind: Some(ref kind), desc: None } => write!(f, "{}", kind),
-            &ParserErrorTokenInfo { kind: Some(ref kind), desc: Some(ref msg) } => {
+            ParserErrorTokenInfo { kind: Some(kind), desc: None } => write!(f, "{}", kind),
+            ParserErrorTokenInfo { kind: Some(kind), desc: Some(msg) } => {
                 write!(f, "{}", kind)?;
                 if !msg.is_empty() {
                     write!(f, " {:?}", msg)?;
                 }
                 Ok(())
             },
-            &ParserErrorTokenInfo { kind: None, desc: Some(ref msg) } => write!(f, "{}", msg),
+            ParserErrorTokenInfo { kind: None, desc: Some(msg) } => write!(f, "{}", msg),
             _ => Ok(()),
         }
     }
@@ -161,7 +161,7 @@ impl<'source> Appendable for ParserErrorKind<'source> {
             return None;
         }
         match self {
-            &mut ParserErrorKind::UnexpectedEnd(ref mut self_group) => {
+            ParserErrorKind::UnexpectedEnd(self_group) => {
                 match other {
                     ParserErrorKind::UnexpectedEnd(other_group) => {
                         self_group.append_group(other_group);
@@ -172,7 +172,7 @@ impl<'source> Appendable for ParserErrorKind<'source> {
                     }
                 }
             }
-            &mut ParserErrorKind::ExpectedGot(ref mut self_group, ref mut self_info) => {
+            ParserErrorKind::ExpectedGot(self_group, self_info) => {
                 match other {
                     ParserErrorKind::ExpectedGot(other_group, other_info) => {
                         match self_info.append_expectation(other_info) {
@@ -190,7 +190,7 @@ impl<'source> Appendable for ParserErrorKind<'source> {
                     }
                 }
             }
-            &mut ParserErrorKind::CustomError(ref mut self_group) => {
+            ParserErrorKind::CustomError(self_group) => {
                 match other {
                     ParserErrorKind::CustomError(other_group) => {
                         self_group.append_group(other_group);
@@ -207,7 +207,7 @@ impl<'source> Appendable for ParserErrorKind<'source> {
 impl<'source> Display for ParserErrorKind<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
-            &ParserErrorKind::UnexpectedEnd(ref s) => {
+            ParserErrorKind::UnexpectedEnd(s) => {
                 write!(f, "unexpected end")?;
                 let expectations = s.extract_into_vec();
                 if expectations.len() > 0 {
@@ -216,13 +216,13 @@ impl<'source> Display for ParserErrorKind<'source> {
                 }
                 Ok(())
             }
-            &ParserErrorKind::ExpectedGot(ref exp, ref got) => {
+            ParserErrorKind::ExpectedGot(exp, got) => {
                 write!(f, "expected: ")?;
                 display_list(f, &exp.extract_into_vec())?;
                 write!(f, ", got: {}", got)?;
                 Ok(())
             }
-            &ParserErrorKind::CustomError(ref messages) => display_list(f, &messages.extract_into_vec()),
+            ParserErrorKind::CustomError(messages) => display_list(f, &messages.extract_into_vec()),
         }
     }
 }
@@ -304,7 +304,7 @@ impl<'source> Appendable for ParserErrorItem<'source> {
 impl<'source> Display for ParserErrorItem<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         write!(f, "{}", self.kind)?;
-        if let &Some(ref pos) = &self.pos {
+        if let Some(pos) = &self.pos {
             write!(f, " on {}", pos)?;
         }
         Ok(())
@@ -344,9 +344,9 @@ pub fn new_error_without_pos<'source>(kind: ParserErrorKind<'source>) -> ParserE
 impl<'source> Display for ParserError<'source> {
     fn fmt(&self, f: &mut Formatter) -> FResult {
         match self {
-            &Group::None => write!(f, "There are no errors detected."),
-            &Group::One(ref err) => write!(f, "There is error: {}", err),
-            &Group::Many(ref vec) => {
+            Group::None => write!(f, "There are no errors detected."),
+            Group::One(err) => write!(f, "There is error: {}", err),
+            Group::Many(vec) => {
                 let mut errors = vec.clone();
                 errors.sort();
                 writeln!(f, "There are some errors:")?;

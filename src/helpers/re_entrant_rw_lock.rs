@@ -97,7 +97,7 @@ impl ReEntrantRWHead {
     }
     fn try_lock_write(&mut self) -> bool {
         if self.is_poisoned { panic!("ReEntrantRWLock was poisoned!"); }
-        if let &mut Some(ref mut holder) = &mut self.write {
+        if let Some(holder) = &mut self.write {
             return holder.try_inc();
         }
         match self.is_readers_from_one_thread() {
@@ -114,10 +114,10 @@ impl ReEntrantRWHead {
     }
     fn try_release_write(&mut self) -> bool {
         match &mut self.write {
-            &mut Some(ref mut holder) => {
+            Some(holder) => {
                 holder.try_dec()
             }
-            &mut None => false,
+            None => false,
         }
     }
     fn readers_for_current_thread(&mut self) -> &mut ThreadEntityCount {
@@ -132,7 +132,7 @@ impl ReEntrantRWHead {
     }
     fn try_lock_read(&mut self) -> bool {
         if self.is_poisoned { panic!("ReEntrantRWLock was poisoned!"); }
-        if let &mut Some(ref mut holder) = &mut self.write {
+        if let Some(holder) = &mut self.write {
             if !holder.is_for_current_thread() {
                 return false;
             }

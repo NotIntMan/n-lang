@@ -61,7 +61,7 @@ impl Item {
         match &self.body {
             ItemBody::DataType { def: _ } => SemanticItemType::DataType,
 //            ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
-//            ItemBody::ImportItem { name: _, original_name: _, ref item } => item.get_type(),
+//            ItemBody::ImportItem { name: _, original_name: _, item } => item.get_type(),
             ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
             ItemBody::Table { def: _ } => SemanticItemType::Table,
             ItemBody::Function { def: _ } => SemanticItemType::Function,
@@ -112,7 +112,7 @@ impl SyncRef<Item> {
         let item = self.read();
         match &item.body {
             ItemBody::DataType { def: _ } => {}
-            ItemBody::ModuleReference { ref module } => {
+            ItemBody::ModuleReference { module } => {
                 return module.get_item(path, search_route);
             }
             ItemBody::Function { def: _ } => {}

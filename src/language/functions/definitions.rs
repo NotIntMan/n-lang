@@ -34,8 +34,8 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for FunctionBodyAST<'sourc
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
         let result = match self {
-            &FunctionBodyAST::External => FunctionBody::External,
-            &FunctionBodyAST::Implementation(ref stmt) => FunctionBody::Implementation(stmt.resolve(ctx)?),
+            FunctionBodyAST::External => FunctionBody::External,
+            FunctionBodyAST::Implementation(stmt) => FunctionBody::Implementation(stmt.resolve(ctx)?),
         };
         Ok(result)
     }
@@ -69,8 +69,8 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
                 .into_err_vec()
         };
         let result = match &self.result {
-            &Some(ref data_type) => data_type.resolve(&ctx.0)?,
-            &None => DataType::Void,
+            Some(data_type) => data_type.resolve(&ctx.0)?,
+            None => DataType::Void,
         };
 
         let context = FunctionContext::new(ctx.0.clone());
@@ -80,7 +80,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
         for (name, data_type) in arguments.iter() {
             let name = name.as_str();
             let &(ident, _) = self.arguments.iter()
-                .find(|&&(ref ident, _)| ident.text() == name)
+                .find(|(ident, _)| ident.text() == name)
                 .expect("The argument has already been preprocessed and its name can not not exist in the input data");
             match root.new_variable(ident.item_pos(), name.to_string(), Some(data_type.clone())) {
                 Ok(var) => var.make_read_only(),
@@ -99,10 +99,10 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
         }
 
         let is_lite_weight = match &body {
-            &FunctionBody::External => {
+            FunctionBody::External => {
                 find_attribute(&ctx.1, "is_lite_weight").is_some()
             }
-            &FunctionBody::Implementation(ref stmt) => {
+            FunctionBody::Implementation(stmt) => {
                 stmt.is_lite_weight()
             }
         };
