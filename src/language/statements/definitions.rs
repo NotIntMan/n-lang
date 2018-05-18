@@ -1,4 +1,5 @@
 use helpers::{
+    PathBuf,
     Resolve,
     SyncRef,
 };
@@ -168,6 +169,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                 match default_value {
                     Some(source) => StatementBody::VariableAssignment {
                         var,
+                        property: PathBuf::empty(),
                         source,
                     },
                     None => StatementBody::Nothing,
@@ -202,8 +204,10 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                         source_type.should_cast_to(self.pos, &prop_type)?;
                     }
                 }
+                let property = var_path.into();
                 StatementBody::VariableAssignment {
                     var,
+                    property,
                     source,
                 }
             }
@@ -298,7 +302,7 @@ pub enum StatementBody {
     Nothing,
     VariableAssignment {
         var: SyncRef<FunctionVariable>,
-        // TODO Нужно хранить целевое свойство left-hand переменной!
+        property: PathBuf,
         source: StatementSource,
     },
     Condition {
@@ -334,7 +338,7 @@ impl Statement {
     pub fn is_lite_weight(&self) -> bool {
         match &self.body {
             StatementBody::Nothing => true,
-            StatementBody::VariableAssignment { var: _, source: _ } => true,
+            StatementBody::VariableAssignment { var: _, property: _, source: _ } => true,
             StatementBody::Condition { condition, then_body, else_body } => {
                 let is_else_body_lite_weight = match else_body {
                     Some(body) => body.is_lite_weight(),
@@ -368,7 +372,7 @@ impl Statement {
     pub fn jumping_check(&self, pos: StatementFlowControlPosition, return_data_type: &DataType) -> Result<StatementFlowControlJumping, Vec<SemanticError>> {
         match &self.body {
             StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
-            StatementBody::VariableAssignment { var: _, source: _ } => Ok(StatementFlowControlJumping::Nothing),
+            StatementBody::VariableAssignment { var: _, property: _, source: _ } => Ok(StatementFlowControlJumping::Nothing),
             StatementBody::Condition { condition: _, then_body, else_body } => {
                 match then_body.jumping_check(pos, return_data_type) {
                     Ok(then_body_jumping) => {
