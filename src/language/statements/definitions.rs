@@ -298,6 +298,7 @@ pub enum StatementBody {
     Nothing,
     VariableAssignment {
         var: SyncRef<FunctionVariable>,
+        // TODO Нужно хранить целевое свойство left-hand переменной!
         source: StatementSource,
     },
     Condition {
