@@ -81,12 +81,18 @@ fn do_it() {
             fn alpha(x: boolean): integer {
                 let a := SELECT
                         w.id,
+                        max(w.signal.component0) as max_c0,
                         max(w.signal.component1) as max_c1
                     FROM Waves w
                     GROUP BY w.id
                     HAVING max(w.signal.component0) > 0
                 ;
-                let b := SELECT sum(a.max_c1) FROM a;
+                let b := SELECT sum(a.max_c0), sum(a.max_c1) FROM a;
+                if x {
+                    return b.component0;
+                } else {
+                    return b.component1;
+                }
             }
         ",
     );

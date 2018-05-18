@@ -37,5 +37,8 @@ pub mod stdlib;
 pub use self::stdlib::*;
 
 pub mod function;
-
 pub use self::function::*;
+
+pub mod statement;
+
+pub use self::statement::*;

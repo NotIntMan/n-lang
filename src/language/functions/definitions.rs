@@ -19,6 +19,8 @@ use project_analysis::{
     Module,
     SemanticError,
     SemanticItemType,
+    StatementFlowControlJumping,
+    StatementFlowControlPosition,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,6 +89,14 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
         }
 
         let body = self.body.resolve(&root)?;
+
+        if let FunctionBody::Implementation(body) = &body {
+            let body_jumping = body.jumping_check(StatementFlowControlPosition::new(), &result)?;
+            if body_jumping != StatementFlowControlJumping::AlwaysReturns {
+                return SemanticError::not_all_branches_returns(body.pos)
+                    .into_err_vec();
+            }
+        }
 
         let is_lite_weight = match &body {
             &FunctionBody::External => {

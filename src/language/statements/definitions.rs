@@ -21,6 +21,8 @@ use project_analysis::{
     FunctionVariable,
     FunctionVariableScope,
     SemanticError,
+    StatementFlowControlJumping,
+    StatementFlowControlPosition,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -143,7 +145,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
     type Result = Statement;
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        match &self.body {
+        let body = match &self.body {
             StatementASTBody::VariableDefinition { name, data_type, default_value } => {
                 let data_type = data_type.resolve(&ctx.context().module())?;
                 let default_value: Option<StatementSource> = default_value.resolve(ctx)?;
@@ -163,14 +165,13 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                     }
                 };
                 let var = ctx.new_variable(name.item_pos(), name.to_string(), data_type)?;
-                let stmt = match default_value {
-                    Some(source) => Statement::VariableAssignment {
+                match default_value {
+                    Some(source) => StatementBody::VariableAssignment {
                         var,
                         source,
                     },
-                    None => Statement::Nothing,
-                };
-                Ok(stmt)
+                    None => StatementBody::Nothing,
+                }
             }
             StatementASTBody::VariableAssignment { path, source } => {
                 let mut var_path = path.path.as_path();
@@ -201,10 +202,10 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                         source_type.should_cast_to(self.pos, &prop_type)?;
                     }
                 }
-                Ok(Statement::VariableAssignment {
+                StatementBody::VariableAssignment {
                     var,
                     source,
-                })
+                }
             }
             StatementASTBody::Condition { condition, then_body, else_body } => {
                 let mut errors = Vec::new();
@@ -224,11 +225,11 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                     Some(x) => x,
                     None => return Err(errors),
                 };
-                Ok(Statement::Condition {
+                StatementBody::Condition {
                     condition,
                     then_body,
                     else_body,
-                })
+                }
             }
             StatementASTBody::Cycle { cycle_type, body } => {
                 let mut errors = Vec::new();
@@ -247,25 +248,25 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                     Some(x) => x,
                     None => return Err(errors),
                 };
-                Ok(Statement::Cycle {
+                StatementBody::Cycle {
                     cycle_type,
                     body,
-                })
+                }
             }
             StatementASTBody::CycleControl { operator, name } => {
                 if name.is_some() {
                     return SemanticError::not_supported_yet(self.pos, "cycle control labels")
                         .into_err_vec();
                 }
-                Ok(Statement::CycleControl {
+                StatementBody::CycleControl {
                     operator: *operator,
-                })
+                }
             }
             StatementASTBody::Return { value } => {
                 let value = value.resolve(ctx)?;
-                Ok(Statement::Return {
+                StatementBody::Return {
                     value,
-                })
+                }
             }
             StatementASTBody::Block { statements } => {
                 let scope = ctx.child();
@@ -273,23 +274,27 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                 for statement in statements {
                     result.push(statement.resolve(&scope)?);
                 }
-                Ok(Statement::Block {
+                StatementBody::Block {
                     statements: result,
-                })
+                }
             }
             StatementASTBody::Expression { expression } => {
                 let expression = expression.resolve(ctx)?;
-                Ok(Statement::Expression {
+                StatementBody::Expression {
                     expression,
-                })
+                }
             }
             _ => unimplemented!()
-        }
+        };
+        Ok(Statement {
+            body,
+            pos: self.pos,
+        })
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Statement {
+pub enum StatementBody {
     Nothing,
     VariableAssignment {
         var: SyncRef<FunctionVariable>,
@@ -318,12 +323,18 @@ pub enum Statement {
     },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Statement {
+    pub body: StatementBody,
+    pub pos: ItemPosition,
+}
+
 impl Statement {
     pub fn is_lite_weight(&self) -> bool {
-        match self {
-            Statement::Nothing => true,
-            Statement::VariableAssignment { var: _, source: _ } => true,
-            Statement::Condition { condition, then_body, else_body } => {
+        match &self.body {
+            StatementBody::Nothing => true,
+            StatementBody::VariableAssignment { var: _, source: _ } => true,
+            StatementBody::Condition { condition, then_body, else_body } => {
                 let is_else_body_lite_weight = match else_body {
                     Some(body) => body.is_lite_weight(),
                     None => true
@@ -332,7 +343,7 @@ impl Statement {
                     && condition.is_lite_weight()
                     && then_body.is_lite_weight()
             }
-            Statement::Cycle { cycle_type, body } => {
+            StatementBody::Cycle { cycle_type, body } => {
                 let is_predicate_lite_weight = match cycle_type {
                     CycleType::Simple => true,
                     CycleType::PostPredicated(predicate) => predicate.is_lite_weight(),
@@ -341,17 +352,90 @@ impl Statement {
                 is_predicate_lite_weight
                     && body.is_lite_weight()
             }
-            Statement::CycleControl { operator: _ } => true,
-            Statement::Return { value } => match value {
+            StatementBody::CycleControl { operator: _ } => true,
+            StatementBody::Return { value } => match value {
                 Some(StatementSource::Expression(expr)) => expr.is_lite_weight(),
                 Some(StatementSource::Selection(_)) => true,
                 None => true,
             },
-            Statement::Block { statements } => statements.iter()
+            StatementBody::Block { statements } => statements.iter()
                 .all(|stmt| stmt.is_lite_weight()),
-            Statement::Expression { expression } => expression.is_lite_weight(),
+            StatementBody::Expression { expression } => expression.is_lite_weight(),
         }
     }
-    //TODO Все ветви кода должны возвращать значение корректного типа.
     //TODO Выражения типа, отличного от Void, должны сохранять результат своего выполнения.
+    pub fn jumping_check(&self, pos: StatementFlowControlPosition, return_data_type: &DataType) -> Result<StatementFlowControlJumping, Vec<SemanticError>> {
+        match &self.body {
+            StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
+            StatementBody::VariableAssignment { var: _, source: _ } => Ok(StatementFlowControlJumping::Nothing),
+            StatementBody::Condition { condition: _, then_body, else_body } => {
+                match then_body.jumping_check(pos, return_data_type) {
+                    Ok(then_body_jumping) => {
+                        let else_body_jumping = match else_body {
+                            Some(else_body) => else_body.jumping_check(pos, return_data_type)?,
+                            None => StatementFlowControlJumping::Nothing,
+                        };
+                        Ok(then_body_jumping + else_body_jumping)
+                    },
+                    Err(mut then_body_errors) => {
+                        if let Some(else_body) = else_body {
+                            if let Err(mut else_body_errors) = else_body.jumping_check(pos, return_data_type) {
+                                then_body_errors.append(&mut else_body_errors);
+                            }
+                        }
+                        Err(then_body_errors)
+                    }
+                }
+            }
+            StatementBody::Cycle { cycle_type: _, body } => {
+                body.jumping_check(pos.in_cycle(), return_data_type)
+            }
+            StatementBody::CycleControl { operator } => {
+                if !pos.is_in_cycle() {
+                    return SemanticError::not_allowed_here(self.pos, "cycle control operators")
+                        .into_err_vec();
+                }
+                match operator {
+                    CycleControlOperator::Break => Ok(StatementFlowControlJumping::AlwaysBreaks),
+                    CycleControlOperator::Continue => Ok(StatementFlowControlJumping::AlwaysContinues),
+                }
+            }
+            StatementBody::Return { value } => {
+                match value {
+                    Some(value) => value.type_of().should_cast_to(self.pos, return_data_type)?,
+                    None => DataType::Void.should_cast_to(self.pos, return_data_type)?,
+                }
+                Ok(StatementFlowControlJumping::AlwaysReturns)
+            }
+            StatementBody::Block { statements } => {
+                let mut result = StatementFlowControlJumping::Nothing;
+                let mut errors = Vec::new();
+                let mut statements_iter = statements.iter();
+                while let Some(statement) = statements_iter.next() {
+                    match statement.jumping_check(pos, return_data_type) {
+                        Ok(local_result) => match local_result {
+                            StatementFlowControlJumping::AlwaysReturns |
+                            StatementFlowControlJumping::AlwaysBreaks |
+                            StatementFlowControlJumping::AlwaysContinues => return match statements_iter.next() {
+                                Some(statement) => SemanticError::unreachable_statement(statement.pos).into_err_vec(),
+                                None => Ok(local_result),
+                            },
+                            local_result => if errors.is_empty() {
+                                result += local_result;
+                            }
+                        }
+                        Err(mut local_errors) => {
+                            errors.append(&mut local_errors);
+                        }
+                    }
+                }
+                if errors.is_empty() {
+                    Ok(result)
+                } else {
+                    Err(errors)
+                }
+            }
+            StatementBody::Expression { expression: _ } => Ok(StatementFlowControlJumping::Nothing),
+        }
+    }
 }

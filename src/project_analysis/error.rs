@@ -98,6 +98,8 @@ pub enum SemanticErrorKind {
     CannotModifyReadOnlyVariable {
         name: String,
     },
+    UnreachableStatement,
+    NotAllBranchesReturns,
 }
 
 impl Default for SemanticErrorKind {
@@ -131,6 +133,8 @@ impl fmt::Display for SemanticErrorKind {
             SemanticErrorKind::NotAllowedInside { feature, output_feature } => write!(f, "{} is not allowed inside {}", feature, output_feature),
             SemanticErrorKind::ExpectedExpressionOfAnotherType { expected, got } => write!(f, "expected expression of type {}, got {}", expected, got),
             SemanticErrorKind::CannotModifyReadOnlyVariable { name } => write!(f, "can't modify read-only variable {}", name),
+            SemanticErrorKind::UnreachableStatement => write!(f, "unreachable statement"),
+            SemanticErrorKind::NotAllBranchesReturns => write!(f, "not all branches of code return a value"),
         }
     }
 }
@@ -247,6 +251,14 @@ impl SemanticError {
     #[inline]
     pub fn cannot_modify_readonly_variable(pos: ItemPosition, name: String) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::CannotModifyReadOnlyVariable { name }, text: None }
+    }
+    #[inline]
+    pub fn unreachable_statement(pos: ItemPosition) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::UnreachableStatement, text: None }
+    }
+    #[inline]
+    pub fn not_all_branches_returns(pos: ItemPosition) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::NotAllBranchesReturns, text: None }
     }
     #[inline]
     pub fn set_text(&mut self, text: Arc<Text>) {
