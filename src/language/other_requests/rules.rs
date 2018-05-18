@@ -19,19 +19,19 @@ use language::{
 };
 use super::*;
 
-parser_rule!(updating_value(i) -> UpdatingValue<'source> {
+parser_rule!(updating_value(i) -> UpdatingValueAST<'source> {
     alt!(i,
-        apply!(keyword, "default") => { |_| UpdatingValue::Default }
-        | expression => { |x| UpdatingValue::Expression(x) }
+        apply!(keyword, "default") => { |t: &Token| UpdatingValueAST::Default(t.pos()) }
+        | expression => { |x| UpdatingValueAST::Expression(x) }
     )
 });
 
-parser_rule!(updating_assignment(i) -> UpdatingAssignment<'source> {
+parser_rule!(updating_assignment(i) -> UpdatingAssignmentAST<'source> {
     do_parse!(i,
         property: property_path >>
         apply!(symbols, "=") >>
         value: updating_value >>
-        (UpdatingAssignment { property, value })
+        (UpdatingAssignmentAST { property, value })
     )
 });
 
@@ -44,7 +44,7 @@ parser_rule!(limit_clause(i) -> u32 {
 });
 
 /// Выполняет разбор запроса обновления
-pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Updating<'source>> {
+pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, UpdatingAST<'source>> {
     do_parse!(input,
         apply!(keyword, "update") >>
         low_priority: opt!(apply!(keyword, "low_priority")) >>
@@ -55,7 +55,7 @@ pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResul
         where_clause: opt!(apply!(select_condition, "where")) >>
         order_by_clause: opt!(apply!(select_sorting, "order")) >>
         limit_clause: opt!(limit_clause) >>
-        (Updating {
+        (UpdatingAST {
             low_priority: low_priority.is_some(),
             ignore: ignore.is_some(),
             source,
@@ -94,28 +94,28 @@ parser_rule!(property_list(i) -> Vec<ItemPath> {
     )
 });
 
-parser_rule!(inserting_source(i) -> InsertingSource<'source> {
+parser_rule!(inserting_source(i) -> InsertingSourceAST<'source> {
     alt!(i,
         do_parse!(
             properties: opt!(property_list) >>
             alt!(apply!(keyword, "value") | apply!(keyword, "values")) >>
             lists: apply!(comma_list, value_list) >>
-            (InsertingSource::ValueLists { properties, lists })
+            (InsertingSourceAST::ValueLists { properties, lists })
         )
         | do_parse!(
             apply!(keyword, "set") >>
             assignments: apply!(comma_list, updating_assignment) >>
-            (InsertingSource::AssignmentList { assignments })
+            (InsertingSourceAST::AssignmentList { assignments })
         )
         | do_parse!(
             properties: opt!(property_list) >>
             query: selection >>
-            (InsertingSource::Selection { properties, query })
+            (InsertingSourceAST::Selection { properties, query })
         )
     )
 });
 
-parser_rule!(inserting_on_duplicate_key_update(i) -> Vec<UpdatingAssignment<'source>> {
+parser_rule!(inserting_on_duplicate_key_update(i) -> Vec<UpdatingAssignmentAST<'source>> {
     do_parse!(i,
         apply!(keyword, "on") >>
         apply!(keyword, "duplicate") >>
@@ -127,7 +127,7 @@ parser_rule!(inserting_on_duplicate_key_update(i) -> Vec<UpdatingAssignment<'sou
 });
 
 /// Выполняет разбор запроса записи
-pub fn inserting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Inserting<'source>> {
+pub fn inserting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, InsertingAST<'source>> {
     do_parse!(input,
         apply!(keyword, "insert") >>
         priority: inserting_priority >>
@@ -136,7 +136,7 @@ pub fn inserting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         target: data_source >>
         source: inserting_source >>
         on_duplicate_key_update: opt!(inserting_on_duplicate_key_update) >>
-        (Inserting {
+        (InsertingAST {
             priority,
             ignore: ignore.is_some(),
             target,
@@ -147,7 +147,7 @@ pub fn inserting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
 }
 
 /// Выполняет разбор запроса удаления
-pub fn deleting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Deleting<'source>> {
+pub fn deleting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DeletingAST<'source>> {
     do_parse!(input,
         apply!(keyword, "delete") >>
         low_priority: opt!(apply!(keyword, "low_priority")) >>
@@ -158,7 +158,7 @@ pub fn deleting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResul
         where_clause: opt!(apply!(select_condition, "where")) >>
         order_by_clause: opt!(apply!(select_sorting, "order")) >>
         limit_clause: opt!(limit_clause) >>
-        (Deleting {
+        (DeletingAST {
             low_priority: low_priority.is_some(),
             quick: quick.is_some(),
             ignore: ignore.is_some(),

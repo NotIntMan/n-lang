@@ -1,25 +1,48 @@
-use helpers::Assertion;
+use helpers::{
+    Assertion,
+    Resolve,
+    SyncRef,
+};
+use lexeme_scanner::ItemPosition;
 use language::{
     DataSourceAST,
+    Expression,
     ExpressionAST,
     ItemPath,
     SelectionAST,
     SelectionSortingItemAST,
 };
+use project_analysis::{
+    FunctionVariableScope,
+    SemanticError,
+};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UpdatingValue<'source> {
-    Default,
+pub enum UpdatingValueAST<'source> {
+    Default(ItemPosition),
     Expression(ExpressionAST<'source>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct UpdatingAssignment<'source> {
-    pub property: ItemPath,
-    pub value: UpdatingValue<'source>,
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingValueAST<'source> {
+    type Result = Expression;
+    type Error = SemanticError;
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        match self {
+            UpdatingValueAST::Default(pos) =>
+                return SemanticError::not_supported_yet(*pos, "default type's value")
+                    .into_err_vec(),
+            UpdatingValueAST::Expression(expr) => expr.resolve(scope),
+        }
+    }
 }
 
-impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignment<'source> {
+#[derive(Debug, Clone, PartialEq)]
+pub struct UpdatingAssignmentAST<'source> {
+    pub property: ItemPath,
+    pub value: UpdatingValueAST<'source>,
+}
+
+impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignmentAST<'source> {
     fn assert(&self, other: &(&str, Option<&str>)) {
         let other_property_tokens = ::lexeme_scanner::Scanner::scan(other.0)
             .expect("Scanner result must be ok");
@@ -28,23 +51,21 @@ impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignme
         assert_eq!(self.property.path, other_property.path);
         match other.1 {
             Some(other_expr) => {
-                if let &UpdatingValue::Expression(ref expr) = &self.value {
+                match_it!(&self.value, UpdatingValueAST::Expression(expr) => {
                     expr.assert(other_expr)
-                } else {
-                    panic!("Pattern UpdatingValue::Expression not matches value {:?}", self.value);
-                }
+                });
             },
-            None => assert_eq!(self.value, UpdatingValue::Default),
+            None => match_it!(&self.value, UpdatingValueAST::Default(_) => {}),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Updating<'source> {
+pub struct UpdatingAST<'source> {
     pub low_priority: bool,
     pub ignore: bool,
     pub source: DataSourceAST<'source>,
-    pub assignments: Vec<UpdatingAssignment<'source>>,
+    pub assignments: Vec<UpdatingAssignmentAST<'source>>,
     pub where_clause: Option<ExpressionAST<'source>>,
     pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
     pub limit_clause: Option<u32>,
@@ -59,13 +80,13 @@ pub enum InsertingPriority {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum InsertingSource<'source> {
+pub enum InsertingSourceAST<'source> {
     ValueLists {
         properties: Option<Vec<ItemPath>>,
         lists: Vec<Vec<ExpressionAST<'source>>>,
     },
     AssignmentList {
-        assignments: Vec<UpdatingAssignment<'source>>,
+        assignments: Vec<UpdatingAssignmentAST<'source>>,
     },
     Selection {
         properties: Option<Vec<ItemPath>>,
@@ -74,16 +95,16 @@ pub enum InsertingSource<'source> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Inserting<'source> {
+pub struct InsertingAST<'source> {
     pub priority: InsertingPriority,
     pub ignore: bool,
     pub target: DataSourceAST<'source>,
-    pub source: InsertingSource<'source>,
-    pub on_duplicate_key_update: Option<Vec<UpdatingAssignment<'source>>>,
+    pub source: InsertingSourceAST<'source>,
+    pub on_duplicate_key_update: Option<Vec<UpdatingAssignmentAST<'source>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Deleting<'source> {
+pub struct DeletingAST<'source> {
     pub low_priority: bool,
     pub quick: bool,
     pub ignore: bool,
