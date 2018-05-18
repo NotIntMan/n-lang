@@ -100,6 +100,7 @@ pub enum SemanticErrorKind {
     },
     UnreachableStatement,
     NotAllBranchesReturns,
+    CannotModifyReadOnlyDataSource,
 }
 
 impl Default for SemanticErrorKind {
@@ -135,6 +136,7 @@ impl fmt::Display for SemanticErrorKind {
             SemanticErrorKind::CannotModifyReadOnlyVariable { name } => write!(f, "can't modify read-only variable {}", name),
             SemanticErrorKind::UnreachableStatement => write!(f, "unreachable statement"),
             SemanticErrorKind::NotAllBranchesReturns => write!(f, "not all branches of code return a value"),
+            SemanticErrorKind::CannotModifyReadOnlyDataSource => write!(f, "can't modify read-only data-source"),
         }
     }
 }
@@ -259,6 +261,10 @@ impl SemanticError {
     #[inline]
     pub fn not_all_branches_returns(pos: ItemPosition) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::NotAllBranchesReturns, text: None }
+    }
+    #[inline]
+    pub fn cannot_modify_readonly_datasource(pos: ItemPosition) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::CannotModifyReadOnlyDataSource, text: None }
     }
     #[inline]
     pub fn set_text(&mut self, text: Arc<Text>) {

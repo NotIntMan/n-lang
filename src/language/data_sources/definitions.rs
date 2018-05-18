@@ -96,7 +96,10 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                             Some(alias) => alias.text(),
                             None => name,
                         };
-                        scope.new_variable(pos, new_var_name.to_string(), Some(entity_type))?;
+                        let new_var = scope.new_variable(pos, new_var_name.to_string(), Some(entity_type))?;
+                        if var.is_read_only() {
+                            new_var.make_read_only();
+                        }
                         return Ok(DataSource::Variable { var });
                     }
                 }
@@ -171,4 +174,15 @@ pub enum DataSource {
         query: Box<Selection>,
         alias: String,
     },
+}
+
+impl DataSource {
+    pub fn is_read_only(&self) -> bool {
+        match self {
+            DataSource::Variable { var } => var.is_read_only(),
+            DataSource::Table { item: _ } => false,
+            DataSource::Join { join_type: _, condition: _, left, right } => left.is_read_only() || right.is_read_only(),
+            DataSource::Selection { query: _, alias: _ } => true,
+        }
+    }
 }

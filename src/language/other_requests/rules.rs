@@ -1,10 +1,12 @@
 use lexeme_scanner::Token;
 use parser_basics::{
     comma_list,
+    item_position,
     keyword,
     none,
     ParserResult,
     symbols,
+    symbol_position,
     u32_literal,
 };
 use language::{
@@ -28,10 +30,12 @@ parser_rule!(updating_value(i) -> UpdatingValueAST<'source> {
 
 parser_rule!(updating_assignment(i) -> UpdatingAssignmentAST<'source> {
     do_parse!(i,
+        begin: symbol_position >>
         property: property_path >>
         apply!(symbols, "=") >>
         value: updating_value >>
-        (UpdatingAssignmentAST { property, value })
+        pos: apply!(item_position, begin) >>
+        (UpdatingAssignmentAST { property, value, pos })
     )
 });
 
@@ -46,6 +50,7 @@ parser_rule!(limit_clause(i) -> u32 {
 /// Выполняет разбор запроса обновления
 pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, UpdatingAST<'source>> {
     do_parse!(input,
+        begin: symbol_position >>
         apply!(keyword, "update") >>
         low_priority: opt!(apply!(keyword, "low_priority")) >>
         ignore: opt!(apply!(keyword, "ignore")) >>
@@ -55,6 +60,7 @@ pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResul
         where_clause: opt!(apply!(select_condition, "where")) >>
         order_by_clause: opt!(apply!(select_sorting, "order")) >>
         limit_clause: opt!(limit_clause) >>
+        pos: apply!(item_position, begin) >>
         (UpdatingAST {
             low_priority: low_priority.is_some(),
             ignore: ignore.is_some(),
@@ -63,6 +69,7 @@ pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResul
             where_clause,
             order_by_clause,
             limit_clause,
+            pos,
         })
     )
 }
