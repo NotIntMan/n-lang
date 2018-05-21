@@ -71,3 +71,7 @@ pub use self::is_f32_enough::*;
 
 #[macro_use]
 pub mod universal_assert_macro;
+
+pub mod result_collect;
+
+pub use self::result_collect::*;
