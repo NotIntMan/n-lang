@@ -12,11 +12,14 @@ use language::{
     ExpressionAST,
     DataType,
     DataTypeAST,
+    Deleting,
     DeletingAST,
+    Inserting,
     InsertingAST,
     ItemPath,
     Selection,
     SelectionAST,
+    Updating,
     UpdatingAST,
 };
 use project_analysis::{
@@ -258,7 +261,18 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
                     expression,
                 }
             }
-            _ => unimplemented!()
+            StatementASTBody::DeletingRequest { request } => {
+                let request = request.resolve(ctx)?;
+                StatementBody::DeletingRequest { request }
+            }
+            StatementASTBody::InsertingRequest { request } => {
+                let request = request.resolve(ctx)?;
+                StatementBody::InsertingRequest { request }
+            }
+            StatementASTBody::UpdatingRequest { request } => {
+                let request = request.resolve(ctx)?;
+                StatementBody::UpdatingRequest { request }
+            }
         };
         Ok(Statement {
             body,
@@ -334,6 +348,15 @@ pub enum StatementBody {
     Expression {
         expression: Expression,
     },
+    DeletingRequest {
+        request: Deleting,
+    },
+    InsertingRequest {
+        request: Inserting,
+    },
+    UpdatingRequest {
+        request: Updating,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -374,12 +397,14 @@ impl Statement {
             StatementBody::Block { statements } => statements.iter()
                 .all(|stmt| stmt.is_lite_weight()),
             StatementBody::Expression { expression } => expression.is_lite_weight(),
+            StatementBody::DeletingRequest { request } => request.is_lite_weight(),
+            StatementBody::InsertingRequest { request } => request.is_lite_weight(),
+            StatementBody::UpdatingRequest { request } => request.is_lite_weight(),
         }
     }
     //TODO Выражения типа, отличного от Void, должны сохранять результат своего выполнения.
     pub fn jumping_check(&self, pos: StatementFlowControlPosition, return_data_type: &DataType) -> Result<StatementFlowControlJumping, Vec<SemanticError>> {
         match &self.body {
-            StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
             StatementBody::VariableAssignment { target: _, source: _ } => Ok(StatementFlowControlJumping::Nothing),
             StatementBody::Condition { condition: _, then_body, else_body } => {
                 match then_body.jumping_check(pos, return_data_type) {
@@ -448,7 +473,11 @@ impl Statement {
                     Err(errors)
                 }
             }
-            StatementBody::Expression { expression: _ } => Ok(StatementFlowControlJumping::Nothing),
+            StatementBody::Expression { expression: _ } |
+            StatementBody::DeletingRequest { request: _ } |
+            StatementBody::InsertingRequest { request: _ } |
+            StatementBody::UpdatingRequest { request: _ } |
+            StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
         }
     }
 }

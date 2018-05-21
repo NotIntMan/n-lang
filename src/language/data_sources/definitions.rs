@@ -217,4 +217,13 @@ impl DataSource {
         };
         inner_var.is_same_ref(&target.var)
     }
+    pub fn is_local(&self) -> bool {
+        match self {
+            DataSource::Variable { var: _ } => true,
+            DataSource::Table { item: _, var: _ } => false,
+            DataSource::Join { join_type: _, condition: _, left, right } =>
+                left.is_local() && right.is_local(),
+            DataSource::Selection { query: _, alias: _, var: _ } => true,
+        }
+    }
 }

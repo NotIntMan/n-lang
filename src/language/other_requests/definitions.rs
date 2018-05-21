@@ -156,6 +156,13 @@ pub struct Updating {
     pub limit_clause: Option<u32>,
 }
 
+impl Updating {
+    #[inline]
+    pub fn is_lite_weight(&self) -> bool {
+        self.source.is_local()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InsertingPriority {
     Usual,
@@ -170,7 +177,6 @@ pub struct ValueList<'source> {
     pub pos: ItemPosition,
 }
 
-//TODO Typeof data source
 #[derive(Debug, Clone, PartialEq)]
 pub enum InsertingSourceASTBody<'source> {
     ValueLists {
@@ -359,6 +365,13 @@ pub struct Inserting {
     pub on_duplicate_key_update: Option<Vec<UpdatingAssignment>>,
 }
 
+impl Inserting {
+    #[inline]
+    pub fn is_lite_weight(&self) -> bool {
+        self.target.is_local()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeletingAST<'source> {
     pub low_priority: bool,
@@ -410,4 +423,11 @@ pub struct Deleting {
     pub where_clause: Option<Expression>,
     pub order_by_clause: Option<Vec<SelectionSortingItem>>,
     pub limit_clause: Option<u32>,
+}
+
+impl Deleting {
+    #[inline]
+    pub fn is_lite_weight(&self) -> bool {
+        self.source.is_local()
+    }
 }
