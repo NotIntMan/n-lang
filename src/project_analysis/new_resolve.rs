@@ -21,6 +21,12 @@ fn do_it() {
 
     let mut stdlib = StdLib::new();
 
+    let tiny_unsigned_integer = DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
+        unsigned: true,
+        zerofill: false,
+        size: 8,
+    }));
+
     let small_integer = DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
         unsigned: false,
         zerofill: false,
@@ -28,6 +34,13 @@ fn do_it() {
     }));
 
     let boolean = DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean));
+
+    stdlib.reg_binary_operation(StdLibBinaryOperation {
+        operator: BinaryOperator::Plus,
+        left: tiny_unsigned_integer.clone(),
+        right: tiny_unsigned_integer.clone(),
+        output: tiny_unsigned_integer.clone(),
+    });
 
     stdlib.reg_binary_operation(StdLibBinaryOperation {
         operator: BinaryOperator::Plus,
@@ -69,37 +82,42 @@ fn do_it() {
         Path::empty(),
         "index.n",
         "\
-            pub struct Complex(small integer, small integer)
-
-            pub struct IntC {
-                value: integer,
+            pub struct PersonInfo {
+                age: unsigned tiny integer,
             }
 
-            table Waves {
+            table Users {
                 #[primary_key]
                 #[auto_increment]
                 id: unsigned integer,
-                signal: Complex,
+                person_info: PersonInfo,
             }
 
-            fn alpha(x: boolean): IntC {
-                let a := SELECT
-                        w.id,
-                        max(w.signal.component0) as max_c0,
-                        max(w.signal.component1) as max_c1
-                    FROM Waves w
-                    GROUP BY w.id
-                    HAVING max(w.signal.component0) > 0
-                ;
-                let b := SELECT sum(a.max_c0), sum(a.max_c1) FROM a;
-                let result: IntC;
-                if x {
-                    result.value := b.component0;
-                    return result;
-                } else {
-                    result.value := b.component1;
-                    return result;
-                }
+            fn user_age(user: Users::entity): unsigned tiny integer {
+                return user.person_info.age;
+            }
+
+            fn get_max_user_age(): small integer {
+                let t := select max(user_age(u)) from Users u;
+                return t.component0;
+            }
+
+            fn add_user(person_info: PersonInfo) {
+                insert into Users u (u.person_info) values (person_info);
+            }
+
+            fn new_person_info(age: unsigned tiny integer): PersonInfo {
+                let result: PersonInfo;
+                result.age := age;
+                return result;
+            }
+
+            fn old_all_users(increment: unsigned tiny integer) {
+                update Users u set u.person_info.age = user_age(u) + 1;
+            }
+
+            fn wrong() {
+                let a := select old_all_users(2) from Users;
             }
         ",
     );
