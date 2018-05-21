@@ -3,8 +3,10 @@ use helpers::{
     Resolve,
     SyncRef,
 };
+use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use language::{
+    AssignmentTarget,
     DataType,
     Expression,
     ExpressionAST,
@@ -102,32 +104,27 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                 }
                 match scope.module().get_item(name.path.as_path(), &mut Vec::new()) {
                     Some(item) => {
-                        {
+                        let var = {
                             let mut item = item.write();
                             let item_type = item.get_type();
-                            match item.get_table_mut() {
-                                Some(table) => {
-                                    let new_var_name = match alias {
-                                        Some(alias) => alias.text(),
-                                        None => name.path.as_path()
-                                            .pop_right()
-                                            .expect("Item's path should not be null"),
-                                    };
-                                    scope.new_variable(
-                                        pos,
-                                        new_var_name.to_string(),
-                                        Some(table.make_entity_type()),
-                                    )?;
-                                }
+                            let entity_type = match item.get_table_mut() {
+                                Some(table) => table.make_entity_type(),
                                 None => return SemanticError::expected_item_of_another_type(
                                     name.pos,
                                     SemanticItemType::Table,
                                     item_type,
                                 )
                                     .into_err_vec(),
-                            }
-                        }
-                        Ok(DataSource::Table { item })
+                            };
+                            let new_var_name = match alias {
+                                Some(alias) => alias.text(),
+                                None => name.path.as_path()
+                                    .pop_right()
+                                    .expect("Item's path should not be null"),
+                            };
+                            scope.new_variable(pos, new_var_name.to_string(), Some(entity_type))?
+                        };
+                        Ok(DataSource::Table { item, var })
                     }
                     None => SemanticError::unresolved_item(name.pos, name.path.clone()).into_err_vec(),
                 }
@@ -142,12 +139,12 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                 let scope = scope.parent()
                     .expect("Sub-selection cannot resolve on scope without parent (because of isolated scope reasons)");
                 let query: Box<Selection> = query.resolve(&scope)?;
-                scope.new_variable(
+                let var = scope.new_variable(
                     alias.item_pos(),
                     alias.to_string(),
                     Some(query.result_data_type.clone()),
                 )?;
-                Ok(DataSource::Selection { query, alias: alias.to_string() })
+                Ok(DataSource::Selection { query, alias: alias.to_string(), var })
             }
         }
     }
@@ -160,6 +157,7 @@ pub enum DataSource {
     },
     Table {
         item: SyncRef<Item>,
+        var: SyncRef<FunctionVariable>,
     },
     Join {
         join_type: JoinType,
@@ -170,6 +168,7 @@ pub enum DataSource {
     Selection {
         query: Box<Selection>,
         alias: String,
+        var: SyncRef<FunctionVariable>,
     },
 }
 
@@ -177,25 +176,45 @@ impl DataSource {
     pub fn is_allows_updates(&self) -> bool {
         match self {
             DataSource::Variable { var } => !var.is_read_only(),
-            DataSource::Table { item: _ } => true,
+            DataSource::Table { item: _, var: _ } => true,
             DataSource::Join { join_type: _, condition: _, left, right } => left.is_allows_updates() && right.is_allows_updates(),
-            DataSource::Selection { query: _, alias: _ } => false,
+            DataSource::Selection { query: _, alias: _, var: _ } => false,
         }
     }
     pub fn is_allows_inserts(&self) -> bool {
         match self {
             DataSource::Variable { var } => !var.is_read_only(),
-            DataSource::Table { item: _ } => true,
+            DataSource::Table { item: _, var: _ } => true,
             DataSource::Join { join_type: _, condition: _, left: _, right: _ } => false,
-            DataSource::Selection { query: _, alias: _ } => false,
+            DataSource::Selection { query: _, alias: _, var: _ } => false,
+        }
+    }
+    pub fn get_datatype_for_insert(&self, pos: ItemPosition) -> Result<DataType, SemanticError> {
+        match self {
+            DataSource::Variable { var } => var.data_type(pos),
+            DataSource::Table { item: _, var } => var.data_type(pos),
+            DataSource::Join { join_type: _, condition: _, left: _, right: _ } =>
+                return Err(SemanticError::not_allowed_inside(pos, "insertion", "JOIN of data sources")),
+            DataSource::Selection { query: _, alias: _, var: _ } =>
+                return Err(SemanticError::not_allowed_inside(pos, "insertion", "SELECT subquery")),
         }
     }
     pub fn is_allows_deletes(&self) -> bool {
         match self {
             DataSource::Variable { var } => !var.is_read_only(),
-            DataSource::Table { item: _ } => true,
+            DataSource::Table { item: _, var: _ } => true,
             DataSource::Join { join_type: _, condition: _, left: _, right: _ } => false,
-            DataSource::Selection { query: _, alias: _ } => false,
+            DataSource::Selection { query: _, alias: _, var: _ } => false,
         }
+    }
+    pub fn is_target_belongs_to_source(&self, target: &AssignmentTarget) -> bool {
+        let inner_var = match self {
+            DataSource::Variable { var } => var,
+            DataSource::Table { item: _, var } => var,
+            DataSource::Join { join_type: _, condition: _, left, right } =>
+                return left.is_target_belongs_to_source(target) || right.is_target_belongs_to_source(target),
+            DataSource::Selection { query: _, alias: _, var } => var,
+        };
+        inner_var.is_same_ref(&target.var)
     }
 }

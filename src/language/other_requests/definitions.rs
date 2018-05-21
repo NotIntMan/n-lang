@@ -21,6 +21,7 @@ use language::{
 };
 use project_analysis::{
     FunctionVariableScope,
+    InsertSourceContext,
     SemanticError,
 };
 
@@ -191,10 +192,10 @@ pub struct InsertingSourceAST<'source> {
     pub pos: ItemPosition,
 }
 
-impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingSourceAST<'source> {
+impl<'source, 'a> Resolve<InsertSourceContext<'a>> for InsertingSourceAST<'source> {
     type Result = InsertingSource;
     type Error = SemanticError;
-    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+    fn resolve(&self, ctx: &InsertSourceContext<'a>) -> Result<Self::Result, Vec<Self::Error>> {
         match &self.body {
             InsertingSourceASTBody::ValueLists { properties, lists } => {
                 let properties = match properties {
@@ -202,10 +203,15 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingSourceAST<'so
                     None => return SemanticError::not_supported_yet(self.pos, "lists of values without list of columns as a data source")
                         .into_err_vec(),
                 };
-                //TODO Проверка на то, чтобы AssignmentTarget принадлежал именно к целевой таблице
                 let properties: Vec<AssignmentTarget> = deep_result_collect(
                     properties.iter()
-                        .map(|prop| AssignmentTarget::new_in_scope(scope, prop.pos, prop.path.as_path()))
+                        .map(|prop| {
+                            let assignment = AssignmentTarget::new_in_scope(ctx.scope, prop.pos, prop.path.as_path())?;
+                            if !ctx.target.is_target_belongs_to_source(&assignment) {
+                                return Err(SemanticError::not_allowed_inside(prop.pos, "assignment not belonging to the target data source", "INSERT query"));
+                            }
+                            Ok(assignment)
+                        })
                 )?;
                 let expected_len = properties.len();
                 let lists: Vec<Vec<Expression>> = accumulative_result_collect(lists.iter().map(|list| {
@@ -214,7 +220,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingSourceAST<'so
                     if got_len != expected_len {
                         errors.push(SemanticError::value_list_with_wrong_length(list.pos, expected_len, got_len));
                     }
-                    let expressions = match list.values.accumulative_resolve(scope, &mut errors) {
+                    let expressions = match list.values.accumulative_resolve(ctx.scope, &mut errors) {
                         Some(expressions) => expressions,
                         None => return Err(errors),
                     };
@@ -235,44 +241,51 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingSourceAST<'so
                 })
             }
             InsertingSourceASTBody::AssignmentList { assignments } => {
-                //TODO Проверка на то, чтобы AssignmentTarget принадлежал именно к целевой таблице
-                let assignments = assignments.resolve(scope)?;
+                let assignments = accumulative_result_collect(assignments.iter().map(|assignment_ast| {
+                    let assignment = assignment_ast.resolve(ctx.scope)?;
+                    if !ctx.target.is_target_belongs_to_source(&assignment.target) {
+                        return SemanticError::not_allowed_inside(assignment_ast.pos, "assignment not belonging to the target data source", "INSERT query")
+                            .into_err_vec();
+                    }
+                    Ok(assignment)
+                }))?;
                 Ok(InsertingSource::AssignmentList { assignments })
             }
             InsertingSourceASTBody::Selection { properties, query } => {
-                let query = query.resolve(scope)?;
-                let query_result_type: &DataType = match &query.result_data_type {
-                    DataType::Array(query_result_type) => &**query_result_type,
-                    query_result_type => query_result_type,
+                let query = query.resolve(ctx.scope)?;
+                let properties = {
+                    let query_result_type: &DataType = match &query.result_data_type {
+                        DataType::Array(query_result_type) => &**query_result_type,
+                        query_result_type => query_result_type,
+                    };
+                    match properties {
+                        Some(properties) => {
+                            let assignments: Vec<AssignmentTarget> = accumulative_result_collect(
+                                properties.iter().enumerate()
+                                    .map(|(i, prop)| {
+                                        let assignment = AssignmentTarget::new_in_scope(
+                                            ctx.scope,
+                                            prop.pos,
+                                            prop.path.as_path(),
+                                        )?;
+                                        let query_field_type = match query_result_type.get_field_type(i) {
+                                            Some(field_type) => field_type,
+                                            None => return SemanticError::select_with_wrong_column_count(query.pos, properties.len(), query.result_data_type.field_len())
+                                                .into_err_vec(),
+                                        };
+                                        assignment.check_source_type(&query_field_type)?;
+                                        Ok(assignment)
+                                    })
+                            )?;
+                            Some(assignments)
+                        },
+                        None => {
+                            query_result_type.should_cast_to(query.pos, &ctx.target.get_datatype_for_insert(query.pos)?)?;
+                            None
+                        },
+                    }
                 };
-                let _properties = match properties {
-                    Some(properties) => {
-                        let assignments: Vec<AssignmentTarget> = accumulative_result_collect(
-                            properties.iter().enumerate()
-                                .map(|(i, prop)| {
-                                    let assignment = AssignmentTarget::new_in_scope(
-                                        scope,
-                                        prop.pos,
-                                        prop.path.as_path(),
-                                    )?;
-                                    let query_field_type = match query_result_type.get_field_type(i) {
-                                        Some(field_type) => field_type,
-                                        None => return SemanticError::select_with_wrong_column_count(query.pos, properties.len(), query.result_data_type.field_len())
-                                            .into_err_vec(),
-                                    };
-                                    assignment.check_source_type(&query_field_type)?;
-                                    Ok(assignment)
-                                })
-                        )?;
-                        Some(assignments)
-                    },
-                    None => {
-                        //TODO Проверка типа результата запроса на валидность приведения к типу записи таблицы
-                        None
-                    },
-                };
-
-                unimplemented!()
+                Ok(InsertingSource::Selection { properties, query })
             }
         }
     }
