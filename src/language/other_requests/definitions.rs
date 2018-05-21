@@ -1,6 +1,7 @@
 use helpers::{
+    accumulative_result_collect,
     Assertion,
-    PathBuf,
+    deep_result_collect,
     Resolve,
     SyncRef,
 };
@@ -12,6 +13,7 @@ use language::{
     Expression,
     ExpressionAST,
     ItemPath,
+    Selection,
     SelectionAST,
     SelectionSortingItem,
     SelectionSortingItemAST,
@@ -106,8 +108,8 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAST<'source> {
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
         let source = self.source.resolve(scope)?;
-        if source.is_read_only() {
-            return SemanticError::cannot_modify_readonly_datasource(self.pos)
+        if !source.is_allows_updates() {
+            return SemanticError::cannot_do_with_datasource(self.pos, "update")
                 .into_err_vec();
         }
         let mut errors = Vec::new();
@@ -160,12 +162,18 @@ pub enum InsertingPriority {
     High,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValueList<'source> {
+    pub values: Vec<ExpressionAST<'source>>,
+    pub pos: ItemPosition,
+}
+
 //TODO Typeof data source
 #[derive(Debug, Clone, PartialEq)]
-pub enum InsertingSourceAST<'source> {
+pub enum InsertingSourceASTBody<'source> {
     ValueLists {
         properties: Option<Vec<ItemPath>>,
-        lists: Vec<Vec<ExpressionAST<'source>>>,
+        lists: Vec<ValueList<'source>>,
     },
     AssignmentList {
         assignments: Vec<UpdatingAssignmentAST<'source>>,
@@ -177,12 +185,92 @@ pub enum InsertingSourceAST<'source> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct InsertingSourceAST<'source> {
+    pub body: InsertingSourceASTBody<'source>,
+    pub pos: ItemPosition,
+}
+
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingSourceAST<'source> {
+    type Result = InsertingSource;
+    type Error = SemanticError;
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        match &self.body {
+            InsertingSourceASTBody::ValueLists { properties, lists } => {
+                let properties = match properties {
+                    Some(properties) => properties,
+                    None => return SemanticError::not_supported_yet(self.pos, "lists of values without list of columns as a data source")
+                        .into_err_vec(),
+                };
+                let properties: Vec<AssignmentTarget> = deep_result_collect(
+                    properties.iter()
+                        .map(|prop| AssignmentTarget::new_in_scope(scope, prop.pos, prop.path.as_path()))
+                )?;
+                let expected_len = properties.len();
+                let lists: Vec<Vec<Expression>> = accumulative_result_collect(lists.iter().map(|list| {
+                    let mut errors = Vec::new();
+                    let got_len = list.values.len();
+                    if got_len != expected_len {
+                        errors.push(SemanticError::value_list_with_wrong_length(list.pos, expected_len, got_len));
+                    }
+                    let expressions = match list.values.accumulative_resolve(scope, &mut errors) {
+                        Some(expressions) => expressions,
+                        None => return Err(errors),
+                    };
+                    for (i, prop) in properties.iter().enumerate() {
+                        if let Err(e) = prop.check_source_type(&expressions[i].data_type) {
+                            errors.push(e);
+                        }
+                    }
+                    if errors.is_empty() {
+                        Ok(expressions)
+                    } else {
+                        Err(errors)
+                    }
+                }))?;
+                Ok(InsertingSource::ValueLists {
+                    properties,
+                    lists,
+                })
+            }
+            InsertingSourceASTBody::AssignmentList { assignments } => {
+                let assignments = assignments.resolve(scope)?;
+                Ok(InsertingSource::AssignmentList { assignments })
+            }
+            _ => unimplemented!(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum InsertingSource {
+    ValueLists {
+        properties: Vec<AssignmentTarget>,
+        lists: Vec<Vec<Expression>>,
+    },
+    AssignmentList {
+        assignments: Vec<UpdatingAssignment>,
+    },
+    Selection {
+        properties: Option<Vec<AssignmentTarget>>,
+        query: Selection,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct InsertingAST<'source> {
     pub priority: InsertingPriority,
     pub ignore: bool,
     pub target: DataSourceAST<'source>,
     pub source: InsertingSourceAST<'source>,
     pub on_duplicate_key_update: Option<Vec<UpdatingAssignmentAST<'source>>>,
+}
+
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> {
+    type Result = ();
+    type Error = SemanticError;
+    fn resolve(&self, _scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

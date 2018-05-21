@@ -11,7 +11,6 @@ use parser_basics::{
 };
 use language::{
     data_source,
-    ExpressionAST,
     expression,
     ItemPath,
     selection,
@@ -83,12 +82,14 @@ parser_rule!(inserting_priority(i) -> InsertingPriority {
     )
 });
 
-parser_rule!(value_list(i) -> Vec<ExpressionAST<'source>> {
+parser_rule!(value_list(i) -> ValueList<'source> {
     do_parse!(i,
+        begin: symbol_position >>
         apply!(symbols, "(") >>
-        result: apply!(comma_list, expression) >>
+        values: apply!(comma_list, expression) >>
         apply!(symbols, ")") >>
-        (result)
+        pos: apply!(item_position, begin) >>
+        (ValueList { values, pos })
     )
 });
 
@@ -102,23 +103,28 @@ parser_rule!(property_list(i) -> Vec<ItemPath> {
 });
 
 parser_rule!(inserting_source(i) -> InsertingSourceAST<'source> {
-    alt!(i,
-        do_parse!(
-            properties: opt!(property_list) >>
-            alt!(apply!(keyword, "value") | apply!(keyword, "values")) >>
-            lists: apply!(comma_list, value_list) >>
-            (InsertingSourceAST::ValueLists { properties, lists })
-        )
-        | do_parse!(
-            apply!(keyword, "set") >>
-            assignments: apply!(comma_list, updating_assignment) >>
-            (InsertingSourceAST::AssignmentList { assignments })
-        )
-        | do_parse!(
-            properties: opt!(property_list) >>
-            query: selection >>
-            (InsertingSourceAST::Selection { properties, query })
-        )
+    do_parse!(i,
+        begin: symbol_position >>
+        body: alt!(
+            do_parse!(
+                properties: opt!(property_list) >>
+                alt!(apply!(keyword, "value") | apply!(keyword, "values")) >>
+                lists: apply!(comma_list, value_list) >>
+                (InsertingSourceASTBody::ValueLists { properties, lists })
+            )
+            | do_parse!(
+                apply!(keyword, "set") >>
+                assignments: apply!(comma_list, updating_assignment) >>
+                (InsertingSourceASTBody::AssignmentList { assignments })
+            )
+            | do_parse!(
+                properties: opt!(property_list) >>
+                query: selection >>
+                (InsertingSourceASTBody::Selection { properties, query })
+            )
+        ) >>
+        pos: apply!(item_position, begin) >>
+        (InsertingSourceAST { body, pos })
     )
 });
 
