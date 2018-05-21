@@ -100,7 +100,13 @@ pub enum SemanticErrorKind {
     },
     UnreachableStatement,
     NotAllBranchesReturns,
-    CannotModifyReadOnlyDataSource,
+    CannotDoWithDataSource {
+        action: &'static str,
+    },
+    ValueListWithWrongLength {
+        expected: usize,
+        got: usize,
+    },
 }
 
 impl Default for SemanticErrorKind {
@@ -136,7 +142,8 @@ impl fmt::Display for SemanticErrorKind {
             SemanticErrorKind::CannotModifyReadOnlyVariable { name } => write!(f, "can't modify read-only variable {}", name),
             SemanticErrorKind::UnreachableStatement => write!(f, "unreachable statement"),
             SemanticErrorKind::NotAllBranchesReturns => write!(f, "not all branches of code return a value"),
-            SemanticErrorKind::CannotModifyReadOnlyDataSource => write!(f, "can't modify read-only data-source"),
+            SemanticErrorKind::CannotDoWithDataSource { action } => write!(f, "can't {} this data-source", action),
+            SemanticErrorKind::ValueListWithWrongLength { expected, got } => write!(f, "expected value list of {} elements, got {}", expected, got),
         }
     }
 }
@@ -263,8 +270,12 @@ impl SemanticError {
         SemanticError { pos, kind: SemanticErrorKind::NotAllBranchesReturns, text: None }
     }
     #[inline]
-    pub fn cannot_modify_readonly_datasource(pos: ItemPosition) -> Self {
-        SemanticError { pos, kind: SemanticErrorKind::CannotModifyReadOnlyDataSource, text: None }
+    pub fn cannot_do_with_datasource(pos: ItemPosition, action: &'static str) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::CannotDoWithDataSource { action }, text: None }
+    }
+    #[inline]
+    pub fn value_list_with_wrong_length(pos: ItemPosition, expected: usize, got: usize) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::ValueListWithWrongLength { expected, got }, text: None }
     }
     #[inline]
     pub fn set_text(&mut self, text: Arc<Text>) {
