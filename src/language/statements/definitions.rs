@@ -1,4 +1,5 @@
 use helpers::{
+    Path,
     PathBuf,
     Resolve,
     SyncRef,

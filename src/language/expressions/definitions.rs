@@ -3,6 +3,7 @@ use std::fmt;
 use std::cmp;
 use std::sync::Arc;
 use helpers::{
+    Path,
     PathBuf,
     Resolve,
     SyncRef,
@@ -494,7 +495,7 @@ impl Expression {
         ident: &Identifier,
     ) -> Result<Self, SemanticError> {
         let var = scope.access_to_variable(ident.item_pos(), ident.text())?;
-        let data_type = var.property_type(&ItemPath { pos, path: PathBuf::empty() })?;
+        let data_type = var.property_type(pos, Path::empty())?;
         Ok(Expression::variable_access(var, pos, data_type))
     }
     #[inline]

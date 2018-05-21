@@ -1,11 +1,11 @@
 use helpers::{
     ID,
     IDPull,
+    Path,
 };
 use helpers::SyncRef;
 use lexeme_scanner::ItemPosition;
 use language::{
-    ItemPath,
     DataType,
 };
 use project_analysis::{
@@ -53,10 +53,10 @@ impl SyncRef<FunctionVariable> {
             None => Err(SemanticError::variable_type_is_unknown(pos, self.read().name.clone())),
         }
     }
-    pub fn property_type(&self, property_path: &ItemPath) -> Result<DataType, SemanticError> {
+    pub fn property_type(&self, pos: ItemPosition, property_path: Path) -> Result<DataType, SemanticError> {
         Ok(
-            self.data_type(property_path.pos)?
-                .property_type(property_path.pos, property_path.path.as_path())?
+            self.data_type(pos)?
+                .property_type(pos, property_path)?
         )
     }
     #[inline]

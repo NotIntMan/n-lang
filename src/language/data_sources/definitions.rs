@@ -1,5 +1,5 @@
 use helpers::{
-    PathBuf,
+    Path,
     Resolve,
     SyncRef,
 };
@@ -84,10 +84,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                 let pos = name.pos;
                 if let Some(name) = name.path.as_path().the_only() {
                     if let Some(var) = scope.get_variable(name) {
-                        let var_data_type = var.property_type(&ItemPath {
-                            pos,
-                            path: PathBuf::empty(),
-                        })?;
+                        let var_data_type = var.property_type(pos, Path::empty())?;
                         let entity_type = match var_data_type {
                             DataType::Array(entity_type) => (*entity_type).clone(),
                             _ => return SemanticError::not_allowed_here(pos, "not array variable").into_err_vec(),
