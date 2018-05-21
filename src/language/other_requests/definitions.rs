@@ -316,11 +316,47 @@ pub struct InsertingAST<'source> {
 }
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> {
-    type Result = ();
+    type Result = Inserting;
     type Error = SemanticError;
-    fn resolve(&self, _scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        unimplemented!()
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let target = self.target.resolve(scope)?;
+        let mut errors = Vec::new();
+
+        let source = {
+            let ctx = InsertSourceContext {
+                scope,
+                target: &target,
+            };
+            self.source.accumulative_resolve(&ctx, &mut errors)
+        };
+        let on_duplicate_key_update = self.on_duplicate_key_update.accumulative_resolve(scope, &mut errors);
+
+        let source = match source {
+            Some(x) => x,
+            None => return Err(errors)
+        };
+        let on_duplicate_key_update = match on_duplicate_key_update {
+            Some(x) => x,
+            None => return Err(errors)
+        };
+
+        Ok(Inserting {
+            priority: self.priority,
+            ignore: self.ignore,
+            target,
+            source,
+            on_duplicate_key_update,
+        })
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Inserting {
+    pub priority: InsertingPriority,
+    pub ignore: bool,
+    pub target: DataSource,
+    pub source: InsertingSource,
+    pub on_duplicate_key_update: Option<Vec<UpdatingAssignment>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -331,5 +367,47 @@ pub struct DeletingAST<'source> {
     pub source: DataSourceAST<'source>,
     pub where_clause: Option<ExpressionAST<'source>>,
     pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
+    pub limit_clause: Option<u32>,
+}
+
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DeletingAST<'source> {
+    type Result = Deleting;
+    type Error = SemanticError;
+    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let source = self.source.resolve(scope)?;
+        let mut errors = Vec::new();
+
+        let where_clause = self.where_clause.accumulative_resolve(scope, &mut errors);
+        let order_by_clause = self.order_by_clause.accumulative_resolve(scope, &mut errors);
+
+        let where_clause = match where_clause {
+            Some(x) => x,
+            None => return Err(errors)
+        };
+        let order_by_clause = match order_by_clause {
+            Some(x) => x,
+            None => return Err(errors)
+        };
+
+        Ok(Deleting {
+            low_priority: self.low_priority,
+            quick: self.quick,
+            ignore: self.ignore,
+            source,
+            where_clause,
+            order_by_clause,
+            limit_clause: self.limit_clause,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Deleting {
+    pub low_priority: bool,
+    pub quick: bool,
+    pub ignore: bool,
+    pub source: DataSource,
+    pub where_clause: Option<Expression>,
+    pub order_by_clause: Option<Vec<SelectionSortingItem>>,
     pub limit_clause: Option<u32>,
 }
