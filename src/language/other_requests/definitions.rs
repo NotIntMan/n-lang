@@ -6,6 +6,7 @@ use helpers::{
 };
 use lexeme_scanner::ItemPosition;
 use language::{
+    AssignmentTarget,
     DataSource,
     DataSourceAST,
     Expression,
@@ -16,7 +17,6 @@ use language::{
     SelectionSortingItemAST,
 };
 use project_analysis::{
-    FunctionVariable,
     FunctionVariableScope,
     SemanticError,
 };
@@ -51,30 +51,15 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAssignmentAST<
     type Result = UpdatingAssignment;
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        let mut var_path = self.property.path.as_path();
-        let name = var_path.pop_left()
-            .expect("Assignment's target path should not be empty");
         let value = self.value.resolve(scope)?;
-        let var = scope.access_to_variable(self.pos, name)?;
-        if var.is_read_only() {
-            return SemanticError::cannot_modify_readonly_variable(self.pos, name.to_string())
-                .into_err_vec();
-        }
-        {
-            if var_path.is_empty() {
-                value.data_type.should_cast_to(
-                    self.pos,
-                    &var.data_type(self.pos)?,
-                )?;
-            } else {
-                let prop_type = value.data_type.property_type(self.pos, var_path.into())?;
-                value.data_type.should_cast_to(self.pos, &prop_type)?;
-            }
-        }
-        let property = var_path.into();
+        let target = AssignmentTarget::new_in_scope(
+            scope,
+            self.property.pos,
+            self.property.path.as_path(),
+        )?;
+        target.check_source_type(&value.data_type)?;
         Ok(UpdatingAssignment {
-            var,
-            property,
+            target,
             value,
         })
     }
@@ -82,8 +67,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAssignmentAST<
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UpdatingAssignment {
-    pub var: SyncRef<FunctionVariable>,
-    pub property: PathBuf,
+    pub target: AssignmentTarget,
     pub value: Expression,
 }
 

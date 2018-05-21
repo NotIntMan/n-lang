@@ -151,64 +151,33 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
             StatementASTBody::VariableDefinition { name, data_type, default_value } => {
                 let data_type = data_type.resolve(&ctx.context().module())?;
                 let default_value: Option<StatementSource> = default_value.resolve(ctx)?;
-                let data_type = match data_type {
-                    Some(data_type) => {
-                        if let Some(default_value) = &default_value {
-                            let default_value_type = default_value.type_of();
-                            default_value_type.should_cast_to(self.pos, &data_type)?;
-                        }
-                        Some(data_type)
-                    }
-                    None => {
-                        match &default_value {
-                            Some(default_value) => Some(default_value.type_of().clone()),
-                            None => None,
-                        }
-                    }
-                };
                 let var = ctx.new_variable(name.item_pos(), name.to_string(), data_type)?;
                 match default_value {
-                    Some(source) => StatementBody::VariableAssignment {
-                        var,
-                        property: PathBuf::empty(),
-                        source,
-                    },
+                    Some(source) => {
+                        let target = AssignmentTarget::new(
+                            var,
+                            self.pos,
+                            PathBuf::empty(),
+                        );
+                        target.check_source_type(source.type_of())?;
+                        StatementBody::VariableAssignment {
+                            target,
+                            source,
+                        }
+                    }
                     None => StatementBody::Nothing,
                 }
             }
             StatementASTBody::VariableAssignment { path, source } => {
-                let mut var_path = path.path.as_path();
-                let name = var_path.pop_left()
-                    .expect("Assignment's target path should not be empty");
                 let source = source.resolve(ctx)?;
-                let var = ctx.access_to_variable(self.pos, name)?;
-                if var.is_read_only() {
-                    return SemanticError::cannot_modify_readonly_variable(self.pos, name.to_string())
-                        .into_err_vec();
-                }
-                {
-                    let source_type = source.type_of();
-                    if var_path.is_empty() {
-                        match var.read().data_type() {
-                            Some(var_type) => {
-                                source_type.should_cast_to(self.pos, var_type)?;
-                            }
-                            None => {
-                                var.replace_data_type(source_type.clone());
-                            }
-                        }
-                    } else {
-                        let prop_type = var.property_type(&ItemPath {
-                            pos: path.pos,
-                            path: var_path.into(),
-                        })?;
-                        source_type.should_cast_to(self.pos, &prop_type)?;
-                    }
-                }
-                let property = var_path.into();
+                let target = AssignmentTarget::new_in_scope(
+                    ctx,
+                    self.pos,
+                    path.path.as_path(),
+                )?;
+                target.check_source_type(source.type_of())?;
                 StatementBody::VariableAssignment {
-                    var,
-                    property,
+                    target,
                     source,
                 }
             }
@@ -299,11 +268,49 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct AssignmentTarget {
+    pub var: SyncRef<FunctionVariable>,
+    pub property: PathBuf,
+    pub pos: ItemPosition,
+}
+
+impl AssignmentTarget {
+    pub fn new(var: SyncRef<FunctionVariable>, pos: ItemPosition, property: PathBuf) -> Self {
+        AssignmentTarget {
+            var,
+            property,
+            pos,
+        }
+    }
+    pub fn new_in_scope(scope: &SyncRef<FunctionVariableScope>, pos: ItemPosition, mut property_path: Path) -> Result<Self, SemanticError> {
+        let name = property_path.pop_left()
+            .expect("Assignment's target path should not be empty");
+        let var = scope.access_to_variable(pos, name)?;
+        if var.is_read_only() {
+            return Err(SemanticError::cannot_modify_readonly_variable(pos, name.to_string()));
+        }
+        Ok(AssignmentTarget::new(var, pos, property_path.into()))
+    }
+    pub fn check_source_type(&self, source_type: &DataType) -> Result<(), SemanticError> {
+        let property = self.property.as_path();
+        if property.is_empty() {
+            let var = self.var.read();
+            match var.data_type() {
+                Some(var_type) => source_type.should_cast_to(self.pos, var_type)?,
+                None => self.var.replace_data_type(source_type.clone()),
+            }
+        } else {
+            source_type.should_cast_to(self.pos, &self.var.property_type(self.pos, property)?)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum StatementBody {
     Nothing,
     VariableAssignment {
-        var: SyncRef<FunctionVariable>,
-        property: PathBuf,
+        target: AssignmentTarget,
         source: StatementSource,
     },
     Condition {
@@ -339,7 +346,7 @@ impl Statement {
     pub fn is_lite_weight(&self) -> bool {
         match &self.body {
             StatementBody::Nothing => true,
-            StatementBody::VariableAssignment { var: _, property: _, source: _ } => true,
+            StatementBody::VariableAssignment { target: _, source: _ } => true,
             StatementBody::Condition { condition, then_body, else_body } => {
                 let is_else_body_lite_weight = match else_body {
                     Some(body) => body.is_lite_weight(),
@@ -373,7 +380,7 @@ impl Statement {
     pub fn jumping_check(&self, pos: StatementFlowControlPosition, return_data_type: &DataType) -> Result<StatementFlowControlJumping, Vec<SemanticError>> {
         match &self.body {
             StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
-            StatementBody::VariableAssignment { var: _, property: _, source: _ } => Ok(StatementFlowControlJumping::Nothing),
+            StatementBody::VariableAssignment { target: _, source: _ } => Ok(StatementFlowControlJumping::Nothing),
             StatementBody::Condition { condition: _, then_body, else_body } => {
                 match then_body.jumping_check(pos, return_data_type) {
                     Ok(then_body_jumping) => {
@@ -382,7 +389,7 @@ impl Statement {
                             None => StatementFlowControlJumping::Nothing,
                         };
                         Ok(then_body_jumping + else_body_jumping)
-                    },
+                    }
                     Err(mut then_body_errors) => {
                         if let Some(else_body) = else_body {
                             if let Err(mut else_body_errors) = else_body.jumping_check(pos, return_data_type) {
