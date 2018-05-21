@@ -223,7 +223,7 @@ impl DataSource {
             DataSource::Table { item: _, var: _ } => false,
             DataSource::Join { join_type: _, condition: _, left, right } =>
                 left.is_local() && right.is_local(),
-            DataSource::Selection { query: _, alias: _, var: _ } => true,
+            DataSource::Selection { query, alias: _, var: _ } => query.source.is_local(),
         }
     }
 }
