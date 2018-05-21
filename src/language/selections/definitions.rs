@@ -227,6 +227,7 @@ pub struct SelectionAST<'source> {
     pub having_clause: Option<ExpressionAST<'source>>,
     pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
     pub limit_clause: Option<SelectionLimit>,
+    pub pos: ItemPosition,
 }
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> {
@@ -360,6 +361,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
                 order_by_clause,
                 limit_clause: self.limit_clause,
                 result_data_type,
+                pos: self.pos,
             })
         } else {
             Err(errors)
@@ -382,4 +384,5 @@ pub struct Selection {
     pub order_by_clause: Option<Vec<SelectionSortingItem>>,
     pub limit_clause: Option<SelectionLimit>,
     pub result_data_type: DataType,
+    pub pos: ItemPosition,
 }

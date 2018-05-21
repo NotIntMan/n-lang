@@ -82,7 +82,7 @@ impl NumberType {
                     if !*self_unsigned && *unsigned { return false; }
                     return (self_size.0 <= other_size.0) && (self_size.1 <= other_size.1);
                 }
-            },
+            }
             NumberType::Float { size: _, double: self_double } => {
                 if let NumberType::Float { size: _, double } = target {
                     return !*self_double || *double;
@@ -445,6 +445,21 @@ impl CompoundDataType {
         }
         false
     }
+    #[inline]
+    pub fn get_field(&self, index: usize) -> Option<&Field> {
+        match self {
+            CompoundDataType::Structure(fields) => fields.get_index(index)
+                .map(|(_, field)| field),
+            CompoundDataType::Tuple(fields) => fields.get(index),
+        }
+    }
+    #[inline]
+    pub fn field_len(&self) -> usize {
+        match self {
+            CompoundDataType::Structure(fields) => fields.len(),
+            CompoundDataType::Tuple(fields) => fields.len(),
+        }
+    }
 }
 
 impl<'source> Assertion for CompoundDataTypeAST<'source> {
@@ -668,6 +683,37 @@ impl DataType {
                 self.clone(),
                 target.clone(),
             ))
+        }
+    }
+    pub fn get_field_type(&self, index: usize) -> Option<DataType> {
+        let one = match self {
+            DataType::Array(item) => &*item,
+            DataType::Compound(compound) => return compound.get_field(index)
+                .map(|field| field.field_type.clone()),
+            DataType::Primitive(_) => self,
+            DataType::Reference(item) => {
+                let item = item.read();
+                let def = item.get_data_type()?;
+                return def.body.get_field_type(index);
+            }
+            DataType::Void => self,
+        };
+        if index == 0 { Some(one.clone()) } else { None }
+    }
+    pub fn field_len(&self) -> usize {
+        match self {
+            DataType::Array(_) |
+            DataType::Primitive(_) |
+            DataType::Void => 1,
+            DataType::Compound(compound) => compound.field_len(),
+            DataType::Reference(item) => {
+                let item = item.read();
+                let def = match item.get_data_type() {
+                    Some(item) => item,
+                    None => return 0,
+                };
+                return def.body.field_len();
+            }
         }
     }
 }

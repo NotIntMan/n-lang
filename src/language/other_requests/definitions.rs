@@ -10,6 +10,7 @@ use language::{
     AssignmentTarget,
     DataSource,
     DataSourceAST,
+    DataType,
     Expression,
     ExpressionAST,
     ItemPath,
@@ -201,6 +202,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingSourceAST<'so
                     None => return SemanticError::not_supported_yet(self.pos, "lists of values without list of columns as a data source")
                         .into_err_vec(),
                 };
+                //TODO Проверка на то, чтобы AssignmentTarget принадлежал именно к целевой таблице
                 let properties: Vec<AssignmentTarget> = deep_result_collect(
                     properties.iter()
                         .map(|prop| AssignmentTarget::new_in_scope(scope, prop.pos, prop.path.as_path()))
@@ -233,10 +235,45 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingSourceAST<'so
                 })
             }
             InsertingSourceASTBody::AssignmentList { assignments } => {
+                //TODO Проверка на то, чтобы AssignmentTarget принадлежал именно к целевой таблице
                 let assignments = assignments.resolve(scope)?;
                 Ok(InsertingSource::AssignmentList { assignments })
             }
-            _ => unimplemented!(),
+            InsertingSourceASTBody::Selection { properties, query } => {
+                let query = query.resolve(scope)?;
+                let query_result_type: &DataType = match &query.result_data_type {
+                    DataType::Array(query_result_type) => &**query_result_type,
+                    query_result_type => query_result_type,
+                };
+                let _properties = match properties {
+                    Some(properties) => {
+                        let assignments: Vec<AssignmentTarget> = accumulative_result_collect(
+                            properties.iter().enumerate()
+                                .map(|(i, prop)| {
+                                    let assignment = AssignmentTarget::new_in_scope(
+                                        scope,
+                                        prop.pos,
+                                        prop.path.as_path(),
+                                    )?;
+                                    let query_field_type = match query_result_type.get_field_type(i) {
+                                        Some(field_type) => field_type,
+                                        None => return SemanticError::select_with_wrong_column_count(query.pos, properties.len(), query.result_data_type.field_len())
+                                            .into_err_vec(),
+                                    };
+                                    assignment.check_source_type(&query_field_type)?;
+                                    Ok(assignment)
+                                })
+                        )?;
+                        Some(assignments)
+                    },
+                    None => {
+                        //TODO Проверка типа результата запроса на валидность приведения к типу записи таблицы
+                        None
+                    },
+                };
+
+                unimplemented!()
+            }
         }
     }
 }

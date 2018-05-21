@@ -145,6 +145,7 @@ parser_rule!(selection_limit(i) -> SelectionLimit {
 /// Функция, выполняющая разбор запроса выборки
 pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, SelectionAST<'source>> {
     do_parse!(input,
+        begin: symbol_position >>
         apply!(keyword, "select") >>
         distinct: select_distincty >>
         high_priority: opt!(apply!(keyword, "high_priority")) >>
@@ -159,6 +160,7 @@ pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         having_clause: opt!(apply!(select_condition, "having")) >>
         order_by_clause: opt!(apply!(select_sorting, "order")) >>
         limit_clause: opt!(selection_limit) >>
+        pos: apply!(item_position, begin) >>
         (SelectionAST {
             distinct,
             high_priority: high_priority.is_some(),
@@ -172,6 +174,7 @@ pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
             having_clause,
             order_by_clause,
             limit_clause,
+            pos,
         })
     )
 }
