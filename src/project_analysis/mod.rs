@@ -40,5 +40,8 @@ pub mod function;
 pub use self::function::*;
 
 pub mod statement;
-
 pub use self::statement::*;
+
+pub mod insert_source;
+
+pub use self::insert_source::*;
