@@ -174,12 +174,28 @@ pub enum DataSource {
 }
 
 impl DataSource {
-    pub fn is_read_only(&self) -> bool {
+    pub fn is_allows_updates(&self) -> bool {
         match self {
-            DataSource::Variable { var } => var.is_read_only(),
-            DataSource::Table { item: _ } => false,
-            DataSource::Join { join_type: _, condition: _, left, right } => left.is_read_only() || right.is_read_only(),
-            DataSource::Selection { query: _, alias: _ } => true,
+            DataSource::Variable { var } => !var.is_read_only(),
+            DataSource::Table { item: _ } => true,
+            DataSource::Join { join_type: _, condition: _, left, right } => left.is_allows_updates() && right.is_allows_updates(),
+            DataSource::Selection { query: _, alias: _ } => false,
+        }
+    }
+    pub fn is_allows_inserts(&self) -> bool {
+        match self {
+            DataSource::Variable { var } => !var.is_read_only(),
+            DataSource::Table { item: _ } => true,
+            DataSource::Join { join_type: _, condition: _, left: _, right: _ } => false,
+            DataSource::Selection { query: _, alias: _ } => false,
+        }
+    }
+    pub fn is_allows_deletes(&self) -> bool {
+        match self {
+            DataSource::Variable { var } => !var.is_read_only(),
+            DataSource::Table { item: _ } => true,
+            DataSource::Join { join_type: _, condition: _, left: _, right: _ } => false,
+            DataSource::Selection { query: _, alias: _ } => false,
         }
     }
 }
