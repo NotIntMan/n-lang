@@ -39,35 +39,22 @@ impl<C, T> Resolve<C> for Vec<T>
     type Result = Vec<T::Result>;
     type Error = T::Error;
     fn resolve(&self, ctx: &C) -> Result<Self::Result, Vec<Self::Error>> {
-        let mut result_vec = Vec::with_capacity(self.len());
-        let mut current_iter = Vec::with_capacity(self.len());
-        let mut next_iter = Vec::new();
-        for item in self.iter() {
-            current_iter.push(item);
-        }
+        let mut results = Vec::with_capacity(self.len());
         let mut errors = Vec::new();
-        let errors = loop {
-            let mut new_results = false;
-            errors.clear();
-            for &item in current_iter.iter() {
-                match item.resolve(ctx) {
-                    Ok(result) => {
-                        new_results = true;
-                        result_vec.push(result);
-                    }
-                    Err(mut err) => {
-                        next_iter.push(item);
-                        errors.append(&mut err)
+        for item in self.iter() {
+            match item.resolve(ctx) {
+                Ok(item_result) => {
+                    if errors.is_empty() {
+                        results.push(item_result)
                     }
                 }
+                Err(mut item_errors) => {
+                    errors.append(&mut item_errors);
+                }
             }
-            if !new_results {
-                break errors;
-            }
-            swap(&mut current_iter, &mut next_iter);
-        };
+        }
         if errors.is_empty() {
-            Ok(result_vec)
+            Ok(results)
         } else {
             Err(errors)
         }
