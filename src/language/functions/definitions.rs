@@ -92,7 +92,8 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
 
         if let FunctionBody::Implementation(body) = &body {
             let body_jumping = body.jumping_check(StatementFlowControlPosition::new(), &result)?;
-            if body_jumping != StatementFlowControlJumping::AlwaysReturns {
+            if (body_jumping != StatementFlowControlJumping::AlwaysReturns)
+                && (result != DataType::Void) {
                 return SemanticError::not_all_branches_returns(body.pos)
                     .into_err_vec();
             }
