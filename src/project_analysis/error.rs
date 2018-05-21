@@ -107,6 +107,10 @@ pub enum SemanticErrorKind {
         expected: usize,
         got: usize,
     },
+    SelectWithWrongColumnCount {
+        expected: usize,
+        got: usize,
+    },
 }
 
 impl Default for SemanticErrorKind {
@@ -144,6 +148,7 @@ impl fmt::Display for SemanticErrorKind {
             SemanticErrorKind::NotAllBranchesReturns => write!(f, "not all branches of code return a value"),
             SemanticErrorKind::CannotDoWithDataSource { action } => write!(f, "can't {} this data-source", action),
             SemanticErrorKind::ValueListWithWrongLength { expected, got } => write!(f, "expected value list of {} elements, got {}", expected, got),
+            SemanticErrorKind::SelectWithWrongColumnCount { expected, got } => write!(f, "expected selection with {} columns, got with {}", expected, got),
         }
     }
 }
@@ -276,6 +281,10 @@ impl SemanticError {
     #[inline]
     pub fn value_list_with_wrong_length(pos: ItemPosition, expected: usize, got: usize) -> Self {
         SemanticError { pos, kind: SemanticErrorKind::ValueListWithWrongLength { expected, got }, text: None }
+    }
+    #[inline]
+    pub fn select_with_wrong_column_count(pos: ItemPosition, expected: usize, got: usize) -> Self {
+        SemanticError { pos, kind: SemanticErrorKind::SelectWithWrongColumnCount { expected, got }, text: None }
     }
     #[inline]
     pub fn set_text(&mut self, text: Arc<Text>) {
