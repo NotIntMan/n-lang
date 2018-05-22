@@ -1,11 +1,17 @@
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ID(usize);
 
 impl fmt::Display for ID {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ID: {}", self.0)
+    }
+}
+
+impl fmt::Debug for ID {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ID({})", self.0)
     }
 }
 

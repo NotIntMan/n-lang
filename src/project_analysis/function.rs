@@ -1,3 +1,4 @@
+use std::fmt;
 use helpers::{
     ID,
     IDPull,
@@ -73,7 +74,7 @@ impl SyncRef<FunctionVariable> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct FunctionVariableScope {
     id: ID,
     parent: Option<ID>,
@@ -171,7 +172,19 @@ impl SyncRef<FunctionVariableScope> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl fmt::Debug for FunctionVariableScope {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("FunctionVariableScope")
+            .field("id", &self.id)
+            .field("parent", &self.parent)
+            .field("variables", &self.variables)
+            .field("is_aggregate", &self.is_aggregate)
+            .field("is_lite_weight", &self.is_lite_weight)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub struct FunctionContext {
     module: SyncRef<Module>,
     scope_id_pull: IDPull,
@@ -232,4 +245,13 @@ impl SyncRef<FunctionContext> {
     }
     #[inline]
     pub fn project(&self) -> SyncRef<ProjectContext> { self.module().project() }
+}
+
+impl fmt::Debug for FunctionContext {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("FunctionContext")
+            .field("scopes", &self.scopes)
+            .field("root", &self.root)
+            .finish()
+    }
 }

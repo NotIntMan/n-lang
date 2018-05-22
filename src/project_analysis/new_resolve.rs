@@ -126,7 +126,10 @@ fn do_it() {
     project.request_resolving_module(Path::empty());
     let result = project.resolve(&mut source);
     match result {
-        Ok(_) => println!("Project resolved!"),
+        Ok(project) => {
+            println!("Project resolved!");
+            println!("{:#?}", project);
+        },
         Err(errors) => {
             println!("Got errors:");
             for error in errors {
