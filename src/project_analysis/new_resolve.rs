@@ -74,6 +74,7 @@ fn do_it() {
         StdLibFunction::new("abs".to_string())
             .gets(vec![small_integer.clone()])
             .returns(small_integer.clone())
+            .lite_weight()
     );
 
     let mut source = HashMapSource::new();
@@ -117,7 +118,7 @@ fn do_it() {
             }
 
             fn wrong() {
-                let a := select old_all_users(2) from Users;
+                let a := select u from Users u;
             }
         ",
     );

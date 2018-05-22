@@ -642,7 +642,7 @@ impl Expression {
                     .into_err_vec(),
             };
 
-            if scope.is_lite_weight() && function.is_lite_weight {
+            if scope.is_lite_weight() && !function.is_lite_weight {
                 return SemanticError::not_allowed_here(
                     pos,
                     "not lite-weight functions",
@@ -688,7 +688,7 @@ impl Expression {
             }
         };
 
-        if scope.is_lite_weight() && function.is_lite_weight {
+        if scope.is_lite_weight() && !function.is_lite_weight {
             return Err(SemanticError::not_allowed_here(
                 pos,
                 "not lite-weight functions",
@@ -827,7 +827,7 @@ impl Expression {
     pub fn is_lite_weight(&self) -> bool {
         match &self.body {
             ExpressionBody::Literal(_) => true,
-            ExpressionBody::Variable(_) => false,
+            ExpressionBody::Variable(_) => true,
             ExpressionBody::BinaryOperation(left, _, right) => {
                 left.is_lite_weight() && right.is_lite_weight()
             }

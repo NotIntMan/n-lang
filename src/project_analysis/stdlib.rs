@@ -190,7 +190,7 @@ impl StdLibFunction {
             arguments: Vec::new(),
             output: DataType::Void,
             is_aggregate: false,
-            is_lite_weight: true,
+            is_lite_weight: false,
         }
     }
     #[inline]
@@ -205,7 +205,7 @@ impl StdLibFunction {
     }
     #[inline]
     pub fn lite_weight(mut self) -> Self {
-        self.is_lite_weight = false;
+        self.is_lite_weight = true;
         self
     }
     #[inline]
