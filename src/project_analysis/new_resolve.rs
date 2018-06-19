@@ -124,7 +124,9 @@ fn do_it() {
     );
 
     let project = ProjectContext::new(SyncRef::new(stdlib));
-    project.request_resolving_module(Path::empty());
+    for (module_path, _) in source.texts() {
+        project.request_resolving_module(module_path.as_path());
+    }
     let result = project.resolve(&mut source);
     match result {
         Ok(project) => {

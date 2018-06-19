@@ -1,6 +1,9 @@
 use std::{
     sync::Arc,
-    collections::HashMap,
+    collections::hash_map::{
+        HashMap,
+        Iter,
+    },
     path,
     io::{
         self,
@@ -106,6 +109,9 @@ impl HashMapSource {
             result.insert(module_name, file_name.to_string(), text);
         }
         Ok(result)
+    }
+    pub fn texts(&self) -> Iter<PathBuf, Arc<Text>> {
+        self.map.iter()
     }
 }
 
