@@ -64,7 +64,7 @@
 
 ## Авторы
 
-- Дмитрий Демин ([0xDE11A])
+- [Дмитрий Демин]
 
 [Rust]: https://www.rust-lang.org
 [Cargo]: https://crates.io
@@ -72,4 +72,4 @@
 [Log]: https://crates.io/crates/log
 [EnvLogger]: https://crates.io/crates/env_logger
 [PrettyAssertion]: https://crates.io/crates/pretty_assertions
-[0xDE11A]: https://github.com/0xDE11A
+[Дмитрий Демин]: https://github.com/NotIntMan
