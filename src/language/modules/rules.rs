@@ -51,7 +51,7 @@ parser_rule!(module_definitions(i) -> ModuleDefinitionValueAST<'source> {
         apply!(keyword, "mod") >>
         name: identifier >>
         apply!(symbols, "{") >>
-        items: module >>
+        items: apply!(module_items, true) >>
         apply!(symbols, "}") >>
         (ModuleDefinitionValueAST::Module(ModuleDefinitionAST { name, items }))
     )
@@ -102,20 +102,34 @@ parser_rule!(module_definition_item(i) -> ModuleDefinitionItemAST<'source> {
     )
 });
 
-/// Выполняет разбор грамматики модуля
-pub fn module<'token, 'source>(mut input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<ModuleDefinitionItemAST<'source>>> {
+#[inline]
+fn module_items<'token, 'source>(
+    mut input: &'token [Token<'source>],
+    is_local: bool,
+) -> ParserResult<'token, 'source, Vec<ModuleDefinitionItemAST<'source>>> {
     let mut result = Vec::new();
     loop {
         match module_definition_item(input) {
             IResult::Done(new_input, output) => {
                 input = new_input;
                 result.push(output);
-                if let IResult::Done(newest_input, _) = end_of_input(input) {
-                    return IResult::Done(newest_input, result);
-                }
+                if is_local {
+                    if let IResult::Done(_, _) = symbols(input, "}") {
+                        return IResult::Done(input, result);
+                    }
+                } else {
+                    if let IResult::Done(newest_input, _) = end_of_input(input) {
+                        return IResult::Done(newest_input, result);
+                    }
+                };
             }
             IResult::Incomplete(n) => return IResult::Incomplete(n),
             IResult::Error(e) => return IResult::Error(e),
         }
     }
+}
+
+/// Выполняет разбор грамматики модуля
+pub fn module<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, Vec<ModuleDefinitionItemAST<'source>>> {
+    module_items(input, false)
 }
