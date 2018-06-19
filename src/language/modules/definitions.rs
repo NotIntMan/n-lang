@@ -170,52 +170,6 @@ impl<'source> ModuleDefinitionValueAST<'source> {
     }
 }
 
-impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for ModuleDefinitionValueAST<'source> {
-    type Result = SyncRef<Item>;
-    type Error = SemanticError;
-    #[allow(unused_assignments)]
-    fn resolve(&self, ctx: &(SyncRef<Module>, Vec<AttributeAST<'source>>)) -> Result<Self::Result, Vec<Self::Error>> {
-        match self {
-            ModuleDefinitionValueAST::DataType(def) => {
-                Ok(SyncRef::new(def.resolve(&ctx.0)?))
-            }
-            ModuleDefinitionValueAST::Import(
-                ExternalItemImportAST { path, tail }
-            ) => {
-                let mut item_path = path.path.as_path();
-                let item = match ctx.0.resolve_import(item_path) {
-                    Some(item) => item,
-                    None => return SemanticError::unresolved_item(path.pos, path.path.clone()).into_err_vec(),
-                };
-                if *tail == ExternalItemTailAST::Asterisk {
-                    let item = item.read();
-                    match item.get_module_ref() {
-                        Some(module) => {
-                            ctx.0.inject_import_module(module.clone());
-                        }
-                        None => return SemanticError::expected_item_of_another_type(
-                            path.pos,
-                            SemanticItemType::Module,
-                            item.get_type(),
-                        )
-                            .into_err_vec(),
-                    }
-                }
-                Ok(item)
-            }
-            ModuleDefinitionValueAST::Function(def) => {
-                let def = def.resolve(ctx)?;
-                Ok(SyncRef::new(Item::function(def)))
-            }
-            ModuleDefinitionValueAST::Table(def) => {
-                let def = def.resolve(&ctx.0)?;
-                Ok(SyncRef::new(Item::table(def)))
-            }
-            _ => unimplemented!(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModuleDefinitionValue {
     DataType(DataTypeDefinition),
@@ -239,12 +193,52 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionItemAST<'source> {
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
         let ModuleDefinitionItemAST { public, position, attributes, value } = self;
         let item = {
-            let ctx = (ctx.clone(), attributes.clone());
-            let value = value.resolve(&ctx)?;
+            let value = match value {
+                ModuleDefinitionValueAST::DataType(def) => {
+                    SyncRef::new(def.resolve(ctx)?)
+                }
+                ModuleDefinitionValueAST::Import(
+                    ExternalItemImportAST { path, tail }
+                ) => {
+                    let mut item_path = path.path.as_path();
+                    let item = match ctx.resolve_import(item_path) {
+                        Some(item) => item,
+                        None => return SemanticError::unresolved_item(path.pos, path.path.clone()).into_err_vec(),
+                    };
+                    if *tail == ExternalItemTailAST::Asterisk {
+                        let item = item.read();
+                        match item.get_module_ref() {
+                            Some(module) => {
+                                ctx.inject_import_module(module.clone());
+                            }
+                            None => return SemanticError::expected_item_of_another_type(
+                                path.pos,
+                                SemanticItemType::Module,
+                                item.get_type(),
+                            )
+                                .into_err_vec(),
+                        }
+                    }
+                    item
+                }
+                ModuleDefinitionValueAST::Function(def) => {
+                    let ctx = (ctx.clone(), attributes.clone());
+                    let def = def.resolve(&ctx)?;
+                    SyncRef::new(Item::function(def))
+                }
+                ModuleDefinitionValueAST::Table(def) => {
+                    let def = def.resolve(ctx)?;
+                    SyncRef::new(Item::table(def))
+                }
+                ModuleDefinitionValueAST::Module(_) => {
+                    return SemanticError::not_supported_yet(self.position, "file-scoped modules")
+                        .into_err_vec()
+                }
+            };
             ModuleDefinitionItem {
                 public: *public,
                 position: *position,
-                attributes: ctx.1.iter()
+                attributes: attributes.iter()
                     .map(|attr| attr.into())
                     .collect(),
                 value,
