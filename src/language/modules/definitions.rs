@@ -17,6 +17,7 @@ use language::{
     Field,
     FunctionDefinitionAST,
     ItemPath,
+    find_attribute,
 };
 use project_analysis::{
     Item,
@@ -75,6 +76,7 @@ impl<'source> Resolve<SyncRef<Module>> for TableDefinitionAST<'source> {
             pos: self.pos,
             body,
             entity: None,
+            primary_key: None,
         })
     }
 }
@@ -85,6 +87,7 @@ pub struct TableDefinition {
     pub pos: ItemPosition,
     pub body: Arc<IndexMap<String, Field>>,
     pub entity: Option<DataType>,
+    pub primary_key: Option<DataType>,
 }
 
 impl TableDefinition {
@@ -96,7 +99,29 @@ impl TableDefinition {
             None => {
                 result = DataType::Compound(CompoundDataType::Structure(self.body.clone()));
                 Some(result.clone())
-            },
+            }
+        };
+        result
+    }
+    #[inline]
+    pub fn make_primary_key_type(&mut self) -> DataType {
+        let result;
+        self.primary_key = match &self.primary_key {
+            Some(data_type) => return data_type.clone(),
+            None => {
+                let mut body = IndexMap::new();
+                for (name, field) in self.body.iter() {
+                    let is_primary_key_part = find_attribute(
+                        field.attributes.as_slice(),
+                        "primary_key",
+                    ).is_some();
+                    if is_primary_key_part {
+                        body.insert(name.clone(), field.clone());
+                    }
+                }
+                result = DataType::Compound(CompoundDataType::Structure(Arc::new(body)));
+                Some(result.clone())
+            }
         };
         result
     }
@@ -114,7 +139,7 @@ impl<'source> Into<ExternalItemTail> for ExternalItemTailAST<'source> {
         match self {
             ExternalItemTailAST::None => ExternalItemTail::None,
             ExternalItemTailAST::Asterisk => ExternalItemTail::Asterisk,
-            ExternalItemTailAST::Alias(ident) => ExternalItemTail::Alias(ident.to_string()),
+            ExternalItemTailAST::Alias(identifier) => ExternalItemTail::Alias(identifier.to_string()),
         }
     }
 }
@@ -232,7 +257,7 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionItemAST<'source> {
                 }
                 ModuleDefinitionValueAST::Module(_) => {
                     return SemanticError::not_supported_yet(self.position, "file-scoped modules")
-                        .into_err_vec()
+                        .into_err_vec();
                 }
             };
             ModuleDefinitionItem {

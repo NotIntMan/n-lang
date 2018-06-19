@@ -355,7 +355,17 @@ pub struct Attribute {
 }
 
 #[inline]
-pub fn find_attribute<'a, 'source>(attributes: &'a [AttributeAST<'source>], name: &str) -> Option<&'a AttributeAST<'source>> {
+pub fn find_attribute_ast<'a, 'source>(attributes: &'a [AttributeAST<'source>], name: &str) -> Option<&'a AttributeAST<'source>> {
+    for attribute in attributes.iter() {
+        if attribute.name == name {
+            return Some(attribute);
+        }
+    }
+    None
+}
+
+#[inline]
+pub fn find_attribute<'a, 'source>(attributes: &'a [Attribute], name: &str) -> Option<&'a Attribute> {
     for attribute in attributes.iter() {
         if attribute.name == name {
             return Some(attribute);

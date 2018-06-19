@@ -9,7 +9,7 @@ use language::{
     AttributeAST,
     DataType,
     DataTypeAST,
-    find_attribute,
+    find_attribute_ast,
     Statement,
     StatementAST,
 };
@@ -101,7 +101,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
 
         let is_lite_weight = match &body {
             FunctionBody::External => {
-                find_attribute(&ctx.1, "is_lite_weight").is_some()
+                find_attribute_ast(&ctx.1, "is_lite_weight").is_some()
             }
             FunctionBody::Implementation(stmt) => {
                 stmt.is_lite_weight()

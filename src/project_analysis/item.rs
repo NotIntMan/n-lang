@@ -34,6 +34,7 @@ pub enum ItemBody {
     Table {
         def: TableDefinition,
         entity: SyncRef<Item>,
+        primary_key: SyncRef<Item>,
     },
     Function {
         def: FunctionDefinition,
@@ -59,7 +60,11 @@ impl Item {
             name: format!("{}::entity", def.name),
             body: def.make_entity_type(),
         }));
-        Item { body: ItemBody::Table { def, entity } }
+        let primary_key = SyncRef::new(Item::data_type(DataTypeDefinition {
+            name: format!("{}::primary_key", def.name),
+            body: def.make_primary_key_type(),
+        }));
+        Item { body: ItemBody::Table { def, entity, primary_key } }
     }
     #[inline]
     pub fn get_type(&self) -> SemanticItemType {
@@ -68,7 +73,7 @@ impl Item {
 //            ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
 //            ItemBody::ImportItem { name: _, original_name: _, item } => item.get_type(),
             ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
-            ItemBody::Table { def: _, entity: _ } => SemanticItemType::Table,
+            ItemBody::Table { def: _, entity: _, primary_key: _ } => SemanticItemType::Table,
             ItemBody::Function { def: _ } => SemanticItemType::Function,
         }
     }
@@ -96,14 +101,14 @@ impl Item {
     #[inline]
     pub fn get_table(&self) -> Option<&TableDefinition> {
         match &self.body {
-            ItemBody::Table { def, entity: _ } => Some(def),
+            ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
             _ => None,
         }
     }
     #[inline]
     pub fn get_table_mut(&mut self) -> Option<&mut TableDefinition> {
         match &mut self.body {
-            ItemBody::Table { def, entity: _ } => Some(def),
+            ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
             _ => None,
         }
     }
@@ -121,9 +126,11 @@ impl SyncRef<Item> {
                 return module.get_item(path, search_route);
             }
             ItemBody::Function { def: _ } => {}
-            ItemBody::Table { def: _, entity } => if let Some(name) = path.the_only() {
-                if name == "entity" {
-                    return Some(entity.clone());
+            ItemBody::Table { def: _, entity, primary_key } => if let Some(name) = path.the_only() {
+                match name {
+                    "entity" => return Some(entity.clone()),
+                    "primary_key" => return Some(primary_key.clone()),
+                    _ => {}
                 }
             }
         }
