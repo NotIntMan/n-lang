@@ -1,11 +1,12 @@
 //! Набор структур для отображения элемента лексического разбора
 
 use std::fmt;
-use helpers::assertion::Assertion;
+use helpers::Assertion;
 use super::*;
+use parser_basics::Identifier;
 
 /// Тип токена
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenKind {
     /// Конец ввода. Этот тип токена генерируется сканером после окончания чтения ввода.
     EndOfInput,
@@ -19,6 +20,8 @@ pub enum TokenKind {
         fractional: bool,
         /// Базис системы счисления
         radix: u32,
+        /// Приблизительное значение найденного числа
+        approx_value: f64,
     },
     /**
         Стрововый литерал. Генерируется сканером при нахождении символа кавычек (`"`).
@@ -27,7 +30,7 @@ pub enum TokenKind {
         (символы, обозначенные префиксным обратным слэшем (`\`), кроме символа кавычек.
     */
     StringLiteral {
-        length: usize,
+        length: u32,
     },
     /**
         Литерал выражения. Генерируется сканером при нахождения опострофа (`'`).
@@ -37,7 +40,7 @@ pub enum TokenKind {
         эквивалентен строковому литералу.
     */
     BracedExpressionLiteral {
-        length: usize,
+        length: u32,
     },
     /**
         Словестный литерал. Генерируется сканером при нахождении группы букв, цифр и символа `_`.
@@ -51,7 +54,7 @@ pub enum TokenKind {
 }
 
 /// Урезанное отображение типа токена в его тип без прочей информации
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKindLess {
     EndOfInput,
     Whitespace,
@@ -78,7 +81,7 @@ impl fmt::Display for TokenKindLess {
 }
 
 /// Токен. Содержит информацию о своём типе, местоположении и тексте элемента, который отображает.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
     pub text: &'a str,
@@ -113,6 +116,7 @@ impl TokenKind {
                 negative: _,
                 fractional: _,
                 radix: _,
+                approx_value: _,
             } => TokenKindLess::NumberLiteral,
             &TokenKind::StringLiteral {
                 length: _,
@@ -130,7 +134,7 @@ impl TokenKind {
         В прочих случаях, `kind` приравнивается к `StringLiteral`.
     */
     #[inline]
-    pub fn new_string_literal(kind: TokenKindLess, length: usize) -> Self {
+    pub fn new_string_literal(kind: TokenKindLess, length: u32) -> Self {
         match kind {
             TokenKindLess::BracedExpressionLiteral => TokenKind::BracedExpressionLiteral { length },
             _ => TokenKind::StringLiteral { length },
@@ -148,5 +152,11 @@ impl<'a> Token<'a> {
     #[allow(dead_code)]
     pub fn new_wrapped(kind: TokenKind, text: &'a str, pos: SymbolPosition) -> Option<ScannerItem<'a>> {
         Some(Ok(Self::new(kind, text, pos)))
+    }
+    pub fn ident(&self) -> Identifier<'a> {
+        Identifier::new(self.text, self.pos)
+    }
+    pub fn pos(&self) -> ItemPosition {
+        self.pos.make_item_pos(self.text)
     }
 }

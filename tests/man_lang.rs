@@ -5,14 +5,11 @@ extern crate indexmap;
 extern crate pretty_assertions;
 
 use n_lang::helpers::assertion::Assertion;
-use n_lang::syntax_parser::expressions::*;
-use n_lang::syntax_parser::data_sources::*;
-use n_lang::syntax_parser::selections::*;
-use n_lang::syntax_parser::other_requests::*;
-use n_lang::syntax_parser::statements::*;
+use n_lang::parser_basics::*;
+use n_lang::language::*;
 
-fn extract_literal<'source>(expr: Expression<'source>) -> LiteralType {
-    match_it!(expr, Expression::Literal(lit) => lit.literal_type)
+fn extract_literal<'source>(expr: ExpressionAST<'source>) -> LiteralType {
+    match_it!(expr, ExpressionAST::Literal(lit) => lit.literal_type)
 }
 
 #[test]
@@ -77,19 +74,19 @@ fn keyword_literals_parses_correctly() {
     }
 }
 
-fn assert_identifier<'source>(expr: Expression, text: &str) {
-    match_it!(expr, Expression::Identifier(token) => assert_eq!(token.text, text));
+fn assert_identifier<'source>(expr: ExpressionAST, text: &str) {
+    match_it!(expr, ExpressionAST::Identifier(token) => assert_eq!(token.text, text));
 }
 
-fn extract_prefix_unary_expression<'source>(expr: Expression<'source>, operator: PrefixUnaryOperator) -> Expression<'source> {
-    match_it!(expr, Expression::PrefixUnaryOperation(op, expr) => {
+fn extract_prefix_unary_expression<'source>(expr: ExpressionAST<'source>, operator: PrefixUnaryOperator) -> ExpressionAST<'source> {
+    match_it!(expr, ExpressionAST::PrefixUnaryOperation(op, expr) => {
         assert_eq!(op, operator);
         *expr
     })
 }
 
-fn extract_postfix_unary_expression<'source>(expr: Expression<'source>, operator: PostfixUnaryOperator) -> Expression<'source> {
-    match_it!(expr, Expression::PostfixUnaryOperation(op, expr) => {
+fn extract_postfix_unary_expression<'source>(expr: ExpressionAST<'source>, operator: PostfixUnaryOperator) -> ExpressionAST<'source> {
+    match_it!(expr, ExpressionAST::PostfixUnaryOperation(op, expr) => {
         assert_eq!(op, operator);
         *expr
     })
@@ -127,8 +124,8 @@ fn all_unary_operations_parses_correctly() {
     assert_identifier(expr, "data");
 }
 
-fn extract_binary_expression<'source>(expr: Expression<'source>, operator: BinaryOperator) -> (Expression<'source>, Expression<'source>) {
-    match_it!(expr, Expression::BinaryOperation(left, op, right) => {
+fn extract_binary_expression<'source>(expr: ExpressionAST<'source>, operator: BinaryOperator) -> (ExpressionAST<'source>, ExpressionAST<'source>) {
+    match_it!(expr, ExpressionAST::BinaryOperation(left, op, right) => {
         assert_eq!(op, operator);
         (*left, *right)
     })
@@ -212,17 +209,17 @@ fn simple_operations_of_all_types_parses_correctly() {
 #[test]
 fn property_access_and_set_and_function_call_expression_parses_correctly() {
     let result = parse!("foo(bar, bar.baz, (box, boz))", expression);
-    let mut args = match_it!(result, Expression::FunctionCall(name, args) => {
+    let mut args = match_it!(result, ExpressionAST::FunctionCall(name, args) => {
         assert_eq!(name, vec!["foo"]);
         args
     });
     assert_identifier(args.remove(0), "bar");
-    let arg1 = match_it!(args.remove(0), Expression::PropertyAccess(expr, prop) => {
-        assert_eq!(prop, ["baz"]);
+    let arg1 = match_it!(args.remove(0), ExpressionAST::PropertyAccess(expr, prop) => {
+        assert_eq!(prop, &["baz"][..]);
         *expr
     });
     assert_identifier(arg1, "bar");
-    let mut arg2 = match_it!(args.remove(0), Expression::Set(vec) => vec);
+    let mut arg2 = match_it!(args.remove(0), ExpressionAST::Set(vec) => vec);
     assert_identifier(arg2.remove(0), "box");
     assert_identifier(arg2.remove(0), "boz");
 }
@@ -239,18 +236,18 @@ fn simple_join_parses_correctly() {
     });
     match_it!(left, DataSource::Table { name, alias } => {
         assert_eq!(name, vec!["foo"]);
-        assert_eq!(alias, Some("f"));
+        assert_eq!(alias, Some(Identifier::new("f")));
     });
     match_it!(right, DataSource::Table { name, alias } => {
         assert_eq!(name, vec!["bar"]);
-        assert_eq!(alias, Some("b"));
+        assert_eq!(alias, Some(Identifier::new("b")));
     });
 }
 
-fn assert_table(source: &DataSource, table_name: &str, table_alias: Option<&str>) {
-    match_it!(source, &DataSource::Table { ref name, alias } => {
+fn assert_table(source: &DataSourceAST, table_name: &str, table_alias: Option<&str>) {
+    match_it!(source, &DataSource::Table { ref name, ref alias } => {
             assert_eq!(*name, vec![table_name]);
-            assert_eq!(alias, table_alias);
+            assert_eq!(*alias, table_alias.map(Identifier::new));
         });
 }
 
@@ -263,7 +260,7 @@ fn simple_selection_parses_correctly() {
     assert_eq!(query.straight_join, false);
     assert_eq!(query.result_size, SelectionResultSize::Usual);
     assert_eq!(query.cache, false);
-    assert_eq!(query.result, SelectionResult::All);
+    assert_eq!(query.result, SelectionResultAST::All);
     assert_table(&query.source, "foo", None);
     assert_eq!(query.where_clause, None);
     assert_eq!(query.group_by_clause, None);
@@ -281,7 +278,7 @@ fn simple_selection_with_flags_parses_correctly() {
     assert_eq!(query.straight_join, true);
     assert_eq!(query.result_size, SelectionResultSize::Big);
     assert_eq!(query.cache, true);
-    assert_eq!(query.result, SelectionResult::All);
+    assert_eq!(query.result, SelectionResultAST::All);
     assert_table(&query.source, "foo", None);
     assert_eq!(query.where_clause, None);
     assert_eq!(query.group_by_clause, None);
@@ -299,7 +296,7 @@ fn simple_selection_with_filtering_parses_correctly() {
     assert_eq!(query.straight_join, false);
     assert_eq!(query.result_size, SelectionResultSize::Usual);
     assert_eq!(query.cache, false);
-    assert_eq!(query.result, SelectionResult::All);
+    assert_eq!(query.result, SelectionResultAST::All);
     assert_table(&query.source, "foo", None);
     query.where_clause
         .expect("Where clause should contain an expression")
@@ -310,7 +307,7 @@ fn simple_selection_with_filtering_parses_correctly() {
     assert_eq!(query.limit_clause, None);
 }
 
-fn assert_selection_sorting_items(items: &Vec<SelectionSortingItem>, pattern: Vec<(&str, SelectionSortingOrder)>) {
+fn assert_selection_sorting_items(items: &Vec<SelectionSortingItemAST>, pattern: Vec<(&str, SelectionSortingOrder)>) {
     let mut pattern_iterator = pattern.iter();
     for item in items {
         let &(expression_text, order) = pattern_iterator.next()
@@ -320,19 +317,19 @@ fn assert_selection_sorting_items(items: &Vec<SelectionSortingItem>, pattern: Ve
     }
 }
 
-fn assert_selection_result(items: &SelectionResult, pattern: Vec<(&str, Option<&str>)>) {
+fn assert_selection_result(items: &SelectionResultAST, pattern: Vec<(&str, Option<&str>)>) {
     match_it!(items, &SelectionResult::Some(ref items) => {
             let mut pattern_iter = pattern.iter();
             for item in items {
                 let &(expression_text, alias) = pattern_iter.next()
                     .expect("Pattern should have same length as the items vector");
                 item.expr.assert(expression_text);
-                assert_eq!(item.alias, alias);
+                assert_eq!(item.alias, alias.map(Identifier::new));
             }
         });
 }
 
-fn assert_selection_group_by_clause(clause: &SelectionGroupByClause, pattern: Vec<(&str, SelectionSortingOrder)>, with_rollup: bool) {
+fn assert_selection_group_by_clause(clause: &SelectionGroupByClauseAST, pattern: Vec<(&str, SelectionSortingOrder)>, with_rollup: bool) {
     assert_eq!(clause.with_rollup, with_rollup);
     assert_selection_sorting_items(&clause.sorting, pattern);
 }
@@ -467,10 +464,12 @@ fn simple_inserting_values_query_parses_correctly() {
     assert_eq!(insert.ignore, false);
     assert_table(&insert.target, "foo", None);
     match_it!(&insert.source, &InsertingSource::ValueLists { ref properties, ref lists } => {
-        assert_eq!(*properties, Some(vec![
-            vec!["start", "x"],
-            vec!["end", "z"],
-        ]));
+        match_it!(properties, &Some(ref paths) => {
+            assert_eq!(*paths, [
+                &["start", "x"][..],
+                &["end", "z"][..],
+            ]);
+        });
         let mut list_iterator = lists.iter();
         let list = list_iterator.next()
             .expect("List of lists must contain list");
@@ -514,10 +513,12 @@ fn simple_inserting_from_selection_query_parses_correctly() {
     assert_eq!(insert.ignore, true);
     assert_table(&insert.target, "foo", None);
     match_it!(&insert.source, &InsertingSource::Selection { ref properties, ref query } => {
-        assert_eq!(*properties, Some(vec![
-            vec!["start", "x"],
-            vec!["end", "z"],
-        ]));
+        match_it!(properties, &Some(ref paths) => {
+            assert_eq!(*paths, [
+                &["start", "x"][..],
+                &["end", "z"][..],
+            ]);
+        });
         assert_eq!(query.distinct, false);
         assert_eq!(query.high_priority, false);
         assert_eq!(query.straight_join, false);
@@ -549,8 +550,8 @@ fn simple_deleting_query_parses_correctly() {
 #[test]
 fn simple_definition_parses_correctly() {
     let result = parse!("let my_first_variable: boolean := false", statement);
-    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-        assert_eq!(name, "my_first_variable");
+    match_it!(result, Statement::VariableDefinition { ref name, ref data_type, ref default_value } => {
+        assert_eq!(*name, "my_first_variable");
         data_type.assert(&Some("boolean"));
         match_it!(default_value, &Some(StatementSource::Expression(ref expr)) => {
             expr.assert("false");
@@ -561,16 +562,16 @@ fn simple_definition_parses_correctly() {
 #[test]
 fn simple_not_perfect_definition_parses_correctly() {
     let result = parse!("let my_first_variable := false", statement);
-    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-        assert_eq!(name, "my_first_variable");
+    match_it!(result, Statement::VariableDefinition { ref name, ref data_type, ref default_value } => {
+        assert_eq!(*name, "my_first_variable");
         assert_eq!(*data_type, None);
         match_it!(default_value, &Some(StatementSource::Expression(ref expr)) => {
             expr.assert("false");
         });
     });
     let result = parse!("let my_first_variable: boolean", statement);
-    match_it!(result, Statement::VariableDefinition { name, ref data_type, ref default_value } => {
-        assert_eq!(name, "my_first_variable");
+    match_it!(result, Statement::VariableDefinition { ref name, ref data_type, ref default_value } => {
+        assert_eq!(*name, "my_first_variable");
         data_type.assert(&Some("boolean"));
         assert_eq!(*default_value, None);
     });
@@ -579,8 +580,8 @@ fn simple_not_perfect_definition_parses_correctly() {
 #[test]
 fn simple_assignment_parses_correctly() {
     let result = parse!("super_variable := 2 + 2", statement);
-    match_it!(result, Statement::VariableAssignment { name, ref source } => {
-        assert_eq!(name, "super_variable");
+    match_it!(result, Statement::VariableAssignment { ref name, ref source } => {
+        assert_eq!(*name, "super_variable");
         match_it!(source, &StatementSource::Expression(ref expr) => {
             expr.assert("2+2");
         });
@@ -665,7 +666,7 @@ fn cycle_control_operators_parses_correctly() {
     let result = parse!("break cycle_name", statement);
     match_it!(result, Statement::CycleControl { ref operator, ref name } => {
         assert_eq!(*operator, CycleControlOperator::Break);
-        assert_eq!(*name, Some("cycle_name"));
+        assert_eq!(*name, Some(Identifier::new("cycle_name")));
     });
     let result = parse!("continue", statement);
     match_it!(result, Statement::CycleControl { ref operator, ref name } => {
@@ -675,7 +676,7 @@ fn cycle_control_operators_parses_correctly() {
     let result = parse!("continue cycle_name", statement);
     match_it!(result, Statement::CycleControl { ref operator, ref name } => {
         assert_eq!(*operator, CycleControlOperator::Continue);
-        assert_eq!(*name, Some("cycle_name"));
+        assert_eq!(*name, Some(Identifier::new("cycle_name")));
     });
 }
 
@@ -697,8 +698,8 @@ fn return_operator_parses_correctly() {
 fn simple_block_of_statements_parses_correctly() {
     let result = parse!("{ a := 2; return a }", statement);
     match_it!(result, Statement::Block { ref statements } => {
-        match_it!(&statements[0], &Statement::VariableAssignment { name, ref source } => {
-            assert_eq!(name, "a");
+        match_it!(&statements[0], &Statement::VariableAssignment { ref name, ref source } => {
+            assert_eq!(*name, "a");
             match_it!(source, &StatementSource::Expression(ref expr) => {
                 expr.assert("2");
             });
@@ -735,8 +736,8 @@ fn simple_expression_as_statement_parses_correctly() {
 #[test]
 fn simple_select_query_as_source_for_variable_parses_correctly() {
     let result = parse!("x := select * from foo", statement);
-    match_it!(result, Statement::VariableAssignment { name, ref source } => {
-        assert_eq!(name, "x");
+    match_it!(result, Statement::VariableAssignment { ref name, ref source } => {
+        assert_eq!(*name, "x");
         match_it!(source, &StatementSource::Selection(ref query) => {
             assert_eq!(query.distinct, false);
             assert_eq!(query.high_priority, false);

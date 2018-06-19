@@ -15,7 +15,7 @@ use super::*;
     Каждый его вариант содержит минимальный и необходимый набор данных для отображения
     информации о произошедней ошибке во время сканирования текста.
 */
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ScannerErrorKind {
     /**
         Этот тип ошибки возникает, когда сканером ожидается какой-то определённый символ,
@@ -87,17 +87,17 @@ impl ScannerErrorKind {
 impl Display for ScannerErrorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            &ScannerErrorKind::ExpectedGot(ref e, ref g) => write!(f, "expected: {:?}, got: {:?}", e, g),
-            &ScannerErrorKind::MustBeGot(ref m, ref g) => write!(f, "symbol must be {}, got: {:?}", m, g),
-            &ScannerErrorKind::UnexpectedEnd(ref e) => {
+            ScannerErrorKind::ExpectedGot(e, g) => write!(f, "expected: {:?}, got: {:?}", e, g),
+            ScannerErrorKind::MustBeGot(m, g) => write!(f, "symbol must be {}, got: {:?}", m, g),
+            ScannerErrorKind::UnexpectedEnd(e) => {
                 write!(f, "unexpected end of input")?;
-                if let &Some(ref c) = e {
+                if let Some(c) = e {
                     write!(f, ", expected: {}", c)?;
                 }
                 Ok(())
             },
-            &ScannerErrorKind::NotInRadix(ref c, ref r) => write!(f, "digit {:?} is not in {}-based radix", c, r),
-            &ScannerErrorKind::UnexpectedInput(ref c) => write!(f, "unexpected input {:?}", c),
+            ScannerErrorKind::NotInRadix(c, r) => write!(f, "digit {:?} is not in {}-based radix", c, r),
+            ScannerErrorKind::UnexpectedInput(c) => write!(f, "unexpected input {:?}", c),
         }
     }
 }

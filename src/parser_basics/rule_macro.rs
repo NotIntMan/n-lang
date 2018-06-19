@@ -27,7 +27,7 @@ macro_rules! parser_rule {
         #[inline]
         fn $name<'token, 'source>(
             $input: &'token [$crate::lexeme_scanner::Token<'source>], $($arg_name: $arg_type),*
-        ) -> $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError> {
+        ) -> $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError<'source>> {
             $body
         }
     };
@@ -36,7 +36,7 @@ macro_rules! parser_rule {
     ) => {
         #[inline]
         fn $name<'token, 'source>($input: &'token [$crate::lexeme_scanner::Token<'source>]) ->
-        $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError> {
+        $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError<'source>> {
             $body
         }
     };
@@ -48,7 +48,7 @@ macro_rules! parser_rule {
         #[inline]
         pub fn $name<'token, 'source>(
             $input: &'token [$crate::lexeme_scanner::Token<'source>], $($arg_name: $arg_type),*
-        ) -> $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError> {
+        ) -> $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError<'source>> {
             $body
         }
     };
@@ -57,7 +57,7 @@ macro_rules! parser_rule {
     ) => {
         #[inline]
         pub fn $name<'token, 'source>($input: &'token [$crate::lexeme_scanner::Token<'source>]) ->
-        $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError> {
+        $crate::nom::IResult<&'token [$crate::lexeme_scanner::Token<'source>], $result, $crate::parser_basics::ParserError<'source>> {
             $body
         }
     };

@@ -150,9 +150,9 @@ pub fn symbol_wrap<
     Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
 >(
     input: &'token [Token<'source>],
-    opening_paren: &str,
+    opening_paren: &'source str,
     element: Element,
-    closing_paren: &str,
+    closing_paren: &'source str,
 )
     -> ParserResult<'token, 'source, ElementOutput>
     where Token<'source>: 'token

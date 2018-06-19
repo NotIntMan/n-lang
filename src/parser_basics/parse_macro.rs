@@ -20,10 +20,10 @@ macro_rules! parse {
             Ok(tokens) => {
                 #[cfg(feature = "parser_trace")]
                 trace!("Parsed tokens: {:#?}", tokens);
-                match_it!(
-                    $crate::parser_basics::parse(tokens.as_slice(), $rule),
+                match $crate::parser_basics::parse(tokens.as_slice(), $rule) {
                     Ok(parser_result) => { parser_result }
-                )
+                    Err(parser_error) => panic!("Parser error: {}", parser_error),
+                }
             }
         )
     }};
