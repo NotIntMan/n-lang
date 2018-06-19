@@ -30,9 +30,6 @@ pub use self::module::*;
 pub mod item;
 pub use self::item::*;
 
-pub mod new_resolve;
-pub use self::new_resolve::*;
-
 pub mod stdlib;
 pub use self::stdlib::*;
 

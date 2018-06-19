@@ -1,24 +1,26 @@
-#[test]
-fn do_it() {
-    use helpers::Resolve;
-    use helpers::{
-        Path,
-        SyncRef,
-    };
-    use language::{
+extern crate n_lang;
+
+use std::path::Path;
+use n_lang::{
+    helpers::Resolve,
+    helpers::SyncRef,
+    language::{
         BinaryOperator,
         DataType,
         PrimitiveDataType,
         NumberType,
-    };
-    use project_analysis::{
+    },
+    project_analysis::{
         ProjectContext,
         HashMapSource,
         StdLib,
         StdLibBinaryOperation,
         StdLibFunction,
-    };
+    },
+};
 
+#[test]
+fn dir_resolve() {
     let mut stdlib = StdLib::new();
 
     let tiny_unsigned_integer = DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
@@ -77,67 +79,19 @@ fn do_it() {
             .lite_weight()
     );
 
-    let mut source = HashMapSource::new();
-
-    source.simple_insert(
-        Path::empty(),
-        "index.n",
-        "\
-            pub struct PersonInfo {
-                age: unsigned tiny integer,
-            }
-
-            table Users {
-                #[primary_key]
-                #[auto_increment]
-                id: unsigned integer,
-                person_info: PersonInfo,
-            }
-
-            fn user_age(user: Users::entity): unsigned tiny integer {
-                return user.person_info.age;
-            }
-
-            fn get_max_user_age(): small integer {
-                let t := select max(user_age(u)) from Users u;
-                return t.component0;
-            }
-
-            fn add_user(person_info: PersonInfo) {
-                insert into Users u (u.person_info) values (person_info);
-            }
-
-            fn new_person_info(age: unsigned tiny integer): PersonInfo {
-                let result: PersonInfo;
-                result.age := age;
-                return result;
-            }
-
-            fn old_all_users(increment: unsigned tiny integer) {
-                update Users u set u.person_info.age = user_age(u) + 1;
-            }
-
-            fn wrong() {
-                let a := select u from Users u;
-            }
-        ",
-    );
+    let source = HashMapSource::for_dir(Path::new("./tests/dir_resolve"))
+        .expect("Cannot process \"dir_resolve\".");
 
     let project = ProjectContext::new(SyncRef::new(stdlib));
     for (module_path, _) in source.texts() {
         project.request_resolving_module(module_path.as_path());
     }
-    let result = project.resolve(&mut source);
-    match result {
-        Ok(project) => {
-            println!("Project resolved!");
-            println!("{:#?}", project);
-        },
-        Err(errors) => {
-            println!("Got errors:");
-            for error in errors {
-                println!("{}", error);
-            }
+    let result = project.resolve(&source);
+    if let Err(errors) = &result {
+        println!("Got errors:");
+        for error in errors {
+            println!("{}", error);
         }
     }
+    assert!(result.is_ok())
 }
