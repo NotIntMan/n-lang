@@ -1,0 +1,174 @@
+use std::fmt;
+use helpers::{
+    Path,
+    SyncRef,
+};
+use language::{
+    DataTypeDefinition,
+    FunctionDefinition,
+    TableDefinition,
+};
+use project_analysis::Module;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Item {
+    body: ItemBody,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ItemBody {
+    DataType {
+        def: DataTypeDefinition,
+    },
+    //    ImportDefinition {
+//        def: ExternalItemImport<'static>
+//    },
+//    ImportItem {
+//        name: StaticIdentifier,
+//        original_name: StaticIdentifier,
+//        item: ItemRef,
+//    },
+    ModuleReference {
+        module: SyncRef<Module>,
+    },
+    Table {
+        def: TableDefinition,
+        entity: SyncRef<Item>,
+        primary_key: SyncRef<Item>,
+    },
+    Function {
+        def: FunctionDefinition,
+    },
+}
+
+impl Item {
+    #[inline]
+    pub fn data_type(def: DataTypeDefinition) -> Self {
+        Item { body: ItemBody::DataType { def } }
+    }
+    #[inline]
+    pub fn module_ref(module: SyncRef<Module>) -> Self {
+        Item { body: ItemBody::ModuleReference { module } }
+    }
+    #[inline]
+    pub fn function(def: FunctionDefinition) -> Self {
+        Item { body: ItemBody::Function { def } }
+    }
+    #[inline]
+    pub fn table(mut def: TableDefinition) -> Self {
+        let entity = SyncRef::new(Item::data_type(DataTypeDefinition {
+            name: format!("{}::entity", def.name),
+            body: def.make_entity_type(),
+        }));
+        let primary_key = SyncRef::new(Item::data_type(DataTypeDefinition {
+            name: format!("{}::primary_key", def.name),
+            body: def.make_primary_key_type(),
+        }));
+        Item { body: ItemBody::Table { def, entity, primary_key } }
+    }
+    #[inline]
+    pub fn get_type(&self) -> SemanticItemType {
+        match &self.body {
+            ItemBody::DataType { def: _ } => SemanticItemType::DataType,
+//            ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
+//            ItemBody::ImportItem { name: _, original_name: _, item } => item.get_type(),
+            ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
+            ItemBody::Table { def: _, entity: _, primary_key: _ } => SemanticItemType::Table,
+            ItemBody::Function { def: _ } => SemanticItemType::Function,
+        }
+    }
+    #[inline]
+    pub fn get_data_type(&self) -> Option<&DataTypeDefinition> {
+        match &self.body {
+            ItemBody::DataType { def } => Some(def),
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn get_module_ref(&self) -> Option<&SyncRef<Module>> {
+        match &self.body {
+            ItemBody::ModuleReference { module } => Some(module),
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn get_function(&self) -> Option<&FunctionDefinition> {
+        match &self.body {
+            ItemBody::Function { def } => Some(def),
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn get_table(&self) -> Option<&TableDefinition> {
+        match &self.body {
+            ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn get_table_mut(&mut self) -> Option<&mut TableDefinition> {
+        match &mut self.body {
+            ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
+            _ => None,
+        }
+    }
+}
+
+impl SyncRef<Item> {
+    pub fn get_item(&self, path: Path, search_route: &mut Vec<SyncRef<Module>>) -> Option<Self> {
+        if path.is_empty() {
+            return Some(self.clone());
+        }
+        let item = self.read();
+        match &item.body {
+            ItemBody::DataType { def: _ } => {}
+            ItemBody::ModuleReference { module } => {
+                return module.get_item(path, search_route);
+            }
+            ItemBody::Function { def: _ } => {}
+            ItemBody::Table { def: _, entity, primary_key } => if let Some(name) = path.the_only() {
+                match name {
+                    "entity" => return Some(entity.clone()),
+                    "primary_key" => return Some(primary_key.clone()),
+                    _ => {}
+                }
+            }
+        }
+        None
+    }
+    #[inline]
+    pub fn get_type(&self) -> SemanticItemType {
+        self.read().get_type()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SemanticItemType {
+    Definition,
+    Field,
+    DataType,
+    Module,
+    Table,
+    Variable,
+    Function,
+}
+
+impl SemanticItemType {
+    pub fn get_description(&self) -> &'static str {
+        match self {
+            &SemanticItemType::Definition => "definition",
+            &SemanticItemType::Field => "field",
+            &SemanticItemType::DataType => "data type",
+            &SemanticItemType::Module => "module",
+            &SemanticItemType::Table => "table",
+            &SemanticItemType::Variable => "variable",
+            &SemanticItemType::Function => "function",
+        }
+    }
+}
+
+impl fmt::Display for SemanticItemType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.get_description())
+    }
+}

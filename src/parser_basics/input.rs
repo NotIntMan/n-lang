@@ -6,6 +6,8 @@ use nom::{
 use lexeme_scanner::Token;
 
 use super::{
+    new_error,
+    new_error_without_pos,
     ParserError,
     ParserErrorKind,
 };
@@ -23,20 +25,20 @@ use super::{
     # use nom::{IResult, ErrorKind};
     # extern crate n_lang;
     # use n_lang::lexeme_scanner::Token;
-    # use n_lang::parser_basics::{ParserInput, ParserError, ParserErrorKind};
+    # use n_lang::parser_basics::{new_error_without_pos, ParserInput, ParserError, ParserErrorKind};
 
     struct Input<'a>(&'a [u8]);
 
     # fn main() {
 
     impl<'a> ParserInput for Input<'a> {
-        type Error = ParserError;
-        type ErrorKind = ParserErrorKind;
+        type Error = ParserError<'a>;
+        type ErrorKind = ParserErrorKind<'a>;
         fn ok_at<T>(self, processed: usize, value: T) -> IResult<Self, T, Self::Error> {
             IResult::Done(Input(&self.0[processed..]), value)
         }
         fn err_at<T>(self, position: usize, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> {
-            IResult::Error(ErrorKind::Custom(ParserError::new_without_pos(kind)))
+            IResult::Error(ErrorKind::Custom(new_error_without_pos(kind)))
         }
     }
 
@@ -61,24 +63,24 @@ pub trait ParserInput: Sized {
     fn err<T>(self, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> { self.err_at(0, kind) }
 }
 
-impl<'a, 'b> ParserInput for &'a [Token<'b>] {
-    type Error = ParserError;
-    type ErrorKind = ParserErrorKind;
+impl<'token, 'source> ParserInput for &'token [Token<'source>] {
+    type Error = ParserError<'source>;
+    type ErrorKind = ParserErrorKind<'source>;
     fn ok_at<T>(self, processed: usize, value: T) -> IResult<Self, T, Self::Error> {
         IResult::Done(&self[processed..], value)
     }
     fn err_at<T>(self, position: usize, kind: Self::ErrorKind) -> IResult<Self, T, Self::Error> {
         let len = self.len();
         let error = if position < len {
-            ParserError::new(kind, self[position].pos)
+            new_error(kind, self[position].pos)
         } else {
             if len > 0 {
                 let t = &self[len - 1];
                 let mut pos = t.pos;
                 pos.step_str(t.text);
-                ParserError::new(kind, pos)
+                new_error(kind, pos)
             } else {
-                ParserError::new_without_pos(kind)
+                new_error_without_pos(kind)
             }
         };
         IResult::Error(ErrorKind::Custom(error))

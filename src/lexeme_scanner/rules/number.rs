@@ -1,7 +1,6 @@
 //! Правило "Число"
+use helpers::parse_number_literal;
 use super::*;
-
-use self::basics::*;
 
 /// Функция-тест, проверяющая начало ввода на предмет начала числа
 #[inline]
@@ -34,61 +33,8 @@ pub fn is_number_begin(input: &[u8]) -> bool {
 
     Возвращает ошибку `MustBeGot` в случае, если начало ввода не является цифрой или знаком `-`.
 */
+#[inline]
 pub fn number(input: &[u8]) -> BatcherResult {
-    let len = input.len();
-    if !is_number_begin(input) {
-        let got = extract_char(input, 0, "begin of a number")?;
-        return Err((ScannerErrorKind::must_be_got("begin of a number", got), 0));
-    }
-    let (
-        negative,
-        mut result,
-    ) = if (len > 0) && ((input[0] as char) == '-') {
-        (true, 1)
-    } else {
-        (false, 0)
-    };
-    let mut fractional = false;
-    let radix = if extract_char(input, result, "a number")? == '0' {
-        result += 1;
-        if result >= len {
-            return Ok((TokenKind::NumberLiteral { negative, radix: 10, fractional: false }, result));
-        }
-        match input[result] as char {
-            'x' => { result += 1; 16 },
-            'o' => { result += 1; 8 },
-            'b' => { result += 1; 2 },
-            '.' => {
-                assert_pred(input, result + 1,
-                            |c| c.is_digit(10), "a decimal digit")?;
-                result += 1;
-                fractional = true;
-                10
-            },
-            _ => 8,
-        }
-    } else { 10 };
-    'parse_cycle: loop {
-        if result >= len {
-            break 'parse_cycle;
-        }
-        let c = input[result] as char;
-        if c.is_digit(16) {
-            if c.is_digit(radix) {
-                result += 1;
-                continue 'parse_cycle;
-            } else {
-                return Err((ScannerErrorKind::NotInRadix(c, radix), result));
-            }
-        }
-        if c == '.' {
-            if !fractional && ((result + 1) < len) && (input[result + 1] as char).is_digit(16) {
-                fractional = true;
-                result += 1;
-                continue 'parse_cycle;
-            }
-        }
-        break 'parse_cycle;
-    }
-    Ok((TokenKind::NumberLiteral { negative, fractional, radix }, result))
+    parse_number_literal(input)
+        .map(|(kind, _, size)| (kind, size))
 }

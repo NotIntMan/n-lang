@@ -1,0 +1,130 @@
+use indexmap::IndexMap;
+use helpers::{
+    as_unique_identifier,
+    Resolve,
+    SyncRef,
+};
+use parser_basics::Identifier;
+use language::{
+    AttributeAST,
+    DataType,
+    DataTypeAST,
+    find_attribute_ast,
+    Statement,
+    StatementAST,
+};
+use project_analysis::{
+    FunctionContext,
+    FunctionVariableScope,
+    Module,
+    SemanticError,
+    SemanticItemType,
+    StatementFlowControlJumping,
+    StatementFlowControlPosition,
+};
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FunctionBodyAST<'source> {
+    External,
+    Implementation(StatementAST<'source>),
+}
+
+impl<'source> Resolve<SyncRef<FunctionVariableScope>> for FunctionBodyAST<'source> {
+    type Result = FunctionBody;
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
+        let result = match self {
+            FunctionBodyAST::External => FunctionBody::External,
+            FunctionBodyAST::Implementation(stmt) => FunctionBody::Implementation(stmt.resolve(ctx)?),
+        };
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FunctionBody {
+    External,
+    Implementation(Statement),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionDefinitionAST<'source> {
+    pub name: Identifier<'source>,
+    pub arguments: Vec<(Identifier<'source>, DataTypeAST<'source>)>,
+    pub result: Option<DataTypeAST<'source>>,
+    pub body: FunctionBodyAST<'source>,
+}
+
+impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for FunctionDefinitionAST<'source> {
+    type Result = FunctionDefinition;
+    type Error = SemanticError;
+    fn resolve(&self, ctx: &(SyncRef<Module>, Vec<AttributeAST<'source>>)) -> Result<Self::Result, Vec<Self::Error>> {
+        let arguments = match as_unique_identifier(self.arguments.clone()) {
+            Ok(map) => map.resolve(&ctx.0)?,
+            Err(name) => return SemanticError::duplicate_definition(
+                name.item_pos(),
+                name.text().to_string(),
+                SemanticItemType::Variable,
+            )
+                .into_err_vec()
+        };
+        let result = match &self.result {
+            Some(data_type) => data_type.resolve(&ctx.0)?,
+            None => DataType::Void,
+        };
+
+        let context = FunctionContext::new(ctx.0.clone());
+        let root = context.root();
+        let mut errors = Vec::new();
+
+        for (name, data_type) in arguments.iter() {
+            let name = name.as_str();
+            let &(ident, _) = self.arguments.iter()
+                .find(|(ident, _)| ident.text() == name)
+                .expect("The argument has already been preprocessed and its name can not not exist in the input data");
+            match root.new_variable(ident.item_pos(), name.to_string(), Some(data_type.clone())) {
+                Ok(var) => var.make_read_only(),
+                Err(error) => errors.push(error),
+            }
+        }
+
+        let body = self.body.resolve(&root)?;
+
+        if let FunctionBody::Implementation(body) = &body {
+            let body_jumping = body.jumping_check(StatementFlowControlPosition::new(), &result)?;
+            if (body_jumping != StatementFlowControlJumping::AlwaysReturns)
+                && (result != DataType::Void) {
+                return SemanticError::not_all_branches_returns(body.pos)
+                    .into_err_vec();
+            }
+        }
+
+        let is_lite_weight = match &body {
+            FunctionBody::External => {
+                find_attribute_ast(&ctx.1, "is_lite_weight").is_some()
+            }
+            FunctionBody::Implementation(stmt) => {
+                stmt.is_lite_weight()
+            }
+        };
+
+        Ok(FunctionDefinition {
+            name: self.name.to_string(),
+            arguments,
+            result,
+            body,
+            context,
+            is_lite_weight,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionDefinition {
+    pub name: String,
+    pub arguments: IndexMap<String, DataType>,
+    pub result: DataType,
+    pub body: FunctionBody,
+    pub context: SyncRef<FunctionContext>,
+    pub is_lite_weight: bool,
+}
