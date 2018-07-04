@@ -10,6 +10,11 @@ pub struct Map<K: Eq, V> {
 }
 
 impl<K: Eq, V> Map<K, V> {
+    pub fn new() -> Self {
+        Self {
+            pairs: Vec::new(),
+        }
+    }
     pub fn iter<'s>(&'s self) -> impl Iterator<Item=(&'s K, &'s V)> {
         self.pairs.iter()
             .map(|(key, value)| (key, value))

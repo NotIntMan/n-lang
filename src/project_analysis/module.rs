@@ -160,6 +160,14 @@ impl Module {
             self.imported.push(module);
         }
     }
+    #[inline]
+    pub fn items(&self) -> &IndexMap<String, ModuleDefinitionItem> {
+        &self.items
+    }
+    #[inline]
+    pub fn path(&self) -> &SyncRef<PathBuf> {
+        &self.path
+    }
 }
 
 impl SyncRef<Module> {
