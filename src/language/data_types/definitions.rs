@@ -766,3 +766,5 @@ impl fmt::Display for DataType {
         }
     }
 }
+
+impl Eq for DataType {}

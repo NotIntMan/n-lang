@@ -1,18 +1,18 @@
-use std::collections::HashMap;
-use helpers::PathBuf;
+//use helpers::PathBuf;
+use helpers::Map;
 use language::{
     DataType,
     FunctionDefinition,
     TableDefinition,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct DataClass {
     name: String,
-    field: HashMap<String, DataType>,
+    field: Map<String, DataType>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct RPCModule {
     name: String,
     functions: Vec<FunctionDefinition>,
@@ -20,8 +20,8 @@ pub struct RPCModule {
 
 #[derive(Debug, Clone)]
 pub struct RPCProject {
-    data_classes: HashMap<PathBuf, DataClass>,
-    rpc_modules: HashMap<String, RPCModule>,
+    data_classes: Map<DataType, DataClass>,
+    rpc_modules: Map<String, RPCModule>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -30,7 +30,7 @@ pub struct DatabaseModule {
     functions: Vec<FunctionDefinition>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct DatabaseProject {
-    modules: HashMap<String, TableDefinition>,
+    modules: Map<String, TableDefinition>,
 }
