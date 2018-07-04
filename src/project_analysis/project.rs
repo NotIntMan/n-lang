@@ -224,7 +224,6 @@ impl<S: TextSource> Resolve<S> for SyncRef<ProjectContext> {
         let project = self.read();
         if errors.is_empty() {
             let mut result = IndexMap::new();
-//            println!("Preparing Result::Ok of {:#?}", project.modules);
             for (path, module) in project.modules.iter() {
                 match module {
                     ResolutionModuleState::Resolved(module) => {
