@@ -102,8 +102,30 @@ pub struct RPCProject {
 
 impl RPCProject {
     pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
-//        let mut data_classes_pre_store = Map::new();
-
+        let mut data_classes_pre_store: Map<DataType, Option<DataClass>> = Map::new();
+        for (module_path, module) in project.iter() {
+            let module_path_guard = module_path.read();
+            let module_guard = module.read();
+            for (item_name, item) in module_guard.items().iter() {
+                let item_value = item.value.read();
+                if let Some(data_type) = item_value.get_data_type() {
+                    data_classes_pre_store.insert(data_type.body.clone(), None);
+                    let mut path = module_path_guard.clone();
+                    path.push(item_name.as_str());
+                    if let Some(data_class) = DataClass::new(
+                        path,
+                        &data_type.body,
+                        |path, data_type| {},
+                    ) {
+                        data_classes_pre_store.insert(data_type.body.clone(), Some(data_class));
+                    }
+                }
+            }
+            let rpc_module = RPCModule::new(
+                &*module_guard,
+                |path, data_type| {},
+            );
+        }
         unimplemented!()
     }
 }
