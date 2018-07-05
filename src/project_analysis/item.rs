@@ -20,14 +20,6 @@ pub enum ItemBody {
     DataType {
         def: DataTypeDefinition,
     },
-    //    ImportDefinition {
-//        def: ExternalItemImport<'static>
-//    },
-//    ImportItem {
-//        name: StaticIdentifier,
-//        original_name: StaticIdentifier,
-//        item: ItemRef,
-//    },
     ModuleReference {
         module: SyncRef<Module>,
     },
@@ -70,8 +62,6 @@ impl Item {
     pub fn get_type(&self) -> SemanticItemType {
         match &self.body {
             ItemBody::DataType { def: _ } => SemanticItemType::DataType,
-//            ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
-//            ItemBody::ImportItem { name: _, original_name: _, item } => item.get_type(),
             ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
             ItemBody::Table { def: _, entity: _, primary_key: _ } => SemanticItemType::Table,
             ItemBody::Function { def: _ } => SemanticItemType::Function,
