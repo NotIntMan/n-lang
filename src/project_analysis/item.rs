@@ -1,6 +1,7 @@
 use std::fmt;
 use helpers::{
     Path,
+    PathBuf,
     SyncRef,
 };
 use language::{
@@ -114,6 +115,23 @@ impl Item {
             ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
             _ => None,
         }
+    }
+    pub fn get_path(&self) -> PathBuf {
+        let name = match &self.body {
+            ItemBody::DataType { def } => def.name.as_str(),
+            ItemBody::ModuleReference { module } => {
+                let module = module.read();
+                let path = module.path().read();
+                return path.clone();
+            }
+            ItemBody::Table { def, .. } => def.name.as_str(),
+            ItemBody::Function { def } => def.name.as_str(),
+        };
+        let parent = self.parent.read();
+        let path = parent.path().read();
+        let mut result = path.clone();
+        result.push(name);
+        result
     }
 }
 

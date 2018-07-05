@@ -19,11 +19,10 @@ pub struct DataClass {
 }
 
 impl DataClass {
-    pub fn new(path: PathBuf, reflection_target: &DataType, request_data_class: impl Fn(PathBuf, &DataType) -> ()) -> Option<Self> {
+    pub fn new(path: PathBuf, reflection_target: &DataType, mut request_data_class: impl FnMut(PathBuf, &DataType) -> ()) -> Option<Self> {
         match reflection_target {
             DataType::Compound(CompoundDataType::Structure(fields)) => {
                 let mut result_fields = Map::new();
-                // TODO Создание DataClass'ов для типов полей
                 for (field_name, field) in fields.iter() {
                     let mut sub_path = path.clone();
                     sub_path.push(field_name.as_str());
@@ -52,7 +51,8 @@ impl DataClass {
             DataType::Reference(item) => {
                 let item = item.read();
                 let data_type = item.get_data_type()?;
-                DataClass::new(path, &data_type.body, request_data_class)
+                request_data_class(path, &data_type.body);
+                None
             }
             _ => None,
         }
@@ -66,7 +66,7 @@ pub struct RPCModule {
 }
 
 impl RPCModule {
-    pub fn new(source: &Module, request_data_class: impl Fn(PathBuf, &DataType) -> ()) -> Self {
+    pub fn new(source: &Module, mut request_data_class: impl FnMut(PathBuf, &DataType) -> ()) -> Self {
         let module_path = source.path().read();
         let mut result = Self {
             path: module_path.clone(),
@@ -74,7 +74,6 @@ impl RPCModule {
         };
         for (item_name, item) in source.items().iter() {
             let item = item.value.read();
-            // TODO Создание DataClass'ов для типов аргументов и возвращаемых значений функций
             if let Some(function) = item.get_function() {
                 let mut function = function.clone();
                 function.name = item_name.clone();
@@ -96,28 +95,33 @@ impl RPCModule {
 
 #[derive(Debug, Clone)]
 pub struct RPCProject {
-    data_classes: Map<DataType, DataClass>,
     rpc_modules: Map<String, RPCModule>,
+    data_classes: Map<PathBuf, DataClass>,
+    anonymous_data_classes: Map<PathBuf, DataClass>,
 }
 
 impl RPCProject {
     pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
-        let mut data_classes_pre_store: Map<DataType, Option<DataClass>> = Map::new();
+        let mut data_classes: Map<PathBuf, DataClass> = Map::new();
+        let mut requested_data_classes: Map<PathBuf, DataType> = Map::new();
         for (module_path, module) in project.iter() {
             let module_path_guard = module_path.read();
             let module_guard = module.read();
             for (item_name, item) in module_guard.items().iter() {
                 let item_value = item.value.read();
-                if let Some(data_type) = item_value.get_data_type() {
-                    data_classes_pre_store.insert(data_type.body.clone(), None);
+                if let Some(data_type_def) = item_value.get_data_type() {
                     let mut path = module_path_guard.clone();
                     path.push(item_name.as_str());
                     if let Some(data_class) = DataClass::new(
-                        path,
-                        &data_type.body,
-                        |path, data_type| {},
+                        path.clone(),
+                        &data_type_def.body,
+                        |path, data_type| {
+                            if !requested_data_classes.has(&path) {
+                                requested_data_classes.insert(path, data_type.clone());
+                            }
+                        },
                     ) {
-                        data_classes_pre_store.insert(data_type.body.clone(), Some(data_class));
+                        data_classes.insert(path, data_class);
                     }
                 }
             }
