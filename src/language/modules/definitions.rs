@@ -41,7 +41,7 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeDefinitionAST<'source> {
             name: self.name.to_string(),
             body,
         };
-        Ok(Item::data_type(def))
+        Ok(Item::data_type(ctx.clone(), def))
     }
 }
 
@@ -249,11 +249,11 @@ impl<'source> Resolve<SyncRef<Module>> for ModuleDefinitionItemAST<'source> {
                 ModuleDefinitionValueAST::Function(def) => {
                     let ctx = (ctx.clone(), attributes.clone());
                     let def = def.resolve(&ctx)?;
-                    SyncRef::new(Item::function(def))
+                    SyncRef::new(Item::function(ctx.0.clone(), def))
                 }
                 ModuleDefinitionValueAST::Table(def) => {
                     let def = def.resolve(ctx)?;
-                    SyncRef::new(Item::table(def))
+                    SyncRef::new(Item::table(ctx.clone(), def))
                 }
                 ModuleDefinitionValueAST::Module(_) => {
                     return SemanticError::not_supported_yet(self.position, "file-scoped modules")

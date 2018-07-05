@@ -10,8 +10,9 @@ use language::{
 };
 use project_analysis::Module;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone)]
 pub struct Item {
+    parent: SyncRef<Module>,
     body: ItemBody,
 }
 
@@ -35,28 +36,40 @@ pub enum ItemBody {
 
 impl Item {
     #[inline]
-    pub fn data_type(def: DataTypeDefinition) -> Self {
-        Item { body: ItemBody::DataType { def } }
+    pub fn data_type(parent: SyncRef<Module>, def: DataTypeDefinition) -> Self {
+        Item {
+            parent,
+            body: ItemBody::DataType { def },
+        }
     }
     #[inline]
     pub fn module_ref(module: SyncRef<Module>) -> Self {
-        Item { body: ItemBody::ModuleReference { module } }
+        Item {
+            parent: module.clone(),
+            body: ItemBody::ModuleReference { module },
+        }
     }
     #[inline]
-    pub fn function(def: FunctionDefinition) -> Self {
-        Item { body: ItemBody::Function { def } }
+    pub fn function(parent: SyncRef<Module>, def: FunctionDefinition) -> Self {
+        Item {
+            parent,
+            body: ItemBody::Function { def },
+        }
     }
     #[inline]
-    pub fn table(mut def: TableDefinition) -> Self {
-        let entity = SyncRef::new(Item::data_type(DataTypeDefinition {
+    pub fn table(parent: SyncRef<Module>, mut def: TableDefinition) -> Self {
+        let entity = SyncRef::new(Item::data_type(parent.clone(), DataTypeDefinition {
             name: format!("{}::entity", def.name),
             body: def.make_entity_type(),
         }));
-        let primary_key = SyncRef::new(Item::data_type(DataTypeDefinition {
+        let primary_key = SyncRef::new(Item::data_type(parent.clone(), DataTypeDefinition {
             name: format!("{}::primary_key", def.name),
             body: def.make_primary_key_type(),
         }));
-        Item { body: ItemBody::Table { def, entity, primary_key } }
+        Item {
+            parent,
+            body: ItemBody::Table { def, entity, primary_key },
+        }
     }
     #[inline]
     pub fn get_type(&self) -> SemanticItemType {
@@ -129,6 +142,24 @@ impl SyncRef<Item> {
     #[inline]
     pub fn get_type(&self) -> SemanticItemType {
         self.read().get_type()
+    }
+}
+
+impl PartialEq for Item {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.parent.is_same_ref(&rhs.parent)
+            &&
+            self.body == rhs.body
+    }
+}
+
+impl fmt::Debug for Item {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if f.alternate() {
+            write!(f, "Item::{:#?}", self.body)
+        } else {
+            write!(f, "Item::{:?}", self.body)
+        }
     }
 }
 
