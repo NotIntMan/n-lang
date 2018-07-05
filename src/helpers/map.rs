@@ -2,6 +2,7 @@ use std::{
     cmp::Eq,
     mem::replace,
     vec::IntoIter,
+    iter::FromIterator,
 };
 
 #[derive(Debug, Clone)]
@@ -13,6 +14,11 @@ impl<K: Eq, V> Map<K, V> {
     pub fn new() -> Self {
         Self {
             pairs: Vec::new(),
+        }
+    }
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            pairs: Vec::with_capacity(capacity),
         }
     }
     pub fn iter<'s>(&'s self) -> impl Iterator<Item=(&'s K, &'s V)> {
@@ -57,5 +63,23 @@ impl<K: Eq, V> IntoIterator for Map<K, V> {
     type IntoIter = IntoIter<(K, V)>;
     fn into_iter(self) -> Self::IntoIter {
         self.pairs.into_iter()
+    }
+}
+
+impl<K: Eq, V> FromIterator<(K, V)> for Map<K, V> {
+    fn from_iter<T: IntoIterator<Item=(K, V)>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let capacity = {
+            let (min, max) = iter.size_hint();
+            match max {
+                Some(max) => min.max(max),
+                None => min,
+            }
+        };
+        let mut map = Map::with_capacity(capacity);
+        for (key, value) in iter {
+            map.insert(key, value);
+        }
+        map
     }
 }
