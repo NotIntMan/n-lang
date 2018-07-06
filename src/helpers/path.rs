@@ -1,6 +1,9 @@
 use std::{
     cmp,
-    fmt,
+    fmt::{
+        self,
+        Write,
+    },
     mem::replace,
 };
 
@@ -53,6 +56,12 @@ impl PathBuf {
             self.data.push_str(&self.delimiter);
         }
         self.data.push_str(component);
+    }
+    pub fn push_fmt(&mut self, component: fmt::Arguments) -> fmt::Result {
+        if !self.data.is_empty() {
+            self.data.push_str(&self.delimiter);
+        }
+        self.data.write_fmt(component)
     }
 }
 

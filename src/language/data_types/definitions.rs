@@ -4,6 +4,7 @@ use helpers::{
     as_unique_identifier,
     parse_index,
     Path,
+    PathBuf,
     Resolve,
     SyncRef,
 };
@@ -728,6 +729,48 @@ impl DataType {
             }
         }
     }
+    pub fn make_primitives(&self, prefix: PathBuf, target: &mut Vec<FieldPrimitive>) {
+        match self {
+            DataType::Array(sub_type) => {
+                let mut sub_prefix = prefix;
+                sub_prefix.push("[]");
+                sub_type.make_primitives(sub_prefix, target);
+            }
+            DataType::Primitive(primitive) => {
+                target.push(FieldPrimitive {
+                    path: prefix,
+                    field_type: primitive.clone(),
+                });
+            }
+            DataType::Void => {},
+            DataType::Compound(CompoundDataType::Tuple(fields)) => {
+                for (i, field) in fields.iter().enumerate() {
+                    let mut path = prefix.clone();
+                    if path.push_fmt(format_args!("component{}", i)).is_ok() {
+                        field.field_type.make_primitives(path, target);
+                    }
+                }
+            },
+            DataType::Compound(CompoundDataType::Structure(fields)) => {
+                for (field_name, field) in fields.iter() {
+                    let mut path = prefix.clone();
+                    path.push(field_name.as_str());
+                    field.field_type.make_primitives(path, target);
+                }
+            },
+            DataType::Reference(item) => {
+                let item = item.read();
+                if let Some(data_type) = item.get_data_type() {
+                    data_type.body.make_primitives(prefix, target);
+                };
+            }
+        }
+    }
+    pub fn primitives(&self) -> Vec<FieldPrimitive> {
+        let mut result = Vec::new();
+        self.make_primitives(PathBuf::new("."), &mut result);
+        result
+    }
 }
 
 impl fmt::Display for DataType {
@@ -770,3 +813,9 @@ impl fmt::Display for DataType {
 }
 
 impl Eq for DataType {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldPrimitive {
+    path: PathBuf,
+    field_type: PrimitiveDataType,
+}
