@@ -58,14 +58,14 @@ impl Item {
         }
     }
     #[inline]
-    pub fn table(parent: SyncRef<Module>, mut def: TableDefinition) -> Self {
+    pub fn table(parent: SyncRef<Module>, def: TableDefinition) -> Self {
         let entity = SyncRef::new(Item::data_type(parent.clone(), DataTypeDefinition {
             name: format!("{}::entity", def.name),
-            body: def.make_entity_type(),
+            body: def.entity.clone(),
         }));
         let primary_key = SyncRef::new(Item::data_type(parent.clone(), DataTypeDefinition {
             name: format!("{}::primary_key", def.name),
-            body: def.make_primary_key_type(),
+            body: def.primary_key.clone(),
         }));
         Item {
             parent,
@@ -105,13 +105,6 @@ impl Item {
     #[inline]
     pub fn get_table(&self) -> Option<&TableDefinition> {
         match &self.body {
-            ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
-            _ => None,
-        }
-    }
-    #[inline]
-    pub fn get_table_mut(&mut self) -> Option<&mut TableDefinition> {
-        match &mut self.body {
             ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
             _ => None,
         }

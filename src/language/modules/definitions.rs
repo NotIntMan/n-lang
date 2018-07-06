@@ -71,12 +71,26 @@ impl<'source> Resolve<SyncRef<Module>> for TableDefinitionAST<'source> {
             )
                 .into_err_vec(),
         };
+        let entity = DataType::Compound(CompoundDataType::Structure(body.clone()));
+        let primary_key = {
+            let mut primary_key = IndexMap::new();
+            for (name, field) in body.iter() {
+                let is_primary_key_part = find_attribute(
+                    field.attributes.as_slice(),
+                    "primary_key",
+                ).is_some();
+                if is_primary_key_part {
+                    primary_key.insert(name.clone(), field.clone());
+                }
+            }
+            DataType::Compound(CompoundDataType::Structure(Arc::new(primary_key)))
+        };
         Ok(TableDefinition {
             name: self.name.to_string(),
             pos: self.pos,
             body,
-            entity: None,
-            primary_key: None,
+            entity,
+            primary_key,
         })
     }
 }
@@ -86,45 +100,8 @@ pub struct TableDefinition {
     pub name: String,
     pub pos: ItemPosition,
     pub body: Arc<IndexMap<String, Field>>,
-    pub entity: Option<DataType>,
-    pub primary_key: Option<DataType>,
-}
-
-impl TableDefinition {
-    #[inline]
-    pub fn make_entity_type(&mut self) -> DataType {
-        let result;
-        self.entity = match &self.entity {
-            Some(data_type) => return data_type.clone(),
-            None => {
-                result = DataType::Compound(CompoundDataType::Structure(self.body.clone()));
-                Some(result.clone())
-            }
-        };
-        result
-    }
-    #[inline]
-    pub fn make_primary_key_type(&mut self) -> DataType {
-        let result;
-        self.primary_key = match &self.primary_key {
-            Some(data_type) => return data_type.clone(),
-            None => {
-                let mut body = IndexMap::new();
-                for (name, field) in self.body.iter() {
-                    let is_primary_key_part = find_attribute(
-                        field.attributes.as_slice(),
-                        "primary_key",
-                    ).is_some();
-                    if is_primary_key_part {
-                        body.insert(name.clone(), field.clone());
-                    }
-                }
-                result = DataType::Compound(CompoundDataType::Structure(Arc::new(body)));
-                Some(result.clone())
-            }
-        };
-        result
-    }
+    pub entity: DataType,
+    pub primary_key: DataType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

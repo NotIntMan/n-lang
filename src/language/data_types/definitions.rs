@@ -816,6 +816,6 @@ impl Eq for DataType {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldPrimitive {
-    path: PathBuf,
-    field_type: PrimitiveDataType,
+    pub path: PathBuf,
+    pub field_type: PrimitiveDataType,
 }

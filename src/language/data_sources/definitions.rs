@@ -105,10 +105,10 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                 match scope.module().get_item(name.path.as_path(), &mut Vec::new()) {
                     Some(item) => {
                         let var = {
-                            let mut item = item.write();
+                            let mut item = item.read();
                             let item_type = item.get_type();
-                            let entity_type = match item.get_table_mut() {
-                                Some(table) => table.make_entity_type(),
+                            let entity_type = match item.get_table() {
+                                Some(table) => &table.entity,
                                 None => return SemanticError::expected_item_of_another_type(
                                     name.pos,
                                     SemanticItemType::Table,
@@ -122,7 +122,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                                     .pop_right()
                                     .expect("Item's path should not be null"),
                             };
-                            scope.new_variable(pos, new_var_name.to_string(), Some(entity_type))?
+                            scope.new_variable(pos, new_var_name.to_string(), Some(entity_type.clone()))?
                         };
                         Ok(DataSource::Table { item, var })
                     }
