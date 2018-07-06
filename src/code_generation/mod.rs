@@ -108,9 +108,12 @@ impl RPCModule {
                 function.name = item_name.clone();
                 let mut function_path = module_path.clone();
                 function_path.push(function.name.as_str());
-                for (argument_name, argument_type) in function.arguments.iter() {
+                for (argument_name, argument) in function.arguments.iter() {
                     let mut sub_path = function_path.clone();
                     sub_path.push(argument_name.as_str());
+                    let argument_guard = argument.read();
+                    let argument_type = argument_guard.data_type()
+                        .expect("Function arguments cannot have undefined data type");
                     DataClass::for_data_type(sub_path, argument_type, data_classes);
                 }
                 function_path.push("result");

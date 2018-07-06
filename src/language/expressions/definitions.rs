@@ -662,9 +662,13 @@ impl Expression {
             }
 
             for (i, argument) in arguments.iter().enumerate() {
-                let (_, target_data_type) = function.arguments.get_index(i)
+                let (_, target) = function.arguments.get_index(i)
                     .expect("The argument can not cease to exist immediately after checking the length of the collection");
-                argument.should_cast_to_type(target_data_type)?;
+                argument.should_cast_to_type(
+                    target.read()
+                        .data_type()
+                        .expect("Function arguments cannot have undefined data type")
+                )?;
             }
 
             function.result.clone()

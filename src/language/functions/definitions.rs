@@ -1,5 +1,4 @@
 use helpers::{
-    as_unique_identifier,
     Resolve,
     SyncRef,
 };
@@ -15,6 +14,7 @@ use language::{
 use parser_basics::Identifier;
 use project_analysis::{
     FunctionContext,
+    FunctionVariable,
     FunctionVariableScope,
     Module,
     SemanticError,
@@ -59,34 +59,44 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
     type Result = FunctionDefinition;
     type Error = SemanticError;
     fn resolve(&self, ctx: &(SyncRef<Module>, Vec<AttributeAST<'source>>)) -> Result<Self::Result, Vec<Self::Error>> {
-        let arguments = match as_unique_identifier(self.arguments.clone()) {
-            Ok(map) => map.resolve(&ctx.0)?,
-            Err(name) => return SemanticError::duplicate_definition(
-                name.item_pos(),
-                name.text().to_string(),
-                SemanticItemType::Variable,
-            )
-                .into_err_vec()
-        };
-        let result = match &self.result {
-            Some(data_type) => data_type.resolve(&ctx.0)?,
-            None => DataType::Void,
-        };
-
         let context = FunctionContext::new(ctx.0.clone());
         let root = context.root();
         let mut errors = Vec::new();
 
-        for (name, data_type) in arguments.iter() {
-            let name = name.as_str();
-            let &(ident, _) = self.arguments.iter()
-                .find(|(ident, _)| ident.text() == name)
-                .expect("The argument has already been preprocessed and its name can not not exist in the input data");
-            match root.new_variable(ident.item_pos(), name.to_string(), Some(data_type.clone())) {
-                Ok(var) => var.make_read_only(),
-                Err(error) => errors.push(error),
+        let mut arguments = IndexMap::new();
+        for (identifier, data_type) in self.arguments.iter() {
+            let name = identifier.text();
+            let position = identifier.item_pos();
+            if arguments.contains_key(name) {
+                errors.push(SemanticError::duplicate_definition(
+                    position,
+                    name.to_string(),
+                    SemanticItemType::Variable,
+                ));
+                continue;
             }
+            let data_type = match data_type.resolve(&ctx.0) {
+                Ok(data_type) => data_type,
+                Err(mut sub_errors) => {
+                    errors.append(&mut sub_errors);
+                    continue;
+                }
+            };
+            let var = match root.new_variable(position, name.to_string(), Some(data_type)) {
+                Ok(var) => var,
+                Err(error) => {
+                    errors.push(error);
+                    continue;
+                }
+            };
+            var.make_read_only();
+            arguments.insert(name.to_string(), var);
         }
+
+        let result = match &self.result {
+            Some(data_type) => data_type.resolve(&ctx.0)?,
+            None => DataType::Void,
+        };
 
         let body = self.body.resolve(&root)?;
 
@@ -122,7 +132,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDefinition {
     pub name: String,
-    pub arguments: IndexMap<String, DataType>,
+    pub arguments: IndexMap<String, SyncRef<FunctionVariable>>,
     pub result: DataType,
     pub body: FunctionBody,
     pub context: SyncRef<FunctionContext>,
