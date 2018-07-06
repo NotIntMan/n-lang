@@ -43,7 +43,7 @@ impl<'a, T: 'a + Write> CodeFormatter<'a, T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BlockFormatter<'a, T: 'a + Write> {
     target: Rc<RefCell<CodeFormatter<'a, T>>>,
     indent_level: usize,
@@ -58,6 +58,15 @@ impl<'a, T: 'a + Write> BlockFormatter<'a, T> {
         Self {
             target: self.target.clone(),
             indent_level: self.indent_level + 1,
+        }
+    }
+}
+
+impl<'a, T: 'a + Write> Clone for BlockFormatter<'a, T> {
+    fn clone(&self) -> Self {
+        Self {
+            target: self.target.clone(),
+            indent_level: self.indent_level,
         }
     }
 }
