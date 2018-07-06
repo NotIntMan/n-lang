@@ -195,9 +195,9 @@ impl DatabaseModule {
     }
     pub fn generate_tables(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
         let prefix = self.path.data.as_str();
+        let mut local = f.sub_block();
         for table in self.tables.iter() {
             f.write_line(format_args!("table {}::{} {{", prefix, table.name))?;
-            let mut local = f.sub_block();
             for primitive in table.entity.primitives() {
                 local.write_line(format_args!("{}: {},", primitive.path, primitive.field_type))?;
             }
@@ -207,8 +207,27 @@ impl DatabaseModule {
     }
     pub fn generate_functions(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
         let prefix = self.path.data.as_str();
+        let mut local = f.sub_block();
         for function in self.functions.iter() {
-            f.write_line(format_args!("function {}::{}", prefix, function.name))?;
+            f.write_line(format_args!("function {}::{} ({{", prefix, function.name))?;
+            let mut primitive_arguments = Vec::new();
+            for (argument_name, argument) in function.arguments.iter() {
+                let argument_guard = argument.read();
+                let mut path_prefix = PathBuf::new(".");
+                path_prefix.push(argument_name.as_str());
+                argument_guard.data_type()
+                    .expect("Function arguments cannot have undefined data type")
+                    .make_primitives(path_prefix, &mut primitive_arguments);
+            }
+            for primitive in primitive_arguments {
+                local.write_line(format_args!("{}: {},", primitive.path, primitive.field_type))?;
+            }
+            f.write_line("}) -> {")?;
+            for primitive in function.result.primitives() {
+                local.write_line(format_args!("{}: {},", primitive.path, primitive.field_type))?;
+            }
+            f.write_line("}")?;
+            f.write_line("")?;
         }
         Ok(())
     }
