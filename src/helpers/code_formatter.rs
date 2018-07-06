@@ -34,13 +34,12 @@ impl<'a, T: 'a + Write> CodeFormatter<'a, T> {
         self.write_indent(indent_level)?;
         writeln!(&mut self.target, "{}", value)
     }
-    pub fn root_block(self) -> (Rc<RefCell<Self>>, BlockFormatter<'a, T>) {
-        let formatter = Rc::new(RefCell::new(self));
+    pub fn root_block(self) -> BlockFormatter<'a, T> {
         let block = BlockFormatter {
-            target: formatter.clone(),
+            target: Rc::new(RefCell::new(self)),
             indent_level: 0,
         };
-        (formatter, block)
+        block
     }
 }
 
@@ -71,7 +70,7 @@ mod tests {
     fn simple_class() -> fmt::Result {
         let mut result = String::new();
         {
-            let (_formatter, mut block) = {
+            let mut block = {
                 let mut f = CodeFormatter::new(&mut result);
                 f.indent_size = 2;
                 f.root_block()
