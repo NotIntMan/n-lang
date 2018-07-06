@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use indexmap::IndexMap;
 use helpers::{
     Map,
@@ -10,7 +11,11 @@ use language::{
     FunctionDefinition,
     TableDefinition,
 };
-use project_analysis::Module;
+use project_analysis::{
+    Item,
+    ItemBody,
+    Module,
+};
 
 #[derive(Debug, Clone)]
 pub struct DataClass {
@@ -19,20 +24,22 @@ pub struct DataClass {
 }
 
 impl DataClass {
-    pub fn new(path: PathBuf, reflection_target: &DataType, mut request_data_class: impl FnMut(PathBuf, &DataType) -> ()) -> Option<Self> {
+    pub fn for_data_type(path: PathBuf, reflection_target: &DataType, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) {
+        if data_classes.contains_key(&path) { return; }
+        data_classes.insert(path.clone(), None);
         match reflection_target {
             DataType::Compound(CompoundDataType::Structure(fields)) => {
                 let mut result_fields = Map::new();
                 for (field_name, field) in fields.iter() {
                     let mut sub_path = path.clone();
                     sub_path.push(field_name.as_str());
-                    request_data_class(sub_path, &field.field_type);
+                    DataClass::for_data_type(sub_path, &field.field_type, data_classes);
                     result_fields.insert(field_name.as_str(), field.field_type.clone());
                 }
-                Some(Self {
+                data_classes.insert(path.clone(), Some(Self {
                     path,
                     fields: result_fields,
-                })
+                }));
             }
             DataType::Compound(CompoundDataType::Tuple(fields)) => {
                 let mut result_fields = Map::new();
@@ -40,22 +47,36 @@ impl DataClass {
                     let field_name = format!("component{}", index);
                     let mut sub_path = path.clone();
                     sub_path.push(field_name.as_str());
-                    request_data_class(sub_path, &field.field_type);
+                    DataClass::for_data_type(sub_path, &field.field_type, data_classes);
                     result_fields.insert(field_name, field.field_type.clone());
                 }
-                Some(Self {
+                data_classes.insert(path.clone(), Some(Self {
                     path,
                     fields: result_fields,
-                })
+                }));
             }
             DataType::Reference(item) => {
-                let item = item.read();
-                let data_type = item.get_data_type()?;
-                request_data_class(path, &data_type.body);
-                None
+                DataClass::for_shared_item(item, data_classes);
             }
-            _ => None,
+            _ => {}
         }
+    }
+    pub fn for_item(item: &Item, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) {
+        match item.body() {
+            ItemBody::DataType { def } => {
+                DataClass::for_data_type(item.get_path(), &def.body, data_classes);
+            }
+            ItemBody::Table { entity, primary_key, .. } => {
+                DataClass::for_shared_item(entity, data_classes);
+                DataClass::for_shared_item(primary_key, data_classes);
+            }
+            _ => {}
+        }
+    }
+    #[inline]
+    pub fn for_shared_item(item: &SyncRef<Item>, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) {
+        let item = item.read();
+        DataClass::for_item(&*item, data_classes);
     }
 }
 
@@ -66,7 +87,7 @@ pub struct RPCModule {
 }
 
 impl RPCModule {
-    pub fn new(source: &Module, mut request_data_class: impl FnMut(PathBuf, &DataType) -> ()) -> Self {
+    pub fn new(source: &Module, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) -> Self {
         let module_path = source.path().read();
         let mut result = Self {
             path: module_path.clone(),
@@ -82,10 +103,10 @@ impl RPCModule {
                 for (argument_name, argument_type) in function.arguments.iter() {
                     let mut sub_path = function_path.clone();
                     sub_path.push(argument_name.as_str());
-                    request_data_class(sub_path, argument_type);
+                    DataClass::for_data_type(sub_path, argument_type, data_classes);
                 }
                 function_path.push("result");
-                request_data_class(function_path, &function.result);
+                DataClass::for_data_type(function_path, &function.result, data_classes);
                 result.functions.push(function);
             }
         }
@@ -95,42 +116,36 @@ impl RPCModule {
 
 #[derive(Debug, Clone)]
 pub struct RPCProject {
-    rpc_modules: Map<String, RPCModule>,
-    data_classes: Map<PathBuf, DataClass>,
-    anonymous_data_classes: Map<PathBuf, DataClass>,
+    rpc_modules: HashMap<PathBuf, RPCModule>,
+    data_classes: HashMap<PathBuf, DataClass>,
 }
 
 impl RPCProject {
     pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
-        let mut data_classes: Map<PathBuf, DataClass> = Map::new();
-        let mut requested_data_classes: Map<PathBuf, DataType> = Map::new();
+        let mut data_classes = HashMap::new();
+        let mut rpc_modules = HashMap::new();
+
         for (module_path, module) in project.iter() {
-            let module_path_guard = module_path.read();
             let module_guard = module.read();
-            for (item_name, item) in module_guard.items().iter() {
-                let item_value = item.value.read();
-                if let Some(data_type_def) = item_value.get_data_type() {
-                    let mut path = module_path_guard.clone();
-                    path.push(item_name.as_str());
-                    if let Some(data_class) = DataClass::new(
-                        path.clone(),
-                        &data_type_def.body,
-                        |path, data_type| {
-                            if !requested_data_classes.has(&path) {
-                                requested_data_classes.insert(path, data_type.clone());
-                            }
-                        },
-                    ) {
-                        data_classes.insert(path, data_class);
-                    }
-                }
+
+            for (_, item) in module_guard.items().iter() {
+                DataClass::for_shared_item(&item.value, &mut data_classes);
             }
-            let rpc_module = RPCModule::new(
-                &*module_guard,
-                |path, data_type| {},
+
+            rpc_modules.insert(
+                module_path.read().clone(),
+                RPCModule::new(&*module_guard, &mut data_classes),
             );
         }
-        unimplemented!()
+        let data_classes = data_classes.into_iter()
+            .filter_map(|(path, data_class)|
+                data_class.map(move |inner_data_class| (path, inner_data_class))
+            )
+            .collect::<HashMap<_, _>>();
+        Self {
+            data_classes,
+            rpc_modules,
+        }
     }
 }
 
@@ -167,5 +182,21 @@ impl DatabaseModule {
 
 #[derive(Debug, Clone)]
 pub struct DatabaseProject {
-    modules: Map<String, TableDefinition>,
+    modules: HashMap<PathBuf, DatabaseModule>,
+}
+
+impl DatabaseProject {
+    pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
+        let mut modules = HashMap::new();
+        for (module_path, module) in project.iter() {
+            let module = module.read();
+            modules.insert(
+                module_path.read().clone(),
+                DatabaseModule::new(&*module),
+            );
+        }
+        Self {
+            modules,
+        }
+    }
 }

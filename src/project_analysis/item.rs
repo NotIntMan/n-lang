@@ -133,6 +133,10 @@ impl Item {
         result.push(name);
         result
     }
+    #[inline]
+    pub fn body(&self) -> &ItemBody {
+        &self.body
+    }
 }
 
 impl SyncRef<Item> {
