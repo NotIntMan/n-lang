@@ -1,7 +1,7 @@
 //! Правило "Строка"
 
-use super::*;
 use self::basics::*;
+use super::*;
 
 /**
     Правило "Строка".

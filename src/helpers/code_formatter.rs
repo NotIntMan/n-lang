@@ -1,11 +1,11 @@
 use std::{
-    rc::Rc,
     cell::RefCell,
     fmt::{
         self,
         Display,
         Write,
     },
+    rc::Rc,
 };
 
 #[derive(Debug)]

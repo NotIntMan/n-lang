@@ -49,8 +49,9 @@
     Правило `data_source` определено в модуле `language::data_sources`.
 */
 
+pub use self::definitions::*;
+pub use self::rules::*;
+
 pub mod definitions;
 pub mod rules;
 
-pub use self::definitions::*;
-pub use self::rules::*;

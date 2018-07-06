@@ -1,4 +1,3 @@
-use std::fmt;
 use helpers::{
     Path,
     PathBuf,
@@ -10,6 +9,7 @@ use language::{
     TableDefinition,
 };
 use project_analysis::Module;
+use std::fmt;
 
 #[derive(Clone)]
 pub struct Item {

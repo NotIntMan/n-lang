@@ -1,30 +1,30 @@
-use std::sync::Arc;
-use indexmap::IndexMap;
 use helpers::{
     as_unique_identifier,
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
-use parser_basics::Identifier;
+use indexmap::IndexMap;
 use language::{
     Attribute,
     AttributeAST,
     CompoundDataType,
-    DataTypeAST,
     DataType,
-    FieldAST,
+    DataTypeAST,
     Field,
+    FieldAST,
+    find_attribute,
     FunctionDefinitionAST,
     ItemPath,
-    find_attribute,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
     Item,
     Module,
-    SemanticItemType,
     SemanticError,
+    SemanticItemType,
 };
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinitionAST<'source> {

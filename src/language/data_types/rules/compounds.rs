@@ -1,21 +1,21 @@
-use lexeme_scanner::Token;
-use parser_basics::ParserResult;
-use parser_basics::{
-    comma_list,
-    identifier,
-    Identifier,
-    symbols,
-    item_position,
-    symbol_position,
-};
 use language::{
     AttributeAST,
     CompoundDataTypeAST,
     DataTypeAST,
     FieldAST,
-    primitive_data_type,
     module_path,
+    primitive_data_type,
 };
+use lexeme_scanner::Token;
+use parser_basics::{
+    comma_list,
+    identifier,
+    Identifier,
+    item_position,
+    symbol_position,
+    symbols,
+};
+use parser_basics::ParserResult;
 
 /// "#[" identifier [(...identifier)] "]"
 parser_rule!(attribute(i) -> AttributeAST<'source> {

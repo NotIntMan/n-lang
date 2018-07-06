@@ -5,7 +5,6 @@ use helpers::{
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
 use language::{
     AssignmentTarget,
     DataSource,
@@ -19,6 +18,7 @@ use language::{
     SelectionSortingItem,
     SelectionSortingItemAST,
 };
+use lexeme_scanner::ItemPosition;
 use project_analysis::{
     FunctionVariableScope,
     InsertSourceContext,
@@ -284,11 +284,11 @@ impl<'source, 'a> Resolve<InsertSourceContext<'a>> for InsertingSourceAST<'sourc
                                     })
                             )?;
                             Some(assignments)
-                        },
+                        }
                         None => {
                             query_result_type.should_cast_to(query.pos, &ctx.target.get_datatype_for_insert(query.pos)?)?;
                             None
-                        },
+                        }
                     }
                 };
                 Ok(InsertingSource::Selection { properties, query })

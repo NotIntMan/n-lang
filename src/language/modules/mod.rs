@@ -37,8 +37,9 @@
     Правило `function_definition` определено в модуле `language::functions`.
 */
 
+pub use self::definitions::*;
+pub use self::rules::*;
+
 pub mod definitions;
 pub mod rules;
 
-pub use self::definitions::*;
-pub use self::rules::*;

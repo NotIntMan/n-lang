@@ -1,4 +1,3 @@
-use std::fmt;
 use helpers::{
     Path,
     PathBuf,
@@ -15,6 +14,7 @@ use parser_basics::{
     symbol_position,
     symbols,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, Eq, Hash)]
 pub struct ItemPath {

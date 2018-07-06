@@ -1,19 +1,13 @@
-use std::u8::MAX as U8MAX;
-use std::fmt;
-use std::cmp;
-use std::sync::Arc;
 use helpers::{
     Path,
     PathBuf,
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
 use helpers::{
     Assertion,
     is_f32_enough,
 };
-use parser_basics::Identifier;
 use language::{
     CompoundDataType,
     DataType,
@@ -23,13 +17,21 @@ use language::{
     PrimitiveDataType,
     StringType,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
-    Item,
-    FunctionVariableScope,
     FunctionVariable,
-    SemanticItemType,
+    FunctionVariableScope,
+    Item,
     SemanticError,
+    SemanticItemType,
     StdLibFunction,
+};
+use std::{
+    cmp,
+    fmt,
+    sync::Arc,
+    u8::MAX as U8MAX,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

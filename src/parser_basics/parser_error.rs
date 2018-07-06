@@ -1,16 +1,5 @@
 //! Ошибка синтаксического разбора
 
-use std::fmt::{
-    Display,
-    Result as FResult,
-    Formatter,
-};
-use std::cmp::{
-    Ord,
-    Ordering,
-    PartialOrd,
-};
-use std::borrow::Cow;
 use helpers::{
     Appendable,
     Group,
@@ -20,8 +9,19 @@ use helpers::{
     IntoStatic,
 };
 use lexeme_scanner::{
-    TokenKindLess,
     SymbolPosition,
+    TokenKindLess,
+};
+use std::borrow::Cow;
+use std::cmp::{
+    Ord,
+    Ordering,
+    PartialOrd,
+};
+use std::fmt::{
+    Display,
+    Formatter,
+    Result as FResult,
 };
 
 /**
@@ -93,7 +93,7 @@ impl<'source> Display for ParserErrorTokenInfo<'source> {
                     write!(f, " {:?}", msg)?;
                 }
                 Ok(())
-            },
+            }
             ParserErrorTokenInfo { kind: None, desc: Some(msg) } => write!(f, "{}", msg),
             _ => Ok(()),
         }

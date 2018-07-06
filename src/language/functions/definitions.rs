@@ -1,10 +1,9 @@
-use indexmap::IndexMap;
 use helpers::{
     as_unique_identifier,
     Resolve,
     SyncRef,
 };
-use parser_basics::Identifier;
+use indexmap::IndexMap;
 use language::{
     AttributeAST,
     DataType,
@@ -13,6 +12,7 @@ use language::{
     Statement,
     StatementAST,
 };
+use parser_basics::Identifier;
 use project_analysis::{
     FunctionContext,
     FunctionVariableScope,

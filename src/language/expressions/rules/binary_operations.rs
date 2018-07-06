@@ -1,17 +1,17 @@
+use language::expressions::{
+    BinaryOperator,
+    ExpressionAST,
+    ExpressionASTBody,
+};
 use lexeme_scanner::{
     ItemPosition,
     Token,
 };
 use parser_basics::{
-    Parser,
     keyword,
+    Parser,
     ParserResult,
     symbols,
-};
-use language::expressions::{
-    BinaryOperator,
-    ExpressionAST,
-    ExpressionASTBody,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

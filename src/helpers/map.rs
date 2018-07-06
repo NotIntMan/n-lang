@@ -1,8 +1,8 @@
 use std::{
     cmp::Eq,
+    iter::FromIterator,
     mem::replace,
     vec::IntoIter,
-    iter::FromIterator,
 };
 
 #[derive(Debug, Clone)]

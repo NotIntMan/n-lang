@@ -1,3 +1,9 @@
+use language::{
+    block,
+    data_type,
+    DataTypeAST,
+};
+use lexeme_scanner::Token;
 use parser_basics::{
     comma_list,
     identifier,
@@ -5,13 +11,7 @@ use parser_basics::{
     keyword,
     symbols,
 };
-use lexeme_scanner::Token;
 use parser_basics::ParserResult;
-use language::{
-    block,
-    data_type,
-    DataTypeAST,
-};
 use super::*;
 
 parser_rule!(type_of(i) -> DataTypeAST<'source> {

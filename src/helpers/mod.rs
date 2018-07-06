@@ -1,5 +1,30 @@
 //! Модуль, содержащий в себе набор простых структур, функций и макросов-помощников, используемых несколькими модулями.
 
+pub use self::{
+    as_unique::*,
+    assertion::*,
+    code_formatter::*,
+    display_list::*,
+    extract::*,
+    extractor::*,
+    find_index::*,
+    group::*,
+    id_pull::*,
+    into_static::*,
+    is_f32_enough::*,
+    lazy::*,
+    loud_rw_lock::*,
+    map::*,
+    parse_component::*,
+    parse_number_literal::*,
+    path::*,
+    re_entrant_rw_lock::*,
+    resolve::*,
+    result_collect::*,
+    sync_ref::*,
+    write_pad::*,
+};
+
 #[macro_use]
 pub mod array_macro;
 pub mod assertion;
@@ -33,27 +58,3 @@ pub mod map;
 #[macro_use]
 pub mod universal_assert_macro;
 
-pub use self::{
-    assertion::*,
-    extract::*,
-    group::*,
-    display_list::*,
-    into_static::*,
-    find_index::*,
-    loud_rw_lock::*,
-    write_pad::*,
-    extractor::*,
-    re_entrant_rw_lock::*,
-    lazy::*,
-    id_pull::*,
-    sync_ref::*,
-    resolve::*,
-    as_unique::*,
-    path::*,
-    parse_component::*,
-    parse_number_literal::*,
-    is_f32_enough::*,
-    result_collect::*,
-    code_formatter::*,
-    map::*,
-};

@@ -1,25 +1,27 @@
 #![allow(unused_imports)]
 
-use std::mem::replace;
-use std::fmt;
-use std::sync::Arc;
-use indexmap::IndexMap;
-use helpers::Assertion;
 use helpers::{
     as_unique_identifier,
-    Path,
     parse_index,
+    Path,
     Resolve,
     SyncRef,
 };
+use helpers::Assertion;
+use indexmap::IndexMap;
+use language::ItemPath;
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
-use language::ItemPath;
 use project_analysis::{
     Item,
-    SemanticItemType,
-    SemanticError,
     Module,
+    SemanticError,
+    SemanticItemType,
+};
+use std::{
+    fmt,
+    mem::replace,
+    sync::Arc,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

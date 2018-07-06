@@ -4,16 +4,14 @@ use helpers::{
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
-use parser_basics::Identifier;
 use language::{
     BOOLEAN_TYPE,
-    Expression,
-    ExpressionAST,
     DataType,
     DataTypeAST,
     Deleting,
     DeletingAST,
+    Expression,
+    ExpressionAST,
     Inserting,
     InsertingAST,
     ItemPath,
@@ -22,6 +20,8 @@ use language::{
     Updating,
     UpdatingAST,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
     FunctionVariable,
     FunctionVariableScope,

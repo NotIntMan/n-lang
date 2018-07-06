@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use helpers::SyncRef;
 use language::{
     BinaryOperator,
@@ -6,6 +5,7 @@ use language::{
     PostfixUnaryOperator,
     PrefixUnaryOperator,
 };
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct StdLib {

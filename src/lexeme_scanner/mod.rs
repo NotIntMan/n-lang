@@ -49,31 +49,26 @@
         игнорировать этот тип лексек
 */
 
-pub mod position;
-pub mod rules;
-pub mod scanner;
-pub mod scanner_error;
-pub mod token;
-
+pub use self::position::{
+    ItemPosition,
+    SymbolPosition,
+};
+pub use self::scanner::Scanner;
+pub use self::scanner_error::{
+    ScannerError,
+    ScannerErrorKind,
+};
 pub use self::token::{
     Token,
     TokenKind,
     TokenKindLess,
 };
 
-pub use self::scanner::{
-    Scanner,
-};
-
-pub use self::position::{
-    SymbolPosition,
-    ItemPosition,
-};
-
-pub use self::scanner_error::{
-    ScannerError,
-    ScannerErrorKind,
-};
+pub mod position;
+pub mod rules;
+pub mod scanner;
+pub mod scanner_error;
+pub mod token;
 
 pub type ScannerItem<'a> = Result<Token<'a>, ScannerError>;
 pub type BatcherResult = Result<(TokenKind, usize), (ScannerErrorKind, usize)>;

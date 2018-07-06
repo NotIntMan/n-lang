@@ -1,6 +1,8 @@
-use std::fmt;
-use std::cmp;
-use std::mem::replace;
+use std::{
+    cmp,
+    fmt,
+    mem::replace,
+};
 
 #[derive(Clone, Eq, Hash)]
 pub struct PathBuf {

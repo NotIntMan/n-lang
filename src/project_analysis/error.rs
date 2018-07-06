@@ -1,12 +1,15 @@
-use std::fmt;
-use std::cmp::max;
-use std::sync::Arc;
 use helpers::{
     decimal_unsigned_length,
     IntoStatic,
     PathBuf,
-    write_pointer_line,
     write_line_numbers_columns_row,
+    write_pointer_line,
+};
+use language::{
+    BinaryOperator,
+    DataType,
+    PostfixUnaryOperator,
+    PrefixUnaryOperator,
 };
 use lexeme_scanner::{
     ItemPosition,
@@ -17,15 +20,14 @@ use parser_basics::{
     ParserErrorItem,
     ParserErrorKind,
 };
-use language::{
-    DataType,
-    BinaryOperator,
-    PostfixUnaryOperator,
-    PrefixUnaryOperator,
-};
 use project_analysis::{
     SemanticItemType,
     Text,
+};
+use std::{
+    cmp::max,
+    fmt,
+    sync::Arc,
 };
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,20 +1,18 @@
-use std::fmt;
 use helpers::{
     ID,
     IDPull,
     Path,
 };
 use helpers::SyncRef;
+use language::DataType;
 use lexeme_scanner::ItemPosition;
-use language::{
-    DataType,
-};
 use project_analysis::{
     Module,
     ProjectContext,
     SemanticError,
     SemanticItemType,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionVariable {

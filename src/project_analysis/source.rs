@@ -1,24 +1,24 @@
-use std::{
-    sync::Arc,
-    collections::hash_map::{
-        HashMap,
-        Iter,
-    },
-    path,
-    io::{
-        self,
-        Read,
-    },
-    fs::{
-        read_dir,
-        File,
-    },
-};
 use helpers::{
     Path,
     PathBuf,
 };
 use lexeme_scanner::rules::word::word;
+use std::{
+    collections::hash_map::{
+        HashMap,
+        Iter,
+    },
+    fs::{
+        File,
+        read_dir,
+    },
+    io::{
+        self,
+        Read,
+    },
+    path,
+    sync::Arc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Text {

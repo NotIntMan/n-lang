@@ -3,8 +3,6 @@ use helpers::{
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
-use parser_basics::Identifier;
 use language::{
     AssignmentTarget,
     DataType,
@@ -14,6 +12,8 @@ use language::{
     Selection,
     SelectionAST,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
     FunctionVariable,
     FunctionVariableScope,

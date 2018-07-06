@@ -1,3 +1,8 @@
+use language::{
+    data_source,
+    expression,
+    ExpressionAST,
+};
 use lexeme_scanner::Token;
 use parser_basics::{
     comma_list,
@@ -7,14 +12,9 @@ use parser_basics::{
     keyword,
     none,
     ParserResult,
-    symbols,
     symbol_position,
+    symbols,
     u32_literal,
-};
-use language::{
-    data_source,
-    expression,
-    ExpressionAST,
 };
 use super::*;
 

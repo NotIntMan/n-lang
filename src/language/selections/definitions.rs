@@ -1,11 +1,8 @@
-use std::sync::Arc;
-use indexmap::IndexMap;
 use helpers::{
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
-use parser_basics::Identifier;
+use indexmap::IndexMap;
 use language::{
     BOOLEAN_TYPE,
     CompoundDataType,
@@ -16,10 +13,13 @@ use language::{
     ExpressionAST,
     Field,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
     FunctionVariableScope,
     SemanticError,
 };
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectionResultSize {

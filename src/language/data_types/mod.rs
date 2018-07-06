@@ -24,8 +24,9 @@
     Правило `primitive_data_type` определено в модуле `language::primitive_types`.
 */
 
+pub use self::definitions::*;
+pub use self::rules::*;
+
 pub mod definitions;
 pub mod rules;
 
-pub use self::definitions::*;
-pub use self::rules::*;

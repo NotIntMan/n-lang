@@ -42,8 +42,9 @@
     Правило `expression` определено в модуле `language::expressions`.
 */
 
+pub use self::definitions::*;
+pub use self::rules::*;
+
 pub mod definitions;
 pub mod rules;
 
-pub use self::definitions::*;
-pub use self::rules::*;

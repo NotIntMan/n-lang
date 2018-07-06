@@ -1,26 +1,28 @@
-use std::sync::Arc;
-use std::fmt;
-use std::cmp;
-use indexmap::IndexMap;
 use helpers::{
     Path,
     PathBuf,
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::Scanner;
-use parser_basics::parse;
+use indexmap::IndexMap;
 use language::modules::{
     module,
     ModuleDefinitionItem,
     ModuleDefinitionItemAST,
 };
+use lexeme_scanner::Scanner;
+use parser_basics::parse;
 use project_analysis::{
     Item,
-    Text,
-    SemanticItemType,
-    SemanticError,
     ProjectContext,
+    SemanticError,
+    SemanticItemType,
+    Text,
+};
+use std::{
+    cmp,
+    fmt,
+    sync::Arc,
 };
 
 #[derive(Debug, Clone, PartialEq)]

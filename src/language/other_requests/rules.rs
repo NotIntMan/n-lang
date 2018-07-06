@@ -1,3 +1,12 @@
+use language::{
+    data_source,
+    expression,
+    ItemPath,
+    property_path,
+    select_condition,
+    select_sorting,
+    selection,
+};
 use lexeme_scanner::Token;
 use parser_basics::{
     comma_list,
@@ -5,18 +14,9 @@ use parser_basics::{
     keyword,
     none,
     ParserResult,
-    symbols,
     symbol_position,
+    symbols,
     u32_literal,
-};
-use language::{
-    data_source,
-    expression,
-    ItemPath,
-    selection,
-    select_condition,
-    select_sorting,
-    property_path,
 };
 use super::*;
 

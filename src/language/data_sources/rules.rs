@@ -1,3 +1,9 @@
+use language::{
+    expression,
+    module_path,
+    property_path,
+    selection,
+};
 use lexeme_scanner::Token;
 use parser_basics::{
     comma_list,
@@ -5,12 +11,6 @@ use parser_basics::{
     not_keyword_identifier,
     ParserResult,
     symbols,
-};
-use language::{
-    expression,
-    property_path,
-    module_path,
-    selection,
 };
 use super::*;
 

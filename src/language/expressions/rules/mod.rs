@@ -1,8 +1,3 @@
-pub mod literals;
-pub mod binary_operations;
-pub mod unary_operations;
-pub mod others;
-
 use lexeme_scanner::Token;
 use parser_basics::{
     identifier,
@@ -10,15 +5,20 @@ use parser_basics::{
     ParserResult,
     symbol_position,
 };
-use super::*;
-use self::literals::literal;
 use self::binary_operations::binary_expression;
-use self::unary_operations::unary_operation;
+use self::literals::literal;
 use self::others::{
+    function_call,
     property_access,
     set,
-    function_call,
 };
+use self::unary_operations::unary_operation;
+use super::*;
+
+pub mod literals;
+pub mod binary_operations;
+pub mod unary_operations;
+pub mod others;
 
 parser_rule!(expression_atom(i) -> ExpressionAST<'source> {
     do_parse!(i,

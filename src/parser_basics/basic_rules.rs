@@ -1,24 +1,26 @@
 //! Набор примитивных правил для образования языка
 
-use std::ops::Range;
-use std::fmt;
-use nom::IResult;
 use helpers::parse_integer_literal;
 use lexeme_scanner::{
     ItemPosition,
+    SymbolPosition,
     Token,
     TokenKind,
     TokenKindLess,
-    SymbolPosition,
+};
+use nom::IResult;
+use std::{
+    fmt,
+    ops::Range,
 };
 use super::{
+    exact_token,
     ParserErrorKind,
     ParserErrorTokenInfo,
     ParserInput,
     ParserResult,
-    token,
-    exact_token,
     some_token,
+    token,
 };
 
 /**

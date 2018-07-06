@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-use indexmap::IndexMap;
 use helpers::{
     Map,
     PathBuf,
     SyncRef,
 };
+use indexmap::IndexMap;
 use language::{
     CompoundDataType,
     DataType,
@@ -16,6 +15,7 @@ use project_analysis::{
     ItemBody,
     Module,
 };
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct DataClass {

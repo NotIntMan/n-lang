@@ -1,6 +1,3 @@
-use std::mem::replace;
-use std::sync::Arc;
-use indexmap::IndexMap;
 use helpers::{
     Path,
     PathBuf,
@@ -9,24 +6,29 @@ use helpers::{
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
+use indexmap::IndexMap;
 use language::{
     BinaryOperator,
     DataType,
     PostfixUnaryOperator,
     PrefixUnaryOperator,
 };
+use lexeme_scanner::ItemPosition;
 use project_analysis::{
     Item,
     Module,
-    TextSource,
     SemanticError,
     StdLib,
     StdLibBinaryOperation,
     StdLibFunction,
     StdLibPostfixUnaryOperation,
     StdLibPrefixUnaryOperation,
+    TextSource,
     UnresolvedModule,
+};
+use std::{
+    mem::replace,
+    sync::Arc,
 };
 
 #[derive(Debug)]
@@ -157,7 +159,7 @@ impl SyncRef<ProjectContext> {
         let mut module_path = path;
         let module = loop {
             if let Some(module) = self.get_module(module_path) {
-                break module
+                break module;
             }
             if module_path.is_empty() {
                 return None;

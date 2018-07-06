@@ -75,9 +75,9 @@
     Правила `comma_list` и `token` определены в модуле `parser_basics`.
 */
 
-pub mod definitions;
-pub mod rules;
-
 pub use self::definitions::*;
 pub use self::rules::*;
+
+pub mod definitions;
+pub mod rules;
 
