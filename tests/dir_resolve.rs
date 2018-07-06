@@ -121,6 +121,11 @@ fn dir_resolve() {
             panic!("Resolved some errors");
         }
     };
-    let _db = DatabaseProject::new(&project);
+    let db = DatabaseProject::new(&project);
     let _rpc = RPCProject::new(&project);
+
+    let db_code = db.generate_string()
+        .expect("Cannot generate output for database");
+
+    println!("{}", db_code);
 }

@@ -137,6 +137,14 @@ impl Item {
     pub fn body(&self) -> &ItemBody {
         &self.body
     }
+    #[inline]
+    pub fn parent(&self) -> &SyncRef<Module> {
+        &self.parent
+    }
+    #[inline]
+    pub fn is_belongs_to(&self, module: &SyncRef<Module>) -> bool {
+        self.parent.is_same_ref(module)
+    }
 }
 
 impl SyncRef<Item> {

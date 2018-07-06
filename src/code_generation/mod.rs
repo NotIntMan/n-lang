@@ -1,4 +1,6 @@
 use helpers::{
+    BlockFormatter,
+    CodeFormatter,
     Map,
     PathBuf,
     SyncRef,
@@ -15,7 +17,13 @@ use project_analysis::{
     ItemBody,
     Module,
 };
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{
+        self,
+        Write,
+    },
+};
 
 #[derive(Debug, Clone)]
 pub struct DataClass {
@@ -157,26 +165,44 @@ pub struct DatabaseModule {
 }
 
 impl DatabaseModule {
-    pub fn new(source: &Module) -> Self {
+    pub fn new(source: &SyncRef<Module>) -> Self {
+        let source_guard = source.read();
         let mut result = Self {
-            path: source.path().read().clone(),
+            path: source_guard.path().read().clone(),
             tables: Vec::new(),
             functions: Vec::new(),
         };
-        for (item_name, item) in source.items().iter() {
+        for (item_name, item) in source_guard.items().iter() {
             let item = item.value.read();
+            if !item.is_belongs_to(source) { continue; }
             if let Some(table) = item.get_table() {
                 let mut table = table.clone();
                 table.name = item_name.clone();
                 result.tables.push(table);
+                continue;
             }
             if let Some(function) = item.get_function() {
                 let mut function = function.clone();
                 function.name = item_name.clone();
                 result.functions.push(function);
+                continue;
             }
         }
         result
+    }
+    pub fn generate_tables(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
+        let prefix = self.path.data.as_str();
+        for table in self.tables.iter() {
+            f.write_line(format_args!("table {}::{}", prefix, table.name))?;
+        }
+        Ok(())
+    }
+    pub fn generate_functions(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
+        let prefix = self.path.data.as_str();
+        for function in self.functions.iter() {
+            f.write_line(format_args!("function {}::{}", prefix, function.name))?;
+        }
+        Ok(())
     }
 }
 
@@ -189,14 +215,39 @@ impl DatabaseProject {
     pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
         let mut modules = HashMap::new();
         for (module_path, module) in project.iter() {
-            let module = module.read();
             modules.insert(
                 module_path.read().clone(),
-                DatabaseModule::new(&*module),
+                DatabaseModule::new(module),
             );
         }
         Self {
             modules,
         }
+    }
+    pub fn generate(&self, target: &mut impl Write) -> fmt::Result {
+        let mut code_formatter = CodeFormatter::new(target);
+        code_formatter.indent_size = 4;
+        let mut root = code_formatter.root_block();
+        let descriptions = root.sub_block();
+
+        root.write_line("Tables {")?;
+        for (_, module) in self.modules.iter() {
+            module.generate_tables(descriptions.clone())?;
+        }
+        root.write_line("}")?;
+        root.write_line("")?;
+
+        root.write_line("Functions {")?;
+        for (_, module) in self.modules.iter() {
+            module.generate_functions(descriptions.clone())?;
+        }
+        root.write_line("}")?;
+        root.write_line("")?;
+        Ok(())
+    }
+    pub fn generate_string(&self) -> Result<String, fmt::Error> {
+        let mut result = String::new();
+        self.generate(&mut result)?;
+        Ok(result)
     }
 }
