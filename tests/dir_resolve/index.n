@@ -1,5 +1,10 @@
+pub struct PersonSex {
+    is_male: boolean,
+}
+
 pub struct PersonInfo {
     age: unsigned tiny integer,
+    sex: PersonSex,
 }
 
 table Users {

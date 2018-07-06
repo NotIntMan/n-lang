@@ -193,7 +193,12 @@ impl DatabaseModule {
     pub fn generate_tables(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
         let prefix = self.path.data.as_str();
         for table in self.tables.iter() {
-            f.write_line(format_args!("table {}::{}", prefix, table.name))?;
+            f.write_line(format_args!("table {}::{} {{", prefix, table.name))?;
+            let mut local = f.sub_block();
+            for primitive in table.entity.primitives() {
+                local.write_line(format_args!("{}: {},", primitive.path, primitive.field_type))?;
+            }
+            f.write_line("}")?;
         }
         Ok(())
     }
