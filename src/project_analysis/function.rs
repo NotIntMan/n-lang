@@ -20,16 +20,18 @@ pub struct FunctionVariable {
     pos: ItemPosition,
     data_type: Option<DataType>,
     is_read_only: bool,
+    is_argument: bool,
 }
 
 impl FunctionVariable {
     #[inline]
-    fn new(pos: ItemPosition, name: String, data_type: Option<DataType>, is_read_only: bool) -> SyncRef<Self> {
+    fn new(pos: ItemPosition, name: String, data_type: Option<DataType>) -> SyncRef<Self> {
         SyncRef::new(FunctionVariable {
             name,
             pos,
             data_type,
-            is_read_only,
+            is_read_only: false,
+            is_argument: false,
         })
     }
     #[inline]
@@ -42,6 +44,22 @@ impl FunctionVariable {
             Some(data_type) => Some(data_type),
             None => None,
         }
+    }
+    #[inline]
+    pub fn is_read_only(&self) -> bool {
+        self.is_read_only
+    }
+    #[inline]
+    pub fn make_read_only(&mut self) {
+        self.is_read_only = true
+    }
+    #[inline]
+    pub fn is_argument(&self) -> bool {
+        self.is_argument
+    }
+    #[inline]
+    pub fn mark_as_argument(&mut self) {
+        self.is_argument = true
     }
 }
 
@@ -64,11 +82,19 @@ impl SyncRef<FunctionVariable> {
     }
     #[inline]
     pub fn is_read_only(&self) -> bool {
-        self.read().is_read_only
+        self.read().is_read_only()
     }
     #[inline]
     pub fn make_read_only(&self) {
-        self.write().is_read_only = true
+        self.write().make_read_only()
+    }
+    #[inline]
+    pub fn is_argument(&self) -> bool {
+        self.read().is_argument()
+    }
+    #[inline]
+    pub fn mark_as_argument(&self) {
+        self.write().mark_as_argument()
     }
 }
 
@@ -148,7 +174,7 @@ impl SyncRef<FunctionVariableScope> {
         if self.read().find_variable(name.as_str()).is_some() {
             return Err(SemanticError::duplicate_definition(pos, name, SemanticItemType::Variable));
         }
-        let var = FunctionVariable::new(pos, name, data_type, false);
+        let var = FunctionVariable::new(pos, name, data_type);
         self.write().variables.push(var.clone());
         Ok(var)
     }

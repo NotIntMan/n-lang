@@ -90,6 +90,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
                 }
             };
             var.make_read_only();
+            var.mark_as_argument();
             arguments.insert(name.to_string(), var);
         }
 
