@@ -1,26 +1,36 @@
+extern crate indexmap;
 extern crate n_lang;
 
-use std::path::Path;
+use indexmap::IndexMap;
 use n_lang::{
-    helpers::Resolve,
-    helpers::SyncRef,
+    code_generation::{
+        DatabaseProject,
+        RPCProject,
+    },
+    helpers::{
+        PathBuf,
+        Resolve,
+        SyncRef,
+    },
     language::{
         BinaryOperator,
         DataType,
-        PrimitiveDataType,
         NumberType,
+        PrimitiveDataType,
     },
     project_analysis::{
-        ProjectContext,
         HashMapSource,
+        Module,
+        ProjectContext,
+        SemanticError,
         StdLib,
         StdLibBinaryOperation,
         StdLibFunction,
     },
 };
+use std::path::Path;
 
-#[test]
-fn dir_resolve() {
+fn get_test_stdlib() -> StdLib {
     let mut stdlib = StdLib::new();
 
     let tiny_unsigned_integer = DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
@@ -79,19 +89,38 @@ fn dir_resolve() {
             .lite_weight()
     );
 
-    let source = HashMapSource::for_dir(Path::new("./tests/dir_resolve"))
-        .expect("Cannot process \"dir_resolve\".");
+    stdlib
+}
 
+fn get_sources(directory: &str) -> HashMapSource {
+    let dir_path = Path::new("./tests/").join(Path::new(directory));
+    match HashMapSource::for_dir(&dir_path) {
+        Ok(result) => result,
+        Err(_) => panic!("Cannot process directory {:#}", directory),
+    }
+}
+
+fn resolve_directory(stdlib: StdLib, directory: &str) -> Result<IndexMap<SyncRef<PathBuf>, SyncRef<Module>>, Vec<SemanticError>> {
+    let source = get_sources(directory);
     let project = ProjectContext::new(SyncRef::new(stdlib));
     for (module_path, _) in source.texts() {
         project.request_resolving_module(module_path.as_path());
     }
-    let result = project.resolve(&source);
-    if let Err(errors) = &result {
-        println!("Got errors:");
-        for error in errors {
-            println!("{}", error);
+    project.resolve(&source)
+}
+
+#[test]
+fn dir_resolve() {
+    let project = match resolve_directory(get_test_stdlib(), "dir_resolve") {
+        Ok(project) => project,
+        Err(errors) => {
+            println!("Got errors:");
+            for error in errors {
+                println!("{}", error);
+            }
+            panic!("Resolved some errors");
         }
-    }
-    assert!(result.is_ok())
+    };
+    let _db = DatabaseProject::new(&project);
+    let _rpc = RPCProject::new(&project);
 }
