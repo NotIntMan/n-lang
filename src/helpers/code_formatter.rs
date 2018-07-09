@@ -1,5 +1,8 @@
 use std::{
-    cell::RefCell,
+    cell::{
+        RefCell,
+        RefMut,
+    },
     fmt::{
         self,
         Display,
@@ -41,6 +44,10 @@ impl<'a, T: 'a + Write> CodeFormatter<'a, T> {
         };
         block
     }
+    #[inline]
+    pub fn target(&mut self) -> &mut T {
+        &mut self.target
+    }
 }
 
 #[derive(Debug)]
@@ -50,6 +57,10 @@ pub struct BlockFormatter<'a, T: 'a + Write> {
 }
 
 impl<'a, T: 'a + Write> BlockFormatter<'a, T> {
+    #[inline]
+    pub fn formatter(&mut self) -> RefMut<CodeFormatter<'a, T>> {
+        self.target.borrow_mut()
+    }
     pub fn write_line(&mut self, line: impl Display) -> fmt::Result {
         let mut f = self.target.borrow_mut();
         f.write_line(self.indent_level, line)

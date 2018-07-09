@@ -1,14 +1,15 @@
 #![allow(unused_imports)]
 
 use helpers::{
+    Assertion,
     as_unique_identifier,
+    BlockFormatter,
     parse_index,
     Path,
     PathBuf,
     Resolve,
     SyncRef,
 };
-use helpers::Assertion;
 use indexmap::IndexMap;
 use language::ItemPath;
 use lexeme_scanner::ItemPosition;
@@ -20,7 +21,10 @@ use project_analysis::{
     SemanticItemType,
 };
 use std::{
-    fmt,
+    fmt::{
+        self,
+        Write,
+    },
     mem::replace,
     sync::Arc,
 };
@@ -45,6 +49,18 @@ pub enum NumberType {
         size: Option<(u32, u32)>,
         double: bool,
     },
+}
+
+#[inline]
+pub fn int_class(size: u32) -> &'static str {
+    match size {
+        0..=1 => "bit",
+        2..=8 => "tinyint",
+        9..=16 => "smallint",
+        17..=32 => "int",
+        33..=64 => "bigint",
+        _ => panic!("{} is too big size for integer in ms-sql", size),
+    }
 }
 
 impl NumberType {
@@ -93,6 +109,24 @@ impl NumberType {
             }
         }
         false
+    }
+    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
+        match self {
+            NumberType::Bit { size } => {
+                f.write_str(int_class(size.unwrap_or(1)))
+            },
+            NumberType::Boolean => f.write_str("bit"),
+            NumberType::Integer { size, .. } => f.write_str(int_class((*size).into())),
+            NumberType::Decimal { size, .. } => match size {
+                None => f.write_str("decimal"),
+                Some((p, None)) => write!(f, "decimal({})", p),
+                Some((p, Some(s))) => write!(f, "decimal({}, {})", p, s),
+            }
+            NumberType::Float { double, .. } => {
+                let class = if *double { "double" } else { "float" };
+                f.write_str(class)
+            }
+        }
     }
 }
 
@@ -154,6 +188,23 @@ pub enum DateTimeType {
     },
 }
 
+impl DateTimeType {
+    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
+        let (class, precision) = match self {
+            DateTimeType::Date => ("date", &None),
+            DateTimeType::Time { precision } => ("time", precision),
+            DateTimeType::Datetime { precision } => ("datetime", precision),
+            DateTimeType::Timestamp { precision } => ("timestamp", precision),
+        };
+        f.write_str(class)?;
+        if let Some(p) = precision {
+            write!(f, "({})", p)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl fmt::Display for DateTimeType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -196,6 +247,9 @@ impl YearType {
             &YearType::Year2 => true,
             &YearType::Year4 => *target == YearType::Year4,
         }
+    }
+    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
+        f.write_str("smallint")
     }
 }
 
@@ -258,6 +312,19 @@ impl StringType {
             }
         }
     }
+    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
+        match self {
+            StringType::Varchar { size, .. } => {
+                f.write_str("nvarchar")?;
+                if let Some(size) = size {
+                    write!(f, "({})", size)
+                } else {
+                    Ok(())
+                }
+            }
+            StringType::Text { .. } => f.write_str("ntext"),
+        }
+    }
 }
 
 impl fmt::Display for StringType {
@@ -316,6 +383,15 @@ impl PrimitiveDataType {
         }
         false
     }
+    pub fn generate(&self, t: &mut impl Write) -> fmt::Result {
+        match self {
+            PrimitiveDataType::Null => t.write_str("null"),
+            PrimitiveDataType::Number(x) => x.generate(t),
+            PrimitiveDataType::DateTime(x) => x.generate(t),
+            PrimitiveDataType::Year(x) => x.generate(t),
+            PrimitiveDataType::String(x) => x.generate(t),
+        }
+    }
 }
 
 impl fmt::Display for PrimitiveDataType {
@@ -327,6 +403,15 @@ impl fmt::Display for PrimitiveDataType {
             PrimitiveDataType::Year(primitive) => write!(f, "{}", primitive),
             PrimitiveDataType::String(primitive) => write!(f, "{}", primitive),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PrimitiveDataTypeGenerator(pub PrimitiveDataType);
+
+impl fmt::Display for PrimitiveDataTypeGenerator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.generate(f)
     }
 }
 
@@ -742,7 +827,7 @@ impl DataType {
                     field_type: primitive.clone(),
                 });
             }
-            DataType::Void => {},
+            DataType::Void => {}
             DataType::Compound(CompoundDataType::Tuple(fields)) => {
                 for (i, field) in fields.iter().enumerate() {
                     let mut path = prefix.clone();
@@ -750,14 +835,14 @@ impl DataType {
                         field.field_type.make_primitives(path, target);
                     }
                 }
-            },
+            }
             DataType::Compound(CompoundDataType::Structure(fields)) => {
                 for (field_name, field) in fields.iter() {
                     let mut path = prefix.clone();
                     path.push(field_name.as_str());
                     field.field_type.make_primitives(path, target);
                 }
-            },
+            }
             DataType::Reference(item) => {
                 let item = item.read();
                 if let Some(data_type) = item.get_data_type() {
