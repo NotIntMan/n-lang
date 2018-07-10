@@ -12,7 +12,10 @@ use project_analysis::{
     SemanticError,
     SemanticItemType,
 };
-use std::fmt;
+use std::{
+    fmt,
+    mem::replace,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionVariable {
@@ -37,6 +40,10 @@ impl FunctionVariable {
     #[inline]
     pub fn name(&self) -> &str {
         self.name.as_str()
+    }
+    #[inline]
+    pub fn set_name(&mut self, new_name: String) -> String {
+        replace(&mut self.name, new_name)
     }
     #[inline]
     pub fn data_type(&self) -> Option<&DataType> {

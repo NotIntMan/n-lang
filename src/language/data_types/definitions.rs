@@ -903,6 +903,56 @@ impl DataType {
         self.make_primitives(PathBuf::new("."), &mut result);
         result
     }
+    pub fn can_be_table(&self) -> bool {
+        match self {
+            DataType::Array(_) |
+            DataType::Compound(_) => true,
+            DataType::Reference(item) => {
+                let item = item.read();
+                if let Some(data_type) = item.get_data_type() {
+                    data_type.body.can_be_table()
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    pub fn make_table_type(&self, prefix: PathBuf, consumer: &mut Vec<FieldPrimitive>) -> bool {
+        match self {
+            DataType::Array(sub_type) => {
+                sub_type.make_primitives(PathBuf::new("."), consumer);
+                true
+            }
+            DataType::Compound(_) => {
+                self.make_primitives(PathBuf::new("."), consumer);
+                true
+            }
+            DataType::Reference(item) => {
+                let item = item.read();
+                if let Some(data_type) = item.get_data_type() {
+                    data_type.body.make_table_type(prefix, consumer)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    pub fn as_table_type(&self, prefix: PathBuf) -> Option<Vec<FieldPrimitive>> {
+        let mut result = Vec::new();
+        if self.make_table_type(prefix, &mut result) {
+            Some(result)
+        } else {
+            None
+        }
+    }
+    pub fn as_primitive(&self) -> Option<&PrimitiveDataType> {
+        match self {
+            DataType::Primitive(x) => Some(x),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for DataType {

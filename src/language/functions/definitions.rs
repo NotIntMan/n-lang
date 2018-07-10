@@ -1,12 +1,20 @@
 use helpers::{
+    BlockFormatter,
+    Extractor,
+    Generate,
+    NameUniquer,
+    PathBuf,
     Resolve,
     SyncRef,
+    TSQL,
+    TSQLParameters,
 };
 use indexmap::IndexMap;
 use language::{
     AttributeAST,
     DataType,
     DataTypeAST,
+    FieldPrimitive,
     find_attribute_ast,
     Statement,
     StatementAST,
@@ -22,6 +30,7 @@ use project_analysis::{
     StatementFlowControlJumping,
     StatementFlowControlPosition,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionBodyAST<'source> {
@@ -138,4 +147,79 @@ pub struct FunctionDefinition {
     pub body: FunctionBody,
     pub context: SyncRef<FunctionContext>,
     pub is_lite_weight: bool,
+}
+
+impl FunctionDefinition {
+    fn fmt_arguments(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        parameters: TSQLParameters,
+        primitives: &mut Vec<FieldPrimitive>,
+        names: &mut NameUniquer,
+    ) -> fmt::Result {
+        primitives.clear();
+        for (argument_name, argument) in self.arguments.iter() {
+            let mut argument_guard = argument.write();
+            let mut prefix = PathBuf::new(".");
+            let new_name = names.add_class_style_name(argument_guard.name());
+            argument_guard.set_name(new_name);
+            prefix.push(argument_name.as_str());
+            argument_guard.data_type()
+                .expect("Function argument cannot have unknown data-type")
+                .make_primitives(prefix, primitives);
+            let primitives_count = primitives.len();
+            for (i, primitive) in Extractor::new(primitives).enumerate() {
+                let mut line = f.line()?;
+                line.write(format_args!("@`{}` {}", primitive.path.data, TSQL(&primitive.field_type, parameters.clone())))?;
+                if i < (primitives_count - 1) {
+                    line.write(", ")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'a> Generate<TSQLParameters<'a>> for FunctionDefinition {
+    fn fmt(&self, mut f: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
+        let function_name = {
+            let mut path = parameters.module_path.into_buf();
+            path.push(self.name.as_str());
+            path
+        };
+        let mut sub_f = f.sub_block();
+        let mut names = NameUniquer::new();
+        if self.is_lite_weight {
+            f.write_line(format_args!("CREATE OR ALTER FUNCTION `{}`", function_name.data))?;
+
+            let mut primitives = Vec::new();
+            self.fmt_arguments(sub_f.clone(), parameters.clone(), &mut primitives, &mut names)?;
+
+            // TODO Добавить переменную-результат в контекст (в случае табличных данных на выходе)
+            let result_var_name = names.add_class_style_name("return_value");
+            let result_var_prefix = {
+                let mut prefix = PathBuf::new(".");
+                prefix.push(result_var_name.as_str());
+                prefix
+            };
+
+            if self.result.make_table_type(result_var_prefix, &mut primitives) {
+                f.write_line(format_args!("RETURNS @`{}` TABLE", result_var_name))?;
+                for primitive in Extractor::new(&mut primitives) {
+                    sub_f.write_line(format_args!("@`{}` {}", primitive.path.data, TSQL(&primitive.field_type, parameters.clone())))?;
+                }
+            } else {
+                primitives.clear();
+                if let Some(result) = self.result.as_primitive() {
+                    f.write_line(format_args!("RETURNS {}", TSQL(result, parameters.clone())))?;
+                } else {
+                    f.write_line("RETURNS bit")?;
+                }
+            }
+
+            f.write_line("<unimplemented>")
+        } else {
+            f.write_line("<unimplemented>")
+        }
+    }
 }

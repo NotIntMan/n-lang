@@ -5,7 +5,6 @@ use helpers::{
     Map,
     PathBuf,
     SyncRef,
-    TSQL,
     TSQLParameters,
 };
 use indexmap::IndexMap;
@@ -201,32 +200,14 @@ impl DatabaseModule {
         for table in self.tables.iter() {
             Generate::fmt(table, f.clone(), parameters.clone())?;
             f.write_line("GO")?;
+            f.write_line("")?;
         }
         Ok(())
     }
     pub fn generate_functions(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
         let parameters = TSQLParameters::new(self.path.as_path());
-        let prefix = self.path.data.as_str();
-        let mut local = f.sub_block();
         for function in self.functions.iter() {
-            f.write_line(format_args!("function {}::{} ({{", prefix, function.name))?;
-            let mut primitive_arguments = Vec::new();
-            for (argument_name, argument) in function.arguments.iter() {
-                let argument_guard = argument.read();
-                let mut path_prefix = PathBuf::new(".");
-                path_prefix.push(argument_name.as_str());
-                argument_guard.data_type()
-                    .expect("Function arguments cannot have undefined data type")
-                    .make_primitives(path_prefix, &mut primitive_arguments);
-            }
-            for primitive in primitive_arguments {
-                local.write_line(format_args!("{}: {},", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
-            }
-            f.write_line("}) -> {")?;
-            for primitive in function.result.primitives() {
-                local.write_line(format_args!("{}: {},", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
-            }
-            f.write_line("}")?;
+            Generate::fmt(function, f.clone(), parameters.clone())?;
             f.write_line("")?;
         }
         Ok(())
@@ -254,21 +235,13 @@ impl DatabaseProject {
     pub fn generate(&self, target: &mut impl Write) -> fmt::Result {
         let mut code_formatter = CodeFormatter::new(target);
         code_formatter.indent_size = 4;
-        let mut root = code_formatter.root_block();
-        let descriptions = root.sub_block();
+        let root = code_formatter.root_block();
 
-        root.write_line("-- Tables")?;
         for (_, module) in self.modules.iter() {
-            module.generate_tables(root.sub_block())?;
-            root.write_line("")?;
+            module.generate_tables(root.clone())?;
+            module.generate_functions(root.clone())?;
         }
-        root.write_line("")?;
 
-        root.write_line("-- Functions")?;
-        for (_, module) in self.modules.iter() {
-            module.generate_functions(descriptions.clone())?;
-        }
-        root.write_line("")?;
         Ok(())
     }
     pub fn generate_string(&self) -> Result<String, fmt::Error> {
