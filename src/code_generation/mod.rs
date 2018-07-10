@@ -1,10 +1,12 @@
 use helpers::{
     BlockFormatter,
     CodeFormatter,
+    Generate,
     Map,
     PathBuf,
     SyncRef,
     TSQL,
+    TSQLParameters,
 };
 use indexmap::IndexMap;
 use language::{
@@ -195,18 +197,15 @@ impl DatabaseModule {
         result
     }
     pub fn generate_tables(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
-        let prefix = self.path.data.as_str();
-        let mut local = f.sub_block();
+        let parameters = TSQLParameters::new(self.path.as_path());
         for table in self.tables.iter() {
-            f.write_line(format_args!("table {}::{} {{", prefix, table.name))?;
-            for primitive in table.entity.primitives() {
-                local.write_line(format_args!("{}: {},", primitive.path, TSQL(primitive.field_type)))?;
-            }
-            f.write_line("}")?;
+            Generate::fmt(table, f.clone(), parameters.clone())?;
+            f.write_line("GO")?;
         }
         Ok(())
     }
     pub fn generate_functions(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
+        let parameters = TSQLParameters::new(self.path.as_path());
         let prefix = self.path.data.as_str();
         let mut local = f.sub_block();
         for function in self.functions.iter() {
@@ -221,11 +220,11 @@ impl DatabaseModule {
                     .make_primitives(path_prefix, &mut primitive_arguments);
             }
             for primitive in primitive_arguments {
-                local.write_line(format_args!("{}: {},", primitive.path, TSQL(primitive.field_type)))?;
+                local.write_line(format_args!("{}: {},", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
             }
             f.write_line("}) -> {")?;
             for primitive in function.result.primitives() {
-                local.write_line(format_args!("{}: {},", primitive.path, TSQL(primitive.field_type)))?;
+                local.write_line(format_args!("{}: {},", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
             }
             f.write_line("}")?;
             f.write_line("")?;
@@ -258,18 +257,17 @@ impl DatabaseProject {
         let mut root = code_formatter.root_block();
         let descriptions = root.sub_block();
 
-        root.write_line("Tables {")?;
+        root.write_line("-- Tables")?;
         for (_, module) in self.modules.iter() {
-            module.generate_tables(descriptions.clone())?;
+            module.generate_tables(root.sub_block())?;
+            root.write_line("")?;
         }
-        root.write_line("}")?;
         root.write_line("")?;
 
-        root.write_line("Functions {")?;
+        root.write_line("-- Functions")?;
         for (_, module) in self.modules.iter() {
             module.generate_functions(descriptions.clone())?;
         }
-        root.write_line("}")?;
         root.write_line("")?;
         Ok(())
     }

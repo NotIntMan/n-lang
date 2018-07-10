@@ -1,7 +1,13 @@
 use helpers::{
     as_unique_identifier,
+    BlockFormatter,
+    Extractor,
+    Generate,
+    PathBuf,
     Resolve,
     SyncRef,
+    TSQL,
+    TSQLParameters,
 };
 use indexmap::IndexMap;
 use language::{
@@ -24,7 +30,10 @@ use project_analysis::{
     SemanticError,
     SemanticItemType,
 };
-use std::sync::Arc;
+use std::{
+    fmt,
+    sync::Arc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataTypeDefinitionAST<'source> {
@@ -102,6 +111,48 @@ pub struct TableDefinition {
     pub body: Arc<IndexMap<String, Field>>,
     pub entity: DataType,
     pub primary_key: DataType,
+}
+
+impl<'a> Generate<TSQLParameters<'a>> for TableDefinition {
+    fn fmt(&self, mut root: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
+        {
+            let mut line = root.line()?;
+            line.write("CREATE TABLE `")?;
+            if !parameters.module_path.data.is_empty() {
+                line.write(format_args!("{}{}", parameters.module_path.data, parameters.module_path.delimiter))?;
+            }
+            line.write(format_args!("{}` (", self.name))?;
+        }
+
+        let mut columns = root.sub_block();
+
+        let mut primitives = Vec::new();
+        for (field_name, field) in self.body.iter() {
+            let mut prefix = PathBuf::new(".");
+            prefix.push(field_name.as_str());
+            field.field_type.make_primitives(prefix, &mut primitives);
+            for primitive in Extractor::new(&mut primitives) {
+                columns.write_line(format_args!("`{}` {},", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
+            }
+        }
+
+        {
+            let mut primary_key = columns.line()?;
+            primary_key.write("PRIMARY KEY (")?;
+            self.primary_key.make_primitives(PathBuf::new("."), &mut primitives);
+
+            let mut primitives = Extractor::new(&mut primitives);
+            if let Some(primitive) = primitives.next() {
+                primary_key.write(format_args!("`{}`", primitive.path.data))?;
+            }
+            for primitive in primitives {
+                primary_key.write(format_args!(", `{}`", primitive.path.data))?;
+            }
+            primary_key.write(")")?;
+        }
+
+        root.write_line(")")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
