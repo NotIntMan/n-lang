@@ -2,6 +2,7 @@ use language::{
     AttributeAST,
     CompoundDataTypeAST,
     DataTypeAST,
+    DataTypeASTBody,
     FieldAST,
     module_path,
     primitive_data_type,
@@ -82,19 +83,33 @@ parser_rule!(tuple_body(i) -> Vec<FieldAST<'source>> {
     )
 });
 
+parser_rule!(compound_body(i) -> CompoundDataTypeAST<'source> {
+    alt!(i,
+        struct_body => { |x| CompoundDataTypeAST::Structure(x) }
+        | tuple_body => { |x| CompoundDataTypeAST::Tuple(x) }
+    )
+});
+
 /// Парсер, реализующий разбор грамматики составных типов
 pub fn compound_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataTypeAST<'source>> {
-    alt!(input,
-        struct_body => { |x| DataTypeAST::Compound(CompoundDataTypeAST::Structure(x)) }
-        | tuple_body => { |x| DataTypeAST::Compound(CompoundDataTypeAST::Tuple(x)) }
+    do_parse!(input,
+        begin: symbol_position >>
+        body: compound_body >>
+        pos: apply!(item_position, begin) >>
+        (DataTypeAST { pos, body: DataTypeASTBody::Compound(body) })
     )
 }
 
 /// Парсер, реализующий разбор грамматики составных и простых типов
 pub fn data_type<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, DataTypeAST<'source>> {
-    alt!(input,
-        compound_type
-        | primitive_data_type => { |x| DataTypeAST::Primitive(x) }
-        | module_path => { |x| DataTypeAST::Reference(x) }
+    do_parse!(input,
+        begin: symbol_position >>
+        body: alt!(
+            compound_body => { |x| DataTypeASTBody::Compound(x) }
+            | primitive_data_type => { |x| DataTypeASTBody::Primitive(x) }
+            | module_path => { |x| DataTypeASTBody::Reference(x) }
+        ) >>
+        pos: apply!(item_position, begin) >>
+        (DataTypeAST { pos, body })
     )
 }

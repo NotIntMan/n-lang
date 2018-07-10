@@ -18,6 +18,7 @@ use project_analysis::{
     Item,
     Module,
     SemanticError,
+    SemanticErrorKind,
     SemanticItemType,
 };
 use std::{
@@ -109,6 +110,26 @@ impl NumberType {
             }
         }
         false
+    }
+    pub fn check(&self) -> Result<(), SemanticErrorKind> {
+        match self {
+            NumberType::Bit { size } => {
+                if size.unwrap_or(1) > 64 {
+                    return Err(SemanticErrorKind::NotSupportedYet {
+                        feature: "long bit sets",
+                    })
+                }
+            },
+            NumberType::Integer { size, .. } => {
+                if *size > 64 {
+                    return Err(SemanticErrorKind::NotSupportedYet {
+                        feature: "big numbers",
+                    })
+                }
+            },
+            _ => {}
+        }
+        Ok(())
     }
     pub fn generate(&self, mut f: impl Write) -> fmt::Result {
         match self {
@@ -383,6 +404,13 @@ impl PrimitiveDataType {
         }
         false
     }
+    #[inline]
+    pub fn check(&self) -> Result<(), SemanticErrorKind> {
+        match self {
+            PrimitiveDataType::Number(x) => x.check(),
+            _ => Ok(()),
+        }
+    }
     pub fn generate(&self, t: &mut impl Write) -> fmt::Result {
         match self {
             PrimitiveDataType::Null => t.write_str("null"),
@@ -625,7 +653,13 @@ impl<'source> Resolve<SyncRef<Module>> for Vec<(Identifier<'source>, FieldAST<'s
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataTypeAST<'source> {
+pub struct DataTypeAST<'source> {
+    pub pos: ItemPosition,
+    pub body: DataTypeASTBody<'source>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataTypeASTBody<'source> {
     Compound(CompoundDataTypeAST<'source>),
     Primitive(PrimitiveDataType),
     Reference(ItemPath),
@@ -633,18 +667,19 @@ pub enum DataTypeAST<'source> {
 
 impl<'source> Assertion for DataTypeAST<'source> {
     fn assert(&self, other_data_type: &DataTypeAST) {
-        match self {
-            DataTypeAST::Compound(compound_type) => {
-                match_it!(other_data_type, DataTypeAST::Compound(other_compound_type) => {
+        let other_body = &other_data_type.body;
+        match &self.body {
+            DataTypeASTBody::Compound(compound_type) => {
+                match_it!(other_body, DataTypeASTBody::Compound(other_compound_type) => {
                     compound_type.assert(other_compound_type);
                 });
             }
-            DataTypeAST::Reference(path) => {
-                match_it!(other_data_type, DataTypeAST::Reference(other_path) => {
+            DataTypeASTBody::Reference(path) => {
+                match_it!(other_body, DataTypeASTBody::Reference(other_path) => {
                     assert_eq!(path.path, other_path.path);
                 });
             }
-            other => assert_eq!(other, other_data_type),
+            other => assert_eq!(other, other_body),
         }
     }
 }
@@ -671,10 +706,15 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
     type Result = DataType;
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
-        match self {
-            DataTypeAST::Compound(value) => Ok(DataType::Compound(value.resolve(ctx)?)),
-            DataTypeAST::Primitive(value) => Ok(DataType::Primitive(value.clone())),
-            DataTypeAST::Reference(path) => {
+        match &self.body {
+            DataTypeASTBody::Compound(value) => Ok(DataType::Compound(value.resolve(ctx)?)),
+            DataTypeASTBody::Primitive(value) => {
+                if let Err(kind) = value.check() {
+                    return Err(vec![SemanticError::new(self.pos, kind)]);
+                }
+                Ok(DataType::Primitive(value.clone()))
+            },
+            DataTypeASTBody::Reference(path) => {
                 let item = match ctx.get_item(path.path.as_path(), &mut vec![]) {
                     Some(item) => item,
                     None => return SemanticError::unresolved_item(path.pos, path.path.clone()).into_err_vec(),
