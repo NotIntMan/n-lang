@@ -18,6 +18,7 @@ pub struct CodeFormatter<'a, T: 'a + Write> {
 }
 
 impl<'a, T: 'a + Write> CodeFormatter<'a, T> {
+    #[inline]
     pub fn new(target: &'a mut T) -> Self {
         Self {
             target,
@@ -33,10 +34,21 @@ impl<'a, T: 'a + Write> CodeFormatter<'a, T> {
         }
         Ok(())
     }
+    #[inline]
+    fn write(&mut self, value: impl Display) -> fmt::Result {
+        write!(&mut self.target, "{}", value)
+    }
+    #[inline]
+    fn end_line(&mut self) -> fmt::Result {
+        writeln!(&mut self.target, "")
+    }
+    #[inline]
     pub fn write_line(&mut self, indent_level: usize, value: impl Display) -> fmt::Result {
         self.write_indent(indent_level)?;
-        writeln!(&mut self.target, "{}", value)
+        self.write(value)?;
+        self.end_line()
     }
+    #[inline]
     pub fn root_block(self) -> BlockFormatter<'a, T> {
         let block = BlockFormatter {
             target: Rc::new(RefCell::new(self)),
@@ -61,24 +73,74 @@ impl<'a, T: 'a + Write> BlockFormatter<'a, T> {
     pub fn formatter(&mut self) -> RefMut<CodeFormatter<'a, T>> {
         self.target.borrow_mut()
     }
+    #[inline]
     pub fn write_line(&mut self, line: impl Display) -> fmt::Result {
         let mut f = self.target.borrow_mut();
         f.write_line(self.indent_level, line)
     }
+    #[inline]
     pub fn sub_block(&self) -> Self {
         Self {
             target: self.target.clone(),
             indent_level: self.indent_level + 1,
         }
     }
+    #[inline]
+    pub fn line<'b>(&'b mut self) -> Result<LineFormatter<'a, 'b, T>, fmt::Error> {
+        LineFormatter::new(self.indent_level, self.target.borrow_mut())
+    }
 }
 
 impl<'a, T: 'a + Write> Clone for BlockFormatter<'a, T> {
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             target: self.target.clone(),
             indent_level: self.indent_level,
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct LineFormatter<'a, 'b, T: 'a + Write>
+    where CodeFormatter<'a, T>: 'b {
+    target: RefMut<'b, CodeFormatter<'a, T>>,
+}
+
+impl<'a, 'b, T: 'a + Write> LineFormatter<'a, 'b, T>
+    where CodeFormatter<'a, T>: 'b
+{
+    #[inline]
+    pub fn new(indent_level: usize, mut target: RefMut<'b, CodeFormatter<'a, T>>) -> Result<Self, fmt::Error> {
+        target.write_indent(indent_level)?;
+        Ok(Self {
+            target,
+        })
+    }
+    #[inline]
+    pub fn write(&mut self, value: impl Display) -> fmt::Result {
+        self.target.write(value)
+    }
+}
+
+impl<'a, 'b, T: 'a + Write> Write for LineFormatter<'a, 'b, T>
+    where CodeFormatter<'a, T>: 'b {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write(s)
+    }
+
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.write(c)
+    }
+
+    fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+        self.write(args)
+    }
+}
+
+impl<'a, 'b, T: 'a + Write> Drop for LineFormatter<'a, 'b, T> {
+    fn drop(&mut self) {
+        let _ = self.target.end_line();
     }
 }
 
