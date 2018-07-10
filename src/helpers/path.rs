@@ -104,13 +104,6 @@ impl<'a> cmp::PartialEq<PathBuf> for Path<'a> {
     }
 }
 
-impl<'a> From<Path<'a>> for PathBuf {
-    #[inline]
-    fn from(path: Path<'a>) -> PathBuf {
-        PathBuf::from_path(path)
-    }
-}
-
 #[derive(Clone, Copy, Eq, Hash)]
 pub struct Path<'a> {
     pub data: &'a str,
@@ -190,6 +183,10 @@ impl<'a> Path<'a> {
             None
         }
     }
+    #[inline]
+    pub fn into_buf(self) -> PathBuf {
+        PathBuf::from_path(self)
+    }
 }
 
 impl<'a> fmt::Debug for Path<'a> {
@@ -227,6 +224,12 @@ impl<'a> cmp::PartialEq<[&'a str]> for Path<'a> {
     }
     fn ne(&self, other: &[&'a str]) -> bool {
         self.components().ne(other.into_iter().cloned())
+    }
+}
+
+impl<'a> Into<PathBuf> for Path<'a> {
+    fn into(self) -> PathBuf {
+        self.into_buf()
     }
 }
 

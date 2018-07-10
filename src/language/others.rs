@@ -27,7 +27,7 @@ impl ItemPath {
     pub fn for_root(delimiter: &str) -> Self {
         ItemPath {
             pos: Default::default(),
-            path: PathBuf::from(Path::new("", delimiter)),
+            path: PathBuf::from_path(Path::new("", delimiter)),
         }
     }
     pub fn new(pos: ItemPosition, idents: Vec<Identifier>, delimiter: &str) -> Self {
