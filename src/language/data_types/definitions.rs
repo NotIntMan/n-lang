@@ -1,15 +1,16 @@
 #![allow(unused_imports)]
 
 use helpers::{
-    Assertion,
     as_unique_identifier,
+    Assertion,
     BlockFormatter,
+    Format,
+    Generate,
     parse_index,
     Path,
     PathBuf,
     Resolve,
     SyncRef,
-    Format,
     TSQLParameters,
 };
 use indexmap::IndexMap;
@@ -119,16 +120,16 @@ impl NumberType {
                 if size.unwrap_or(1) > 64 {
                     return Err(SemanticErrorKind::NotSupportedYet {
                         feature: "long bit sets",
-                    })
+                    });
                 }
-            },
+            }
             NumberType::Integer { size, .. } => {
                 if *size > 64 {
                     return Err(SemanticErrorKind::NotSupportedYet {
                         feature: "big numbers",
-                    })
+                    });
                 }
-            },
+            }
             _ => {}
         }
         Ok(())
@@ -179,12 +180,12 @@ impl fmt::Display for NumberType {
     }
 }
 
-impl Format<TSQLParameters> for NumberType {
-    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+impl<'a> Format<TSQLParameters<'a>> for NumberType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
         match self {
             NumberType::Bit { size } => {
                 f.write_str(int_class(size.unwrap_or(1)))
-            },
+            }
             NumberType::Boolean => f.write_str("bit"),
             NumberType::Integer { size, .. } => f.write_str(int_class((*size).into())),
             NumberType::Decimal { size, .. } => match size {
@@ -243,8 +244,8 @@ impl fmt::Display for DateTimeType {
     }
 }
 
-impl Format<TSQLParameters> for DateTimeType {
-    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+impl<'a> Format<TSQLParameters<'a>> for DateTimeType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
         let (class, precision) = match self {
             DateTimeType::Date => ("date", &None),
             DateTimeType::Time { precision } => ("time", precision),
@@ -286,8 +287,8 @@ impl fmt::Display for YearType {
     }
 }
 
-impl Format<TSQLParameters> for YearType {
-    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+impl<'a> Format<TSQLParameters<'a>> for YearType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
         f.write_str("smallint")
     }
 }
@@ -367,8 +368,8 @@ impl fmt::Display for StringType {
     }
 }
 
-impl Format<TSQLParameters> for StringType {
-    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+impl<'a> Format<TSQLParameters<'a>> for StringType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
         match self {
             StringType::Varchar { size, .. } => {
                 f.write_str("nvarchar")?;
@@ -424,6 +425,7 @@ impl PrimitiveDataType {
     }
 }
 
+// TODO Удалить impl fmt::Display у всех сущностей, которым это не нужно. В частности, у типов данных.
 impl fmt::Display for PrimitiveDataType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -436,14 +438,14 @@ impl fmt::Display for PrimitiveDataType {
     }
 }
 
-impl Format<TSQLParameters> for PrimitiveDataType {
-    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+impl<'a> Format<TSQLParameters<'a>> for PrimitiveDataType {
+    fn fmt(&self, f: &mut impl fmt::Write, parameters: TSQLParameters<'a>) -> fmt::Result {
         match self {
             PrimitiveDataType::Null => f.write_str("null"),
-            PrimitiveDataType::Number(x) => Format::<TSQLParameters>::fmt(x, f),
-            PrimitiveDataType::DateTime(x) => Format::<TSQLParameters>::fmt(x, f),
-            PrimitiveDataType::Year(x) => Format::<TSQLParameters>::fmt(x, f),
-            PrimitiveDataType::String(x) => Format::<TSQLParameters>::fmt(x, f),
+            PrimitiveDataType::Number(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
+            PrimitiveDataType::DateTime(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
+            PrimitiveDataType::Year(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
+            PrimitiveDataType::String(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
         }
     }
 }
@@ -718,7 +720,7 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
                     return Err(vec![SemanticError::new(self.pos, kind)]);
                 }
                 Ok(DataType::Primitive(value.clone()))
-            },
+            }
             DataTypeASTBody::Reference(path) => {
                 let item = match ctx.get_item(path.path.as_path(), &mut vec![]) {
                     Some(item) => item,
