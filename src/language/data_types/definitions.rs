@@ -9,6 +9,8 @@ use helpers::{
     PathBuf,
     Resolve,
     SyncRef,
+    Format,
+    TSQLParameters,
 };
 use indexmap::IndexMap;
 use language::ItemPath;
@@ -131,24 +133,6 @@ impl NumberType {
         }
         Ok(())
     }
-    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
-        match self {
-            NumberType::Bit { size } => {
-                f.write_str(int_class(size.unwrap_or(1)))
-            },
-            NumberType::Boolean => f.write_str("bit"),
-            NumberType::Integer { size, .. } => f.write_str(int_class((*size).into())),
-            NumberType::Decimal { size, .. } => match size {
-                None => f.write_str("decimal"),
-                Some((p, None)) => write!(f, "decimal({})", p),
-                Some((p, Some(s))) => write!(f, "decimal({}, {})", p, s),
-            }
-            NumberType::Float { double, .. } => {
-                let class = if *double { "double" } else { "float" };
-                f.write_str(class)
-            }
-        }
-    }
 }
 
 impl fmt::Display for NumberType {
@@ -195,6 +179,27 @@ impl fmt::Display for NumberType {
     }
 }
 
+impl Format<TSQLParameters> for NumberType {
+    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+        match self {
+            NumberType::Bit { size } => {
+                f.write_str(int_class(size.unwrap_or(1)))
+            },
+            NumberType::Boolean => f.write_str("bit"),
+            NumberType::Integer { size, .. } => f.write_str(int_class((*size).into())),
+            NumberType::Decimal { size, .. } => match size {
+                None => f.write_str("decimal"),
+                Some((p, None)) => write!(f, "decimal({})", p),
+                Some((p, Some(s))) => write!(f, "decimal({}, {})", p, s),
+            }
+            NumberType::Float { double, .. } => {
+                let class = if *double { "double" } else { "float" };
+                f.write_str(class)
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DateTimeType {
     Date,
@@ -207,23 +212,6 @@ pub enum DateTimeType {
     Timestamp {
         precision: Option<u32>,
     },
-}
-
-impl DateTimeType {
-    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
-        let (class, precision) = match self {
-            DateTimeType::Date => ("date", &None),
-            DateTimeType::Time { precision } => ("time", precision),
-            DateTimeType::Datetime { precision } => ("datetime", precision),
-            DateTimeType::Timestamp { precision } => ("timestamp", precision),
-        };
-        f.write_str(class)?;
-        if let Some(p) = precision {
-            write!(f, "({})", p)
-        } else {
-            Ok(())
-        }
-    }
 }
 
 impl fmt::Display for DateTimeType {
@@ -255,6 +243,23 @@ impl fmt::Display for DateTimeType {
     }
 }
 
+impl Format<TSQLParameters> for DateTimeType {
+    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+        let (class, precision) = match self {
+            DateTimeType::Date => ("date", &None),
+            DateTimeType::Time { precision } => ("time", precision),
+            DateTimeType::Datetime { precision } => ("datetime", precision),
+            DateTimeType::Timestamp { precision } => ("timestamp", precision),
+        };
+        f.write_str(class)?;
+        if let Some(p) = precision {
+            write!(f, "({})", p)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum YearType {
     Year2,
@@ -269,9 +274,6 @@ impl YearType {
             &YearType::Year4 => *target == YearType::Year4,
         }
     }
-    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
-        f.write_str("smallint")
-    }
 }
 
 impl fmt::Display for YearType {
@@ -281,6 +283,12 @@ impl fmt::Display for YearType {
             &YearType::Year2 => write!(f, "year(2)"),
             &YearType::Year4 => write!(f, "year(4)"),
         }
+    }
+}
+
+impl Format<TSQLParameters> for YearType {
+    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+        f.write_str("smallint")
     }
 }
 
@@ -333,19 +341,6 @@ impl StringType {
             }
         }
     }
-    pub fn generate(&self, mut f: impl Write) -> fmt::Result {
-        match self {
-            StringType::Varchar { size, .. } => {
-                f.write_str("nvarchar")?;
-                if let Some(size) = size {
-                    write!(f, "({})", size)
-                } else {
-                    Ok(())
-                }
-            }
-            StringType::Text { .. } => f.write_str("ntext"),
-        }
-    }
 }
 
 impl fmt::Display for StringType {
@@ -368,6 +363,22 @@ impl fmt::Display for StringType {
                 }
                 Ok(())
             }
+        }
+    }
+}
+
+impl Format<TSQLParameters> for StringType {
+    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+        match self {
+            StringType::Varchar { size, .. } => {
+                f.write_str("nvarchar")?;
+                if let Some(size) = size {
+                    write!(f, "({})", size)
+                } else {
+                    Ok(())
+                }
+            }
+            StringType::Text { .. } => f.write_str("ntext"),
         }
     }
 }
@@ -411,15 +422,6 @@ impl PrimitiveDataType {
             _ => Ok(()),
         }
     }
-    pub fn generate(&self, t: &mut impl Write) -> fmt::Result {
-        match self {
-            PrimitiveDataType::Null => t.write_str("null"),
-            PrimitiveDataType::Number(x) => x.generate(t),
-            PrimitiveDataType::DateTime(x) => x.generate(t),
-            PrimitiveDataType::Year(x) => x.generate(t),
-            PrimitiveDataType::String(x) => x.generate(t),
-        }
-    }
 }
 
 impl fmt::Display for PrimitiveDataType {
@@ -434,12 +436,15 @@ impl fmt::Display for PrimitiveDataType {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct PrimitiveDataTypeGenerator(pub PrimitiveDataType);
-
-impl fmt::Display for PrimitiveDataTypeGenerator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.generate(f)
+impl Format<TSQLParameters> for PrimitiveDataType {
+    fn fmt(&self, f: &mut impl fmt::Write) -> fmt::Result {
+        match self {
+            PrimitiveDataType::Null => f.write_str("null"),
+            PrimitiveDataType::Number(x) => Format::<TSQLParameters>::fmt(x, f),
+            PrimitiveDataType::DateTime(x) => Format::<TSQLParameters>::fmt(x, f),
+            PrimitiveDataType::Year(x) => Format::<TSQLParameters>::fmt(x, f),
+            PrimitiveDataType::String(x) => Format::<TSQLParameters>::fmt(x, f),
+        }
     }
 }
 

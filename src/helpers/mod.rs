@@ -8,6 +8,7 @@ pub use self::{
     extract::*,
     extractor::*,
     find_index::*,
+    format::*,
     group::*,
     id_pull::*,
     into_static::*,
@@ -39,6 +40,7 @@ pub mod display_list;
 pub mod extract;
 pub mod extractor;
 pub mod find_index;
+pub mod format;
 pub mod group;
 pub mod id_pull;
 pub mod into_static;

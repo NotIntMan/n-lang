@@ -4,6 +4,7 @@ use helpers::{
     Map,
     PathBuf,
     SyncRef,
+    TSQL,
 };
 use indexmap::IndexMap;
 use language::{
@@ -11,7 +12,6 @@ use language::{
     DataType,
     FunctionDefinition,
     TableDefinition,
-    PrimitiveDataTypeGenerator,
 };
 use project_analysis::{
     Item,
@@ -200,7 +200,7 @@ impl DatabaseModule {
         for table in self.tables.iter() {
             f.write_line(format_args!("table {}::{} {{", prefix, table.name))?;
             for primitive in table.entity.primitives() {
-                local.write_line(format_args!("{}: {},", primitive.path, PrimitiveDataTypeGenerator(primitive.field_type)))?;
+                local.write_line(format_args!("{}: {},", primitive.path, TSQL(primitive.field_type)))?;
             }
             f.write_line("}")?;
         }
@@ -221,11 +221,11 @@ impl DatabaseModule {
                     .make_primitives(path_prefix, &mut primitive_arguments);
             }
             for primitive in primitive_arguments {
-                local.write_line(format_args!("{}: {},", primitive.path, PrimitiveDataTypeGenerator(primitive.field_type)))?;
+                local.write_line(format_args!("{}: {},", primitive.path, TSQL(primitive.field_type)))?;
             }
             f.write_line("}) -> {")?;
             for primitive in function.result.primitives() {
-                local.write_line(format_args!("{}: {},", primitive.path, PrimitiveDataTypeGenerator(primitive.field_type)))?;
+                local.write_line(format_args!("{}: {},", primitive.path, TSQL(primitive.field_type)))?;
             }
             f.write_line("}")?;
             f.write_line("")?;
