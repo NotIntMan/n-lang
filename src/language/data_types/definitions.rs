@@ -921,11 +921,11 @@ impl DataType {
     pub fn make_table_type(&self, prefix: PathBuf, consumer: &mut Vec<FieldPrimitive>) -> bool {
         match self {
             DataType::Array(sub_type) => {
-                sub_type.make_primitives(PathBuf::new("."), consumer);
+                sub_type.make_primitives(prefix, consumer);
                 true
             }
             DataType::Compound(_) => {
-                self.make_primitives(PathBuf::new("."), consumer);
+                self.make_primitives(prefix, consumer);
                 true
             }
             DataType::Reference(item) => {
