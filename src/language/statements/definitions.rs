@@ -1,5 +1,6 @@
 use helpers::{
     BlockFormatter,
+    Extractor,
     Path,
     PathBuf,
     Resolve,
@@ -31,7 +32,10 @@ use project_analysis::{
     StatementFlowControlJumping,
     StatementFlowControlPosition,
 };
-use std::fmt;
+use std::fmt::{
+    self,
+    Write,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CycleTypeAST<'source> {
@@ -483,11 +487,54 @@ impl Statement {
             StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
         }
     }
+    #[inline]
+    pub fn as_block(&self) -> Option<&[Statement]> {
+        match &self.body {
+            StatementBody::Block { statements } => Some(&statements[..]),
+            _ => None,
+        }
+    }
     pub fn fmt(
         &self,
         mut f: BlockFormatter<impl fmt::Write>,
         context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
-        unimplemented!()
+        match &self.body {
+            StatementBody::VariableAssignment { target, source } => {
+                let var_guard = target.var.read();
+                let data_type = var_guard.data_type()
+                    .expect("Variable cannot have undefined data-type at generate-time");
+                context.primitives_buffer.clear();
+                if let Some(sub_type) = data_type.as_array() {
+                    {
+                        let mut line = f.line()?;
+                        write!(line, "INSERT INTO @{} (", var_guard.name())?;
+                        context.primitives_buffer.clear();
+                        sub_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
+                        let mut primitives = Extractor::new(&mut context.primitives_buffer).peekable();
+                        while let Some(primitive) = primitives.next() {
+                            line.write_str(primitive.path.data.as_str())?;
+                            if primitives.peek().is_some() {
+                                line.write_str(", ")?;
+                            }
+                        }
+                        line.write_str(")")?;
+                    }
+                    match source {
+                        StatementSource::Expression(expr) => {
+                            let mut sub_f = f.sub_block();
+                            let mut line = sub_f.line()?;
+                            expr.fmt(&mut line, context)
+                        }
+                        StatementSource::Selection(_) => {
+                            f.write_line("<unimplemented selection>")
+                        }
+                    }
+                } else {
+                    f.write_line("<unimplemented statement>")
+                }
+            }
+            _ => f.write_line("<unimplemented statement>"),
+        }
     }
 }

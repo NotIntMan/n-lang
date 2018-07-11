@@ -288,8 +288,13 @@ impl FunctionDefinition {
         mut f: BlockFormatter<impl fmt::Write>,
         context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
+        let body = match &context.function.body {
+            FunctionBody::Implementation(stmt) => stmt,
+            FunctionBody::External => return Ok(()),
+        };
+
         f.write_line("BEGIN")?;
-        let mut sub_f = f.sub_block();
+        let sub_f = f.sub_block();
 
         for variable in context.function.context.get_all_variables() {
             let mut variable_guard = variable.write();
@@ -298,7 +303,14 @@ impl FunctionDefinition {
             FunctionDefinition::fmt_variable(sub_f.clone(), context, &*variable_guard)?;
         }
 
-        sub_f.write_line("<body is unimplemented>")?;
+        if let Some(statements) = body.as_block() {
+            for statement in statements {
+                statement.fmt(sub_f.clone(), context)?;
+            }
+        } else {
+            body.fmt(sub_f, context)?;
+        }
+
         f.write_line("END")
     }
 }
