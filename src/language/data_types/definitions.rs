@@ -955,6 +955,13 @@ impl DataType {
             _ => None,
         }
     }
+    #[inline]
+    pub fn as_array(&self) -> Option<&Arc<DataType>> {
+        match self {
+            DataType::Array(sub_type) => Some(sub_type),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for DataType {

@@ -1,4 +1,5 @@
 use helpers::{
+    Extractor,
     Path,
     PathBuf,
     Resolve,
@@ -16,6 +17,7 @@ use language::{
     NumberType,
     PrimitiveDataType,
     StringType,
+    TSQLFunctionContext,
 };
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
@@ -145,6 +147,26 @@ pub struct Literal {
     pub pos: ItemPosition,
 }
 
+impl Literal {
+    pub fn fmt(
+        &self,
+        f: &mut impl fmt::Write,
+    ) -> fmt::Result {
+        match &self.literal_type {
+            LiteralType::NumberLiteral { .. } |
+            LiteralType::StringLiteral { .. } |
+            LiteralType::BracedExpressionLiteral { .. } =>
+                f.write_str(self.text.as_str()),
+            LiteralType::KeywordLiteral(keyword) =>
+                f.write_str(match keyword {
+                    KeywordLiteralType::True => "true",
+                    KeywordLiteralType::False => "false",
+                    KeywordLiteralType::Null => "null",
+                })
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOperator {
     // Logical operators
@@ -182,7 +204,7 @@ pub enum BinaryOperator {
 
 impl BinaryOperator {
     pub fn get_description(&self) -> &'static str {
-        match *self {
+        match self {
             BinaryOperator::Or => "or",
             BinaryOperator::XOr => "exclusive or",
             BinaryOperator::And => "and",
@@ -208,6 +230,35 @@ impl BinaryOperator {
             BinaryOperator::Div => "div",
             BinaryOperator::Pow => "pow",
             BinaryOperator::Interval => "interval",
+        }
+    }
+    pub fn get_operator(&self) -> &'static str {
+        match self {
+            BinaryOperator::Or => "||",
+            BinaryOperator::XOr => "<>",
+            BinaryOperator::And => "&&",
+            BinaryOperator::BitOr => "|",
+            BinaryOperator::BitXOr => "^",
+            BinaryOperator::BitAnd => "&",
+            BinaryOperator::ShiftLeft => "<<",
+            BinaryOperator::ShiftRight => ">>",
+            BinaryOperator::IsIn => "is in",
+            BinaryOperator::Equals => "=",
+            BinaryOperator::MoreThanOrEquals => ">=",
+            BinaryOperator::MoreThan => ">",
+            BinaryOperator::LessThanOrEquals => "<=",
+            BinaryOperator::LessThan => "<",
+            BinaryOperator::Like => "like",
+            BinaryOperator::SoundsLike => "sounds like",
+            BinaryOperator::RegExp => "reg exp",
+            BinaryOperator::Plus => "+",
+            BinaryOperator::Minus => "-",
+            BinaryOperator::Times => "*",
+            BinaryOperator::Divide => "/",
+            BinaryOperator::Mod => "%",
+            BinaryOperator::Div => "div",
+            BinaryOperator::Pow => "**",
+            BinaryOperator::Interval => "..",
         }
     }
 }
@@ -237,13 +288,26 @@ pub enum PrefixUnaryOperator {
 
 impl PrefixUnaryOperator {
     pub fn get_description(&self) -> &'static str {
-        match *self {
+        match self {
             PrefixUnaryOperator::Not => "not",
             PrefixUnaryOperator::All => "all",
             PrefixUnaryOperator::Any => "any",
             PrefixUnaryOperator::Plus => "plus",
             PrefixUnaryOperator::Minus => "minus",
             PrefixUnaryOperator::Tilde => "tilde",
+            PrefixUnaryOperator::Binary => "binary",
+            PrefixUnaryOperator::Row => "row",
+            PrefixUnaryOperator::Exists => "exists",
+        }
+    }
+    pub fn get_operator(&self) -> &'static str {
+        match self {
+            PrefixUnaryOperator::Not => "!",
+            PrefixUnaryOperator::All => "all",
+            PrefixUnaryOperator::Any => "any",
+            PrefixUnaryOperator::Plus => "+",
+            PrefixUnaryOperator::Minus => "-",
+            PrefixUnaryOperator::Tilde => "~",
             PrefixUnaryOperator::Binary => "binary",
             PrefixUnaryOperator::Row => "row",
             PrefixUnaryOperator::Exists => "exists",
@@ -267,7 +331,15 @@ pub enum PostfixUnaryOperator {
 
 impl PostfixUnaryOperator {
     pub fn get_description(&self) -> &'static str {
-        match *self {
+        match self {
+            PostfixUnaryOperator::IsNull => "is null",
+            PostfixUnaryOperator::IsTrue => "is true",
+            PostfixUnaryOperator::IsFalse => "is false",
+            PostfixUnaryOperator::IsUnknown => "is unknown",
+        }
+    }
+    pub fn get_operator(&self) -> &'static str {
+        match self {
             PostfixUnaryOperator::IsNull => "is null",
             PostfixUnaryOperator::IsTrue => "is true",
             PostfixUnaryOperator::IsFalse => "is false",
@@ -862,6 +934,128 @@ impl Expression {
             ExpressionBody::StdFunctionCall(function, expressions) => {
                 function.is_lite_weight
                     && expressions.iter().all(|expr| expr.is_lite_weight())
+            }
+        }
+    }
+    pub fn fmt(
+        &self,
+        f: &mut impl fmt::Write,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        match &self.body {
+            ExpressionBody::Literal(lit) => lit.fmt(f),
+            ExpressionBody::Variable(var) => {
+                let var_guard = var.read();
+                let data_type = var_guard.data_type()
+                    .expect("Variables cannot have unknown data-type at generate-time");
+
+                f.write_str("(SELECT ")?;
+
+                if let Some(sub_type) = data_type.as_array() {
+                    // Если в переменной лежит таблица - нужно выбрать все записи
+                    context.primitives_buffer.clear();
+                    sub_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
+                    if context.primitives_buffer.is_empty() {
+                        f.write_char('0')?;
+                    } else {
+                        let mut primitives = Extractor::new(&mut context.primitives_buffer).peekable();
+                        while let Some(primitive) = primitives.next() {
+                            f.write_str(primitive.path.data.as_str())?;
+                            if primitives.peek().is_some() {
+                                f.write_str(", ")?;
+                            }
+                        }
+                        f.write_str(" FROM @")?;
+                        f.write_str(var_guard.name())?;
+                    }
+                } else {
+                    // Если нет - одну запись той же структуры, что и переменная
+                    context.primitives_buffer.clear();
+                    data_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
+                    if context.primitives_buffer.is_empty() {
+                        f.write_char('0')?;
+                    } else {
+                        let mut primitives = Extractor::new(&mut context.primitives_buffer).peekable();
+                        while let Some(primitive) = primitives.next() {
+                            write!(f, "@{var_name}#{path} as {path}", var_name = var_guard.name(), path = primitive.path.data)?;
+                            if primitives.peek().is_some() {
+                                f.write_str(", ")?;
+                            }
+                        }
+                    }
+                }
+
+                f.write_str(")")
+            }
+            ExpressionBody::BinaryOperation(left, op, right) => {
+                f.write_str("( ")?;
+                left.fmt(f, context)?;
+                f.write_str(" ")?;
+                f.write_str(op.get_operator())?;
+                f.write_str(" ")?;
+                right.fmt(f, context)?;
+                f.write_str(" )")
+            }
+            ExpressionBody::PostfixUnaryOperation(op, expr) => {
+                f.write_str("( ")?;
+                f.write_str(op.get_operator())?;
+                f.write_str(" ")?;
+                expr.fmt(f, context)?;
+                f.write_str(" )")
+            }
+            ExpressionBody::PrefixUnaryOperation(op, expr) => {
+                f.write_str("( ")?;
+                f.write_str(op.get_operator())?;
+                f.write_str(" ")?;
+                expr.fmt(f, context)?;
+                f.write_str(" )")
+            }
+            ExpressionBody::PropertyAccess(expr, path) => {
+                write!(f,
+                       "(SELECT t#{} from",
+                       path.path.as_path()
+                           .into_new_buf("#"),
+                )?;
+                expr.fmt(f, context)?;
+                f.write_str(" as t)")
+            }
+            ExpressionBody::Set(expressions) => {
+                f.write_str("(SELECT ")?;
+                if expressions.is_empty() {
+                    f.write_str("0")?;
+                } else {
+                    let max_i = expressions.len() - 1;
+                    for (i, expression) in expressions.iter().enumerate() {
+                        expression.fmt(f, context)?;
+                        write!(f, " as component{}", i)?;
+                        if i < max_i {
+                            f.write_str(", ")?;
+                        }
+                    }
+                }
+                f.write_str(")")
+            }
+            ExpressionBody::FunctionCall(function, arguments) => {
+                write!(f, "[{}](", function.read().get_path().data)?;
+                let mut arguments = arguments.iter().peekable();
+                while let Some(argument) = arguments.next() {
+                    argument.fmt(f, context)?;
+                    if arguments.peek().is_some() {
+                        f.write_str(", ")?;
+                    }
+                }
+                f.write_str(")")
+            }
+            ExpressionBody::StdFunctionCall(function, arguments) => {
+                write!(f, "[{}](", function.name)?;
+                let mut arguments = arguments.iter().peekable();
+                while let Some(argument) = arguments.next() {
+                    argument.fmt(f, context)?;
+                    if arguments.peek().is_some() {
+                        f.write_str(", ")?;
+                    }
+                }
+                f.write_str(")")
             }
         }
     }
