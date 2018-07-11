@@ -1,4 +1,5 @@
 use helpers::{
+    BlockFormatter,
     Resolve,
     SyncRef,
 };
@@ -12,6 +13,7 @@ use language::{
     Expression,
     ExpressionAST,
     Field,
+    TSQLFunctionContext,
 };
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
@@ -19,7 +21,10 @@ use project_analysis::{
     FunctionVariableScope,
     SemanticError,
 };
-use std::sync::Arc;
+use std::{
+    fmt,
+    sync::Arc,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectionResultSize {
@@ -385,4 +390,14 @@ pub struct Selection {
     pub limit_clause: Option<SelectionLimit>,
     pub result_data_type: DataType,
     pub pos: ItemPosition,
+}
+
+impl Selection {
+    pub fn fmt(
+        &self,
+        _f: BlockFormatter<impl fmt::Write>,
+        _context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        unimplemented!()
+    }
 }

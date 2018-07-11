@@ -524,10 +524,12 @@ impl Statement {
                         StatementSource::Expression(expr) => {
                             let mut sub_f = f.sub_block();
                             let mut line = sub_f.line()?;
-                            expr.fmt(&mut line, context)
+                            expr.fmt(&mut line, context)?;
+                            line.write_str(";")
                         }
-                        StatementSource::Selection(_) => {
-                            f.write_line("<unimplemented selection>")
+                        StatementSource::Selection(query) => {
+                            query.fmt(f.sub_block(), context)?;
+                            f.write_line(";")
                         }
                     }
                 } else {

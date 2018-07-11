@@ -937,6 +937,16 @@ impl Expression {
             }
         }
     }
+    pub fn not(&self) -> Self {
+        Self {
+            body: ExpressionBody::PrefixUnaryOperation(
+                PrefixUnaryOperator::Not,
+                box self.clone(),
+            ),
+            pos: self.pos,
+            data_type: self.data_type.clone(),
+        }
+    }
     pub fn fmt(
         &self,
         f: &mut impl fmt::Write,

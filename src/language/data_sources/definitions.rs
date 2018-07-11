@@ -1,4 +1,5 @@
 use helpers::{
+    BlockFormatter,
     Path,
     Resolve,
     SyncRef,
@@ -11,6 +12,7 @@ use language::{
     ItemPath,
     Selection,
     SelectionAST,
+    TSQLFunctionContext,
 };
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
@@ -21,6 +23,7 @@ use project_analysis::{
     SemanticError,
     SemanticItemType,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum JoinConditionAST<'source> {
@@ -49,6 +52,15 @@ pub enum JoinCondition {
     Using(Vec<ItemPath>),
     // TODO Специальная проверка синтаксиса JOIN ... NATURAL
     Natural,
+}
+
+impl JoinCondition {
+    pub fn not(&self) -> Self {
+        match self {
+            JoinCondition::Expression(expr) => JoinCondition::Expression(expr.not()),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -229,6 +241,58 @@ impl DataSource {
             DataSource::Join { join_type: _, condition: _, left, right } =>
                 left.is_local() && right.is_local(),
             DataSource::Selection { query, alias: _, var: _ } => query.source.is_local(),
+        }
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        match self {
+            DataSource::Variable { var } => {
+                let var_guard = var.read();
+                f.write_line(format_args!("@{}", var_guard.name()))
+            }
+            DataSource::Table { item, var } => {
+                let item_guard = item.read();
+                let var_guard = var.read();
+                f.write_line(format_args!("[{}] as {}", item_guard.get_path().data, var_guard.name()))
+            }
+            DataSource::Join { join_type, condition, left, right } => {
+                left.fmt(f.clone(), context)?;
+                let class = match join_type {
+                    JoinType::Cross => "cross join",
+                    JoinType::Left => "left join",
+                    JoinType::Right => "right join",
+                    JoinType::Full => {
+                        f.write_line("(")?;
+                        let mut sub_f = f.sub_block();
+
+                        sub_f.write_line("SELECT * FROM")?;
+                        DataSource::Join {
+                            join_type: JoinType::Left,
+                            condition: condition.clone(),
+                            left: left.clone(),
+                            right: right.clone(),
+                        }.fmt(f.sub_block(), context)?;
+                        sub_f.write_line("UNION ALL SELECT * FROM")?;
+                        DataSource::Join {
+                            join_type: JoinType::Right,
+                            condition: match condition {
+                                Some(c) => Some(c.not()),
+                                None => None,
+                            },
+                            left: left.clone(),
+                            right: right.clone(),
+                        }.fmt(f.sub_block(), context)?;
+
+                        return f.write_line(")");
+                    }
+                };
+                f.write_line(class)?;
+                right.fmt(f, context)
+            }
+            DataSource::Selection { query, alias: _, var: _ } => query.fmt(f, context),
         }
     }
 }
