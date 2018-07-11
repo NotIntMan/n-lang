@@ -1,4 +1,5 @@
 use helpers::{
+    BlockFormatter,
     Path,
     PathBuf,
     Resolve,
@@ -17,6 +18,7 @@ use language::{
     ItemPath,
     Selection,
     SelectionAST,
+    TSQLFunctionContext,
     Updating,
     UpdatingAST,
 };
@@ -29,6 +31,7 @@ use project_analysis::{
     StatementFlowControlJumping,
     StatementFlowControlPosition,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CycleTypeAST<'source> {
@@ -479,5 +482,12 @@ impl Statement {
             StatementBody::UpdatingRequest { request: _ } |
             StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
         }
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        unimplemented!()
     }
 }

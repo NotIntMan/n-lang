@@ -161,7 +161,7 @@ impl FunctionDefinition {
         let mut arguments = Extractor::new(&mut context.primitives_buffer).peekable();
         while let Some(primitive) = arguments.next() {
             let mut line = f.line()?;
-            line.write(format_args!("@`{}` {}", primitive.path.data, TSQL(&primitive.field_type, context.parameters.clone())))?;
+            line.write(format_args!("@{} {}", primitive.path.data, TSQL(&primitive.field_type, context.parameters.clone())))?;
             if is_output {
                 line.write(" OUTPUT")?;
             }
@@ -181,7 +181,7 @@ impl FunctionDefinition {
             let mut arguments = context.function.arguments.iter().peekable();
             while let Some((argument_name, argument)) = arguments.next() {
                 let mut argument_guard = argument.write();
-                let mut prefix = PathBuf::new(".");
+                let mut prefix = PathBuf::new("#");
                 let new_name = context.names.add_name(argument_guard.name().into());
                 argument_guard.set_name(new_name);
                 prefix.push(argument_name.as_str());
@@ -212,7 +212,7 @@ impl FunctionDefinition {
                 )?;
             } else {
                 let mut line = sub_f.line()?;
-                line.write(format_args!("@`{}` ", context.make_result_variable_name()))?;
+                line.write(format_args!("@{} ", context.make_result_variable_name()))?;
                 if let Some(result) = context.function.result.as_primitive() {
                     line.write(TSQL(result, context.parameters.clone()))?;
                 } else {
@@ -224,10 +224,10 @@ impl FunctionDefinition {
             context.primitives_buffer.clear();
             if context.function.result.can_be_table()
                 && context.function.result.make_table_type(
-                PathBuf::new("."),
+                PathBuf::new("#"),
                 &mut context.primitives_buffer,
             ) {
-                f.write_line(format_args!("RETURNS @`{}` TABLE", context.make_result_variable_name()))?;
+                f.write_line(format_args!("RETURNS @{} TABLE", context.make_result_variable_name()))?;
                 FunctionDefinition::fmt_primitives_as_args(
                     sub_f,
                     context,
@@ -251,7 +251,7 @@ impl FunctionDefinition {
         let sub_f = f.sub_block();
         // TODO Добавить переменную-результат в контекст (в случае табличных данных на выходе)
         let class = if context.function.is_lite_weight { "FUNCTION" } else { "PROCEDURE" };
-        f.write_line(format_args!("CREATE OR ALTER {} `{}`", class, context.make_function_name().data))?;
+        f.write_line(format_args!("CREATE OR ALTER {} [{}]", class, context.make_function_name().data))?;
         FunctionDefinition::fmt_arguments(sub_f.clone(), context)
     }
     pub fn fmt_variable(
@@ -265,8 +265,8 @@ impl FunctionDefinition {
             .expect("Variable must have determined data-type in generate-time");
         context.primitives_buffer.clear();
         if let DataType::Array(sub_type) = data_type {
-            sub_type.make_primitives(PathBuf::new("."), &mut context.primitives_buffer);
-            f.write_line(format_args!("DECLARE @`{}` TABLE (", var.name()))?;
+            sub_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
+            f.write_line(format_args!("DECLARE @{} TABLE (", var.name()))?;
             TableDefinition::fmt_primitives_as_columns(
                 f.sub_block(),
                 context.parameters.clone(),
@@ -275,11 +275,11 @@ impl FunctionDefinition {
             )?;
             f.write_line(");")?;
         } else {
-            let mut prefix = PathBuf::new(".");
+            let mut prefix = PathBuf::new("#");
             prefix.push(var.name());
             data_type.make_primitives(prefix, &mut context.primitives_buffer);
             for primitive in Extractor::new(&mut context.primitives_buffer) {
-                f.write_line(format_args!("DECLARE @`{}` {};", primitive.path, TSQL(&primitive.field_type, context.parameters.clone())))?;
+                f.write_line(format_args!("DECLARE @{} {};", primitive.path, TSQL(&primitive.field_type, context.parameters.clone())))?;
             }
         }
         Ok(())
@@ -353,7 +353,7 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
         }
     }
     pub fn make_result_variable_prefix(&mut self) -> PathBuf {
-        let mut prefix = PathBuf::new(".");
+        let mut prefix = PathBuf::new("#");
         prefix.push(self.make_result_variable_name());
         prefix
     }

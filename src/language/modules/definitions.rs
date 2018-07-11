@@ -124,7 +124,7 @@ impl TableDefinition {
         let mut columns = columns.into_iter().peekable();
         while let Some(primitive) = columns.next() {
             let mut line = f.line()?;
-            line.write(format_args!("`{}` {}", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
+            line.write(format_args!("{} {}", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
             if last_comma || columns.peek().is_some() {
                 line.write(",")?;
             }
@@ -137,18 +137,18 @@ impl<'a> Generate<TSQLParameters<'a>> for TableDefinition {
     fn fmt(&self, mut root: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
         {
             let mut line = root.line()?;
-            line.write("CREATE TABLE `")?;
+            line.write("CREATE TABLE [")?;
             if !parameters.module_path.data.is_empty() {
                 line.write(format_args!("{}{}", parameters.module_path.data, parameters.module_path.delimiter))?;
             }
-            line.write(format_args!("{}` (", self.name))?;
+            line.write(format_args!("{}] (", self.name))?;
         }
 
         let mut columns = root.sub_block();
 
         let mut primitives = Vec::new();
         for (field_name, field) in self.body.iter() {
-            let mut prefix = PathBuf::new(".");
+            let mut prefix = PathBuf::new("#");
             prefix.push(field_name.as_str());
             field.field_type.make_primitives(prefix, &mut primitives);
             TableDefinition::fmt_primitives_as_columns(
@@ -162,14 +162,14 @@ impl<'a> Generate<TSQLParameters<'a>> for TableDefinition {
         {
             let mut primary_key = columns.line()?;
             primary_key.write("PRIMARY KEY (")?;
-            self.primary_key.make_primitives(PathBuf::new("."), &mut primitives);
+            self.primary_key.make_primitives(PathBuf::new("#"), &mut primitives);
 
             let mut primitives = Extractor::new(&mut primitives);
             if let Some(primitive) = primitives.next() {
-                primary_key.write(format_args!("`{}`", primitive.path.data))?;
+                primary_key.write(format_args!("{}", primitive.path.data))?;
             }
             for primitive in primitives {
-                primary_key.write(format_args!(", `{}`", primitive.path.data))?;
+                primary_key.write(format_args!(", {}", primitive.path.data))?;
             }
             primary_key.write(")")?;
         }

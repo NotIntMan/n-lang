@@ -900,7 +900,7 @@ impl DataType {
     }
     pub fn primitives(&self) -> Vec<FieldPrimitive> {
         let mut result = Vec::new();
-        self.make_primitives(PathBuf::new("."), &mut result);
+        self.make_primitives(PathBuf::new("#"), &mut result);
         result
     }
     pub fn can_be_table(&self) -> bool {
@@ -939,6 +939,7 @@ impl DataType {
             _ => false,
         }
     }
+    #[inline]
     pub fn as_table_type(&self, prefix: PathBuf) -> Option<Vec<FieldPrimitive>> {
         let mut result = Vec::new();
         if self.make_table_type(prefix, &mut result) {
@@ -947,6 +948,7 @@ impl DataType {
             None
         }
     }
+    #[inline]
     pub fn as_primitive(&self) -> Option<&PrimitiveDataType> {
         match self {
             DataType::Primitive(x) => Some(x),
