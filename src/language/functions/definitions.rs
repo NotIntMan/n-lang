@@ -264,10 +264,8 @@ impl FunctionDefinition {
         let data_type = var.data_type()
             .expect("Variable must have determined data-type in generate-time");
         context.primitives_buffer.clear();
-        let mut prefix = PathBuf::new(".");
-        prefix.push(var.name());
         if let DataType::Array(sub_type) = data_type {
-            sub_type.make_primitives(prefix, &mut context.primitives_buffer);
+            sub_type.make_primitives(PathBuf::new("."), &mut context.primitives_buffer);
             f.write_line(format_args!("DECLARE @`{}` TABLE (", var.name()))?;
             TableDefinition::fmt_primitives_as_columns(
                 f.sub_block(),
@@ -277,6 +275,8 @@ impl FunctionDefinition {
             )?;
             f.write_line(");")?;
         } else {
+            let mut prefix = PathBuf::new(".");
+            prefix.push(var.name());
             data_type.make_primitives(prefix, &mut context.primitives_buffer);
             for primitive in Extractor::new(&mut context.primitives_buffer) {
                 f.write_line(format_args!("DECLARE @`{}` {};", primitive.path, TSQL(&primitive.field_type, context.parameters.clone())))?;
