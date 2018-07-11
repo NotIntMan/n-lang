@@ -18,6 +18,7 @@ use language::{
     DataTypeAST,
     Field,
     FieldAST,
+    FieldPrimitive,
     find_attribute,
     FunctionDefinitionAST,
     ItemPath,
@@ -113,6 +114,25 @@ pub struct TableDefinition {
     pub primary_key: DataType,
 }
 
+impl TableDefinition {
+    pub fn fmt_primitives_as_columns(
+        mut f: BlockFormatter<impl fmt::Write>,
+        parameters: TSQLParameters,
+        columns: impl IntoIterator<Item=FieldPrimitive>,
+        last_comma: bool,
+    ) -> fmt::Result {
+        let mut columns = columns.into_iter().peekable();
+        while let Some(primitive) = columns.next() {
+            let mut line = f.line()?;
+            line.write(format_args!("`{}` {}", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
+            if last_comma || columns.peek().is_some() {
+                line.write(",")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl<'a> Generate<TSQLParameters<'a>> for TableDefinition {
     fn fmt(&self, mut root: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
         {
@@ -131,9 +151,12 @@ impl<'a> Generate<TSQLParameters<'a>> for TableDefinition {
             let mut prefix = PathBuf::new(".");
             prefix.push(field_name.as_str());
             field.field_type.make_primitives(prefix, &mut primitives);
-            for primitive in Extractor::new(&mut primitives) {
-                columns.write_line(format_args!("`{}` {},", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
-            }
+            TableDefinition::fmt_primitives_as_columns(
+                columns.clone(),
+                parameters.clone(),
+                Extractor::new(&mut primitives),
+                true,
+            )?;
         }
 
         {

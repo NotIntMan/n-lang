@@ -122,7 +122,12 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                                     .pop_right()
                                     .expect("Item's path should not be null"),
                             };
-                            scope.new_variable(pos, new_var_name.to_string(), Some(entity_type.clone()))?
+                            let var = scope.new_variable(pos, new_var_name.to_string(), Some(entity_type.clone()))?;
+                            {
+                                let mut var_guard = var.write();
+                                var_guard.mark_as_automatic();
+                            }
+                            var
                         };
                         Ok(DataSource::Table { item, var })
                     }

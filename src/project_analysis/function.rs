@@ -23,7 +23,7 @@ pub struct FunctionVariable {
     pos: ItemPosition,
     data_type: Option<DataType>,
     is_read_only: bool,
-    is_argument: bool,
+    is_automatic: bool,
 }
 
 impl FunctionVariable {
@@ -34,7 +34,7 @@ impl FunctionVariable {
             pos,
             data_type,
             is_read_only: false,
-            is_argument: false,
+            is_automatic: false,
         })
     }
     #[inline]
@@ -61,12 +61,12 @@ impl FunctionVariable {
         self.is_read_only = true
     }
     #[inline]
-    pub fn is_argument(&self) -> bool {
-        self.is_argument
+    pub fn is_automatic(&self) -> bool {
+        self.is_automatic
     }
     #[inline]
-    pub fn mark_as_argument(&mut self) {
-        self.is_argument = true
+    pub fn mark_as_automatic(&mut self) {
+        self.is_automatic = true
     }
 }
 
@@ -97,11 +97,11 @@ impl SyncRef<FunctionVariable> {
     }
     #[inline]
     pub fn is_argument(&self) -> bool {
-        self.read().is_argument()
+        self.read().is_automatic()
     }
     #[inline]
     pub fn mark_as_argument(&self) {
-        self.write().mark_as_argument()
+        self.write().mark_as_automatic()
     }
 }
 
@@ -276,6 +276,19 @@ impl SyncRef<FunctionContext> {
     }
     #[inline]
     pub fn project(&self) -> SyncRef<ProjectContext> { self.module().project() }
+    pub fn get_all_variables(&self) -> Vec<SyncRef<FunctionVariable>> {
+        let mut result = Vec::new();
+        let self_guard = self.read();
+        for scope in self_guard.scopes.iter() {
+            let scope_guard = scope.read();
+            result.extend(
+                scope_guard.variables()
+                    .into_iter()
+                    .cloned(),
+            );
+        }
+        result
+    }
 }
 
 impl fmt::Debug for FunctionContext {
