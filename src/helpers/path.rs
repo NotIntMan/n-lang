@@ -187,6 +187,14 @@ impl<'a> Path<'a> {
     pub fn into_buf(self) -> PathBuf {
         PathBuf::from_path(self)
     }
+    #[inline]
+    pub fn into_new_buf(self, delimiter: &str) -> PathBuf {
+        let mut result = PathBuf::new(delimiter);
+        for item in self {
+            result.push(item);
+        }
+        result
+    }
 }
 
 impl<'a> fmt::Debug for Path<'a> {
