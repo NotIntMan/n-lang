@@ -3,6 +3,7 @@ use helpers::{
     Extractor,
     Generate,
     NameUniquer,
+    Path,
     PathBuf,
     Resolve,
     SyncRef,
@@ -150,76 +151,165 @@ pub struct FunctionDefinition {
 }
 
 impl FunctionDefinition {
+    fn fmt_primitives_as_args(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        last_comma: bool,
+        is_output: bool,
+    ) -> fmt::Result {
+        let mut arguments = Extractor::new(&mut context.primitives_buffer).peekable();
+        while let Some(primitive) = arguments.next() {
+            let mut line = f.line()?;
+            line.write(format_args!("@`{}` {}", primitive.path.data, TSQL(&primitive.field_type, context.parameters.clone())))?;
+            if is_output {
+                line.write(" OUTPUT")?;
+            }
+            if last_comma || arguments.peek().is_some() {
+                line.write(", ")?;
+            }
+        }
+        Ok(())
+    }
     fn fmt_arguments(
         &self,
         mut f: BlockFormatter<impl fmt::Write>,
-        parameters: TSQLParameters,
-        primitives: &mut Vec<FieldPrimitive>,
-        names: &mut NameUniquer,
+        context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
-        primitives.clear();
-        for (argument_name, argument) in self.arguments.iter() {
-            let mut argument_guard = argument.write();
-            let mut prefix = PathBuf::new(".");
-            let new_name = names.add_class_style_name(argument_guard.name());
-            argument_guard.set_name(new_name);
-            prefix.push(argument_name.as_str());
-            argument_guard.data_type()
-                .expect("Function argument cannot have unknown data-type")
-                .make_primitives(prefix, primitives);
-            let primitives_count = primitives.len();
-            for (i, primitive) in Extractor::new(primitives).enumerate() {
-                let mut line = f.line()?;
-                line.write(format_args!("@`{}` {}", primitive.path.data, TSQL(&primitive.field_type, parameters.clone())))?;
-                if i < (primitives_count - 1) {
-                    line.write(", ")?;
+        let is_procedure = !self.is_lite_weight;
+        let mut sub_f = f.sub_block();
+        {
+            let mut arguments = self.arguments.iter().peekable();
+            while let Some((argument_name, argument)) = arguments.next() {
+                let mut argument_guard = argument.write();
+                let mut prefix = PathBuf::new(".");
+                let new_name = context.names.add_class_style_name(argument_guard.name());
+                argument_guard.set_name(new_name);
+                prefix.push(argument_name.as_str());
+                context.primitives_buffer.clear();
+                argument_guard.data_type()
+                    .expect("Function argument cannot have unknown data-type")
+                    .make_primitives(prefix, &mut context.primitives_buffer);
+                self.fmt_primitives_as_args(
+                    sub_f.clone(),
+                    context,
+                    is_procedure || arguments.peek().is_some(),
+                    false,
+                )?;
+            }
+        }
+        if is_procedure {
+            context.primitives_buffer.clear();
+            if self.result.can_be_table()
+                && self.result.make_table_type(
+                context.make_result_variable_prefix(),
+                &mut context.primitives_buffer,
+            ) {
+                self.fmt_primitives_as_args(
+                    sub_f,
+                    context,
+                    false,
+                    true,
+                )?;
+            } else {
+                let mut line = sub_f.line()?;
+                line.write(format_args!("@`{}` ", context.make_result_variable_name()))?;
+                if let Some(result) = self.result.as_primitive() {
+                    line.write(TSQL(result, context.parameters.clone()))?;
+                } else {
+                    line.write("bit")?;
+                }
+                line.write(" OUTPUT")?;
+            }
+        } else {
+            context.primitives_buffer.clear();
+            if self.result.can_be_table()
+                && self.result.make_table_type(
+                PathBuf::new("."),
+                &mut context.primitives_buffer,
+            ) {
+                f.write_line(format_args!("RETURNS @`{}` TABLE", context.make_result_variable_name()))?;
+                self.fmt_primitives_as_args(
+                    sub_f,
+                    context,
+                    false,
+                    false,
+                )?;
+            } else {
+                if let Some(result) = self.result.as_primitive() {
+                    f.write_line(format_args!("RETURNS {}", TSQL(result, context.parameters.clone())))?;
+                } else {
+                    f.write_line("RETURNS bit")?;
                 }
             }
         }
         Ok(())
     }
+    fn fmt_head(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let sub_f = f.sub_block();
+        // TODO Добавить переменную-результат в контекст (в случае табличных данных на выходе)
+        let class = if self.is_lite_weight { "FUNCTION" } else { "PROCEDURE" };
+        f.write_line(format_args!("CREATE OR ALTER {} `{}`", class, context.make_function_name().data))?;
+        self.fmt_arguments(sub_f.clone(), context)?;
+        f.write_line("<body is unimplemented>")
+    }
 }
 
 impl<'a> Generate<TSQLParameters<'a>> for FunctionDefinition {
-    fn fmt(&self, mut f: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
-        let function_name = {
-            let mut path = parameters.module_path.into_buf();
-            path.push(self.name.as_str());
-            path
-        };
-        let mut sub_f = f.sub_block();
-        let mut names = NameUniquer::new();
-        if self.is_lite_weight {
-            f.write_line(format_args!("CREATE OR ALTER FUNCTION `{}`", function_name.data))?;
+    fn fmt(&self, f: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
+        let mut context = TSQLFunctionContext::new(self, parameters);
+        self.fmt_head(f, &mut context)
+    }
+}
 
-            let mut primitives = Vec::new();
-            self.fmt_arguments(sub_f.clone(), parameters.clone(), &mut primitives, &mut names)?;
+#[derive(Debug, Clone)]
+pub struct TSQLFunctionContext<'a, 'b> {
+    pub function: &'a FunctionDefinition,
+    pub parameters: TSQLParameters<'b>,
+    pub primitives_buffer: Vec<FieldPrimitive>,
+    pub names: NameUniquer,
+    pub function_name: Option<PathBuf>,
+    pub result_variable_name: Option<String>,
+}
 
-            // TODO Добавить переменную-результат в контекст (в случае табличных данных на выходе)
-            let result_var_name = names.add_class_style_name("return_value");
-            let result_var_prefix = {
-                let mut prefix = PathBuf::new(".");
-                prefix.push(result_var_name.as_str());
-                prefix
-            };
-
-            if self.result.make_table_type(result_var_prefix, &mut primitives) {
-                f.write_line(format_args!("RETURNS @`{}` TABLE", result_var_name))?;
-                for primitive in Extractor::new(&mut primitives) {
-                    sub_f.write_line(format_args!("@`{}` {}", primitive.path.data, TSQL(&primitive.field_type, parameters.clone())))?;
-                }
-            } else {
-                primitives.clear();
-                if let Some(result) = self.result.as_primitive() {
-                    f.write_line(format_args!("RETURNS {}", TSQL(result, parameters.clone())))?;
-                } else {
-                    f.write_line("RETURNS bit")?;
-                }
-            }
-
-            f.write_line("<unimplemented>")
-        } else {
-            f.write_line("<unimplemented>")
+impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
+    pub fn new(function: &'a FunctionDefinition, parameters: TSQLParameters<'b>) -> Self {
+        Self {
+            function,
+            parameters,
+            primitives_buffer: Vec::new(),
+            names: NameUniquer::new(),
+            function_name: None,
+            result_variable_name: None,
         }
+    }
+    pub fn make_function_name<'x>(&'x mut self) -> Path<'x> {
+        if self.function_name.is_none() {
+            let mut path = self.parameters.module_path.into_buf();
+            path.push(self.function.name.as_str());
+            self.function_name = Some(path)
+        }
+        match &self.function_name {
+            Some(function_name) => return function_name.as_path(),
+            None => unreachable!()
+        }
+    }
+    pub fn make_result_variable_name(&mut self) -> &str {
+        if self.result_variable_name.is_none() {
+            self.result_variable_name = Some(self.names.add_name("return_value".into()));
+        }
+        match &self.result_variable_name {
+            Some(result_variable_name) => result_variable_name.as_str(),
+            None => unreachable!(),
+        }
+    }
+    pub fn make_result_variable_prefix(&mut self) -> PathBuf {
+        let mut prefix = PathBuf::new(".");
+        prefix.push(self.make_result_variable_name());
+        prefix
     }
 }
