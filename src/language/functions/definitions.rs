@@ -254,15 +254,15 @@ impl FunctionDefinition {
         // TODO Добавить переменную-результат в контекст (в случае табличных данных на выходе)
         let class = if self.is_lite_weight { "FUNCTION" } else { "PROCEDURE" };
         f.write_line(format_args!("CREATE OR ALTER {} `{}`", class, context.make_function_name().data))?;
-        self.fmt_arguments(sub_f.clone(), context)?;
-        f.write_line("<body is unimplemented>")
+        self.fmt_arguments(sub_f.clone(), context)
     }
 }
 
 impl<'a> Generate<TSQLParameters<'a>> for FunctionDefinition {
-    fn fmt(&self, f: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
+    fn fmt(&self, mut f: BlockFormatter<impl fmt::Write>, parameters: TSQLParameters<'a>) -> fmt::Result {
         let mut context = TSQLFunctionContext::new(self, parameters);
-        self.fmt_head(f, &mut context)
+        self.fmt_head(f.clone(), &mut context)?;
+        f.write_line("<body is unimplemented>")
     }
 }
 
