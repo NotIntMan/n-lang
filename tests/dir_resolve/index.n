@@ -23,8 +23,9 @@ fn get_max_user_age(): small integer {
     return t.component0;
 }
 
-fn add_user(person_info: PersonInfo) {
+fn add_user(person_info: PersonInfo): PersonInfo {
     insert into Users u (u.person_info) values (person_info);
+    return person_info;
 }
 
 fn new_person_info(age: unsigned tiny integer): PersonInfo {
