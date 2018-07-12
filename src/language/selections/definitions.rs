@@ -334,21 +334,9 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
             }
         }
 
-        let one_row_result = {
-            let limit_one_row = match self.limit_clause {
-                Some(limit_clause) => limit_clause.count == 1,
-                None => false,
-            };
-
-            limit_one_row || (is_aggregate_query && group_by_clause.is_none())
-        };
-
-        let result_data_type = SelectionExpression::type_of_expression_set(result.as_slice());
-        let result_data_type = if one_row_result {
-            result_data_type
-        } else {
-            DataType::Array(Arc::new(result_data_type))
-        };
+        let result_data_type = DataType::Array(Arc::new(
+            SelectionExpression::type_of_expression_set(result.as_slice())
+        ));
 
         if errors.is_empty() {
             Ok(Selection {
@@ -392,9 +380,16 @@ pub struct Selection {
 impl Selection {
     pub fn fmt(
         &self,
-        _f: BlockFormatter<impl fmt::Write>,
+        mut f: BlockFormatter<impl fmt::Write>,
         _context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
+        {
+            let mut line = f.line()?;
+            line.write_str("SELECT")?;
+            if self.distinct {
+                line.write_str(" distinct")?;
+            }
+        }
         unimplemented!()
     }
 }
