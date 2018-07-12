@@ -898,9 +898,9 @@ impl DataType {
             }
         }
     }
-    pub fn primitives(&self) -> Vec<FieldPrimitive> {
+    pub fn primitives(&self, prefix: PathBuf) -> Vec<FieldPrimitive> {
         let mut result = Vec::new();
-        self.make_primitives(PathBuf::new("#"), &mut result);
+        self.make_primitives(prefix, &mut result);
         result
     }
     pub fn can_be_table(&self) -> bool {
