@@ -1,12 +1,11 @@
 use language::{
     expression,
+    ExpressionAST,
     module_path,
-    property_path,
     selection,
 };
 use lexeme_scanner::Token;
 use parser_basics::{
-    comma_list,
     keyword,
     not_keyword_identifier,
     ParserResult,
@@ -14,20 +13,11 @@ use parser_basics::{
 };
 use super::*;
 
-parser_rule!(join_condition(i) -> JoinConditionAST<'source> {
-    alt!(i,
-        do_parse!(
-            apply!(keyword, "on") >>
-            x: expression >>
-            (JoinConditionAST::Expression(x))
-        )
-        | do_parse!(
-            apply!(keyword, "using") >>
-            apply!(symbols, "(") >>
-            fields: apply!(comma_list, property_path) >>
-            apply!(symbols, ")") >>
-            (JoinConditionAST::Using(fields))
-        )
+parser_rule!(join_condition(i) -> ExpressionAST<'source> {
+    do_parse!(i,
+        apply!(keyword, "on") >>
+        x: expression >>
+        (x)
     )
 });
 
@@ -59,18 +49,10 @@ parser_rule!(join_source(i) -> DataSourceAST<'source> {
     )
 });
 
-type JoinTail<'source> = (JoinType, Option<JoinConditionAST<'source>>, DataSourceAST<'source>);
+type JoinTail<'source> = (JoinType, Option<ExpressionAST<'source>>, DataSourceAST<'source>);
 parser_rule!(join_tail(i) -> JoinTail<'source> {
     alt!(i,
         do_parse!(
-            apply!(keyword, "natural") >>
-            apply!(keyword, "left") >>
-            opt!(apply!(keyword, "outer")) >>
-            apply!(keyword, "join") >>
-            source: join_source >>
-            ((JoinType::Left, Some(JoinConditionAST::Natural), source))
-        )
-        | do_parse!(
             apply!(keyword, "left") >>
             opt!(apply!(keyword, "outer")) >>
             apply!(keyword, "join") >>
@@ -79,36 +61,12 @@ parser_rule!(join_tail(i) -> JoinTail<'source> {
             ((JoinType::Left, condition, source))
         )
         | do_parse!(
-            apply!(keyword, "natural") >>
-            apply!(keyword, "right") >>
-            opt!(apply!(keyword, "outer")) >>
-            apply!(keyword, "join") >>
-            source: join_source >>
-            ((JoinType::Right, Some(JoinConditionAST::Natural), source))
-        )
-        | do_parse!(
             apply!(keyword, "right") >>
             opt!(apply!(keyword, "outer")) >>
             apply!(keyword, "join") >>
             source: join_source >>
             condition: opt!(join_condition) >>
             ((JoinType::Right, condition, source))
-        )
-        | do_parse!(
-            apply!(keyword, "natural") >>
-            apply!(keyword, "full") >>
-            opt!(apply!(keyword, "outer")) >>
-            apply!(keyword, "join") >>
-            source: join_source >>
-            ((JoinType::Full, Some(JoinConditionAST::Natural), source))
-        )
-        | do_parse!(
-            apply!(keyword, "full") >>
-            opt!(apply!(keyword, "outer")) >>
-            apply!(keyword, "join") >>
-            source: join_source >>
-            condition: opt!(join_condition) >>
-            ((JoinType::Full, condition, source))
         )
         | do_parse!(
             apply!(keyword, "inner") >>

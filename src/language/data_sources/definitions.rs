@@ -25,50 +25,11 @@ use project_analysis::{
 };
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum JoinConditionAST<'source> {
-    Expression(ExpressionAST<'source>),
-    Using(Vec<ItemPath>),
-    Natural,
-}
-
-impl<'source> Resolve<SyncRef<FunctionVariableScope>> for JoinConditionAST<'source> {
-    type Result = JoinCondition;
-    type Error = SemanticError;
-    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        let result = match self {
-            JoinConditionAST::Expression(expr) => JoinCondition::Expression(expr.resolve(scope)?),
-            JoinConditionAST::Using(paths) => JoinCondition::Using(paths.clone()),
-            JoinConditionAST::Natural => JoinCondition::Natural,
-        };
-        Ok(result)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum JoinCondition {
-    Expression(Expression),
-    // TODO Специальная проверка синтаксиса JOIN ... USING (...)
-    Using(Vec<ItemPath>),
-    // TODO Специальная проверка синтаксиса JOIN ... NATURAL
-    Natural,
-}
-
-impl JoinCondition {
-    pub fn not(&self) -> Self {
-        match self {
-            JoinCondition::Expression(expr) => JoinCondition::Expression(expr.not()),
-            _ => unimplemented!(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinType {
     Cross,
     Left,
     Right,
-    Full,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,7 +40,7 @@ pub enum DataSourceAST<'source> {
     },
     Join {
         join_type: JoinType,
-        condition: Option<JoinConditionAST<'source>>,
+        condition: Option<ExpressionAST<'source>>,
         left: Box<DataSourceAST<'source>>,
         right: Box<DataSourceAST<'source>>,
     },
@@ -178,7 +139,7 @@ pub enum DataSource {
     },
     Join {
         join_type: JoinType,
-        condition: Option<JoinCondition>,
+        condition: Option<Expression>,
         left: Box<DataSource>,
         right: Box<DataSource>,
     },
@@ -264,30 +225,6 @@ impl DataSource {
                     JoinType::Cross => "CROSS JOIN",
                     JoinType::Left => "LEFT JOIN",
                     JoinType::Right => "RIGHT JOIN",
-                    JoinType::Full => {
-                        f.write_line("(")?;
-                        let mut sub_f = f.sub_block();
-
-                        sub_f.write_line("SELECT * FROM")?;
-                        DataSource::Join {
-                            join_type: JoinType::Left,
-                            condition: condition.clone(),
-                            left: left.clone(),
-                            right: right.clone(),
-                        }.fmt(f.sub_block(), context)?;
-                        sub_f.write_line("UNION ALL SELECT * FROM")?;
-                        DataSource::Join {
-                            join_type: JoinType::Right,
-                            condition: match condition {
-                                Some(c) => Some(c.not()),
-                                None => None,
-                            },
-                            left: left.clone(),
-                            right: right.clone(),
-                        }.fmt(f.sub_block(), context)?;
-
-                        return f.write_line(")");
-                    }
                 };
                 f.write_line(format_args!("{} ON <unimplemented condition>", class))?;
                 // TODO Отображения условия объединения
