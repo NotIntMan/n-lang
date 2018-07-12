@@ -22,7 +22,10 @@ use project_analysis::{
     SemanticError,
 };
 use std::{
-    fmt,
+    fmt::{
+        self,
+        Write,
+    },
     sync::Arc,
 };
 
