@@ -222,7 +222,6 @@ pub struct SelectionLimit {
 pub struct SelectionAST<'source> {
     pub distinct: bool,
     pub high_priority: bool,
-    pub straight_join: bool,
     pub result_size: SelectionResultSize,
     pub cache: bool,
     pub result: SelectionResultAST<'source>,
@@ -355,7 +354,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
             Ok(Selection {
                 distinct: self.distinct,
                 high_priority: self.high_priority,
-                straight_join: self.straight_join,
                 result_size: self.result_size,
                 cache: self.cache,
                 result,
@@ -378,7 +376,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
 pub struct Selection {
     pub distinct: bool,
     pub high_priority: bool,
-    pub straight_join: bool,
     pub result_size: SelectionResultSize,
     pub cache: bool,
     pub result: Vec<SelectionExpression>,

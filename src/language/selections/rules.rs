@@ -149,7 +149,6 @@ pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         apply!(keyword, "select") >>
         distinct: select_distincty >>
         high_priority: opt!(apply!(keyword, "high_priority")) >>
-        straight_join: opt!(apply!(keyword, "straight_join")) >>
         result_size: select_result_size >>
         cache: select_cache >>
         result: select_result >>
@@ -164,7 +163,6 @@ pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         (SelectionAST {
             distinct,
             high_priority: high_priority.is_some(),
-            straight_join: straight_join.is_some(),
             result_size,
             cache,
             result,
