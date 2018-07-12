@@ -341,6 +341,22 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
             DataType::Array(Arc::new(result_data_type))
         };
 
+        if let Some(limit_clause) = &self.limit_clause {
+            if limit_clause.offset.is_some() {
+                let is_order_by_clause_empty = match &order_by_clause {
+                    Some(clause) => clause.is_empty(),
+                    None => true,
+                };
+                if is_order_by_clause_empty {
+                    errors.push(SemanticError::not_allowed_inside(
+                        self.pos,
+                        "LIMIT clause with offset",
+                        "query without sorting",
+                    ));
+                }
+            }
+        }
+
         if errors.is_empty() {
             Ok(Selection {
                 distinct: self.distinct,
@@ -378,15 +394,103 @@ impl Selection {
     pub fn fmt(
         &self,
         mut f: BlockFormatter<impl fmt::Write>,
-        _context: &mut TSQLFunctionContext,
+        context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
+        let mut offset_fetch_clause = None;
         {
             let mut line = f.line()?;
             line.write_str("SELECT")?;
             if self.distinct {
-                line.write_str(" distinct")?;
+                line.write_str(" DISTINCT")?;
+            }
+            if let Some(limit_clause) = &self.limit_clause {
+                match &limit_clause.offset {
+                    Some(offset) => {
+                        offset_fetch_clause = Some((limit_clause.count, *offset));
+                    }
+                    None => {
+                        write!(line, " TOP({})", limit_clause.count)?;
+                    }
+                }
             }
         }
-        unimplemented!()
+
+        let mut sub_f = f.sub_block();
+        let mut sub_sub_f = sub_f.sub_block();
+
+        for result_item in self.result.iter() {
+            let mut line = sub_sub_f.line()?;
+            result_item.expr.fmt(&mut line, context)?;
+            if let Some(alias) = &result_item.alias {
+                write!(line, " AS {}", alias)?;
+            }
+        }
+
+        sub_f.write_line("FROM")?;
+        self.source.fmt(sub_sub_f.clone(), context)?;
+
+        if let Some(where_clause) = &self.where_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("WHERE ")?;
+            where_clause.fmt(&mut line, context)?;
+        }
+
+        if let Some(group_by_clause) = &self.group_by_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("GROUP BY ")?;
+            let mut items = group_by_clause.sorting.iter().peekable();
+            while let Some(expr) = items.next() {
+                expr.expr.fmt(&mut line, context)?;
+                line.write_str(match &expr.order {
+                    SelectionSortingOrder::Asc => " ASC",
+                    SelectionSortingOrder::Desc => " DESC",
+                })?;
+                if items.peek().is_some() {
+                    line.write_str(", ")?;
+                }
+            }
+            if group_by_clause.with_rollup {
+                line.write_str(" WITH ROLLUP")?;
+            }
+        }
+
+        if let Some(having_clause) = &self.having_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("HAVING ")?;
+            having_clause.fmt(&mut line, context)?;
+        }
+
+        {
+            let order_by_clause = match &self.order_by_clause {
+                Some(expressions) => &expressions[..],
+                None => &[][..],
+            };
+            if !order_by_clause.is_empty() || offset_fetch_clause.is_some() {
+                {
+                    let mut line = sub_f.line()?;
+                    line.write_str("ORDER BY ")?;
+                    if order_by_clause.is_empty() {
+                        // TODO Проброс ошибок из генератора
+                        unreachable!("LIMIT clause doesn't make sense without ORDER BY clause");
+                    }
+                    let mut items = order_by_clause.iter().peekable();
+                    while let Some(expr) = items.next() {
+                        expr.expr.fmt(&mut line, context)?;
+                        line.write_str(match &expr.order {
+                            SelectionSortingOrder::Asc => " ASC",
+                            SelectionSortingOrder::Desc => " DESC",
+                        })?;
+                        if items.peek().is_some() {
+                            line.write_str(", ")?;
+                        }
+                    }
+                }
+                if let Some((count, offset)) = offset_fetch_clause {
+                    sub_f.write_line(format_args!("OFFSET {} ROWS FETCH NEXT {} ROWS ONLY", offset, count))?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
