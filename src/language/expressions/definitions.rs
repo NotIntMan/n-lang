@@ -1,5 +1,6 @@
 use helpers::{
     Extractor,
+    parse_index,
     Path,
     PathBuf,
     Resolve,
@@ -937,15 +938,58 @@ impl Expression {
             }
         }
     }
-    pub fn not(&self) -> Self {
-        Self {
-            body: ExpressionBody::PrefixUnaryOperation(
-                PrefixUnaryOperator::Not,
-                box self.clone(),
-            ),
-            pos: self.pos,
-            data_type: self.data_type.clone(),
+    pub fn get_property(&self, path: Path) -> Option<&Expression> {
+        match &self.body {
+            ExpressionBody::PropertyAccess(expr, local_path) => {
+                let mut deeper_path = local_path.path.clone();
+                deeper_path.append(path);
+                expr.get_property(deeper_path.as_path())
+            }
+            ExpressionBody::Set(expressions) => {
+                let index = {
+                    let mut path_components = path.components();
+                    let first = path_components.next()?;
+                    if path_components.next().is_some() { return None; }
+                    parse_index(first)?
+                };
+                if expressions.len() > index {
+                    Some(&expressions[index])
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
+    }
+    pub fn fmt_variable(
+        f: &mut impl fmt::Write,
+        var: &FunctionVariable,
+    ) -> fmt::Result {
+        let name = var.name();
+        if var.is_automatic() {
+            write!(f, "{}.", name)
+        } else {
+            write!(f, "@{}#", name)
+        }
+    }
+    pub fn fmt_property_access(
+        f: &mut impl fmt::Write,
+        expr: &Expression,
+        path: Path,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let path_buf = path.into_new_buf("#");
+        if let ExpressionBody::Variable(var) = &expr.body {
+            let var_guard = var.read();
+            Expression::fmt_variable(f, &*var_guard)?;
+            return f.write_str(&path_buf.data)
+        }
+        if let Some(sub_expr) = expr.get_property(path) {
+            return sub_expr.fmt(f, context)
+        }
+        write!(f, "(SELECT t#{} from", path_buf.data)?;
+        expr.fmt(f, context)?;
+        f.write_str(" as t)")
     }
     pub fn fmt(
         &self,
@@ -987,7 +1031,8 @@ impl Expression {
                     } else {
                         let mut primitives = Extractor::new(&mut context.primitives_buffer).peekable();
                         while let Some(primitive) = primitives.next() {
-                            write!(f, "@{var_name}#{path} as {path}", var_name = var_guard.name(), path = primitive.path.data)?;
+                            Expression::fmt_variable(f, &*var_guard)?;
+                            write!(f, "{path} AS {path}", path = primitive.path.data)?;
                             if primitives.peek().is_some() {
                                 f.write_str(", ")?;
                             }
@@ -1021,13 +1066,12 @@ impl Expression {
                 f.write_str(" )")
             }
             ExpressionBody::PropertyAccess(expr, path) => {
-                write!(f,
-                       "(SELECT t#{} from",
-                       path.path.as_path()
-                           .into_new_buf("#"),
-                )?;
-                expr.fmt(f, context)?;
-                f.write_str(" as t)")
+                Expression::fmt_property_access(
+                    f,
+                    &expr,
+                    path.path.as_path(),
+                    context,
+                )
             }
             ExpressionBody::Set(expressions) => {
                 f.write_str("(SELECT ")?;

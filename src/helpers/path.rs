@@ -256,7 +256,7 @@ impl<'a> PathComponents<'a> {
 
 impl<'a> Iterator for PathComponents<'a> {
     type Item = &'a str;
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<&'a str> {
         let data_length = self.data.len();
         if data_length == 0 {
             return None;
