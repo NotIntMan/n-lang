@@ -23,7 +23,10 @@ use project_analysis::{
     SemanticError,
     SemanticItemType,
 };
-use std::fmt;
+use std::fmt::{
+    self,
+    Write,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinType {
@@ -221,13 +224,18 @@ impl DataSource {
             }
             DataSource::Join { join_type, condition, left, right } => {
                 left.fmt(f.clone(), context)?;
-                let class = match join_type {
-                    JoinType::Cross => "CROSS JOIN",
-                    JoinType::Left => "LEFT JOIN",
-                    JoinType::Right => "RIGHT JOIN",
-                };
-                f.write_line(format_args!("{} ON <unimplemented condition>", class))?;
-                // TODO Отображения условия объединения
+                {
+                    let mut line = f.line()?;
+                    line.write_str(match join_type {
+                        JoinType::Cross => "CROSS JOIN",
+                        JoinType::Left => "LEFT JOIN",
+                        JoinType::Right => "RIGHT JOIN",
+                    })?;
+                    if let Some(condition) = condition {
+                        line.write_str(" ON ")?;
+                        condition.fmt(&mut line, context)?;
+                    }
+                }
                 right.fmt(f, context)
             }
             DataSource::Selection { query, alias: _, var: _ } => query.fmt(f, context),
