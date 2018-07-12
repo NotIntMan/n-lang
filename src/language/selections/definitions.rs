@@ -224,9 +224,6 @@ pub struct SelectionLimit {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionAST<'source> {
     pub distinct: bool,
-    pub high_priority: bool,
-    pub result_size: SelectionResultSize,
-    pub cache: bool,
     pub result: SelectionResultAST<'source>,
     pub source: DataSourceAST<'source>,
     pub where_clause: Option<ExpressionAST<'source>>,
@@ -344,9 +341,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
         if errors.is_empty() {
             Ok(Selection {
                 distinct: self.distinct,
-                high_priority: self.high_priority,
-                result_size: self.result_size,
-                cache: self.cache,
                 result,
                 source,
                 where_clause,
@@ -366,9 +360,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Selection {
     pub distinct: bool,
-    pub high_priority: bool,
-    pub result_size: SelectionResultSize,
-    pub cache: bool,
     pub result: Vec<SelectionExpression>,
     pub source: DataSource,
     pub where_clause: Option<Expression>,

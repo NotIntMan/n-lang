@@ -27,23 +27,6 @@ parser_rule!(select_distincty(i) -> bool {
     )
 });
 
-parser_rule!(select_result_size(i) -> SelectionResultSize {
-    alt!(i,
-        apply!(keyword, "sql_small_result") => { |_| SelectionResultSize::Small } |
-        apply!(keyword, "sql_big_result") => { |_| SelectionResultSize::Big } |
-        apply!(keyword, "sql_buffer_result") => { |_| SelectionResultSize::Buffered } |
-        none => { |_| SelectionResultSize::Usual }
-    )
-});
-
-parser_rule!(select_cache(i) -> bool {
-    alt!(i,
-        apply!(keyword, "sql_cache") => { |_| true } |
-        apply!(keyword, "sql_no_cache") => { |_| false } |
-        none => { |_| false }
-    )
-});
-
 parser_rule!(select_expression(i) -> SelectionExpressionAST<'source> {
     do_parse!(i,
         expr: expression >>
@@ -81,7 +64,6 @@ parser_rule!(pub select_condition(i, prefix_keyword_text: &'source str) -> Expre
     )
 });
 
-// TODO Рассмотреть возможность использования синтаксиса tableName.* в группировке и сортировке
 parser_rule!(select_sorting_order(i) -> SelectionSortingOrder {
     alt!(i,
         apply!(keyword, "asc") => { |_| SelectionSortingOrder::Asc } |
@@ -148,9 +130,6 @@ pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         begin: symbol_position >>
         apply!(keyword, "select") >>
         distinct: select_distincty >>
-        high_priority: opt!(apply!(keyword, "high_priority")) >>
-        result_size: select_result_size >>
-        cache: select_cache >>
         result: select_result >>
         apply!(keyword, "from") >>
         source: data_source >>
@@ -162,9 +141,6 @@ pub fn selection<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         pos: apply!(item_position, begin) >>
         (SelectionAST {
             distinct,
-            high_priority: high_priority.is_some(),
-            result_size,
-            cache,
             result,
             source,
             where_clause,
