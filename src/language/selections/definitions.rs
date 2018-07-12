@@ -1,5 +1,6 @@
 use helpers::{
     BlockFormatter,
+    PathBuf,
     Resolve,
     SyncRef,
 };
@@ -416,27 +417,51 @@ impl Selection {
         }
 
         let mut sub_f = f.sub_block();
-        let mut sub_sub_f = sub_f.sub_block();
 
         for result_item in self.result.iter() {
-            let mut line = sub_sub_f.line()?;
-            result_item.expr.fmt(&mut line, context)?;
-            if let Some(alias) = &result_item.alias {
-                write!(line, " AS {}", alias)?;
+            let mut primitives = {
+                let mut prefix = PathBuf::new(".");
+                if let Some(alias) = &result_item.alias {
+                    prefix.push(&alias);
+                }
+                result_item.expr.data_type.primitives(prefix)
+                    .into_iter()
+                    .peekable()
+            };
+
+            while let Some(primitive) = primitives.next() {
+                let mut line = sub_f.line()?;
+
+                let new_path = primitive.path.as_path()
+                    .into_new_buf("#");
+
+                if let Some(sub_expr) = result_item.expr.get_property(primitive.path.as_path()) {
+                    sub_expr.fmt(&mut line, context)?;
+                } else {
+                    write!(line, "( SELECT t.{} FROM (", new_path)?;
+                    result_item.expr.fmt(&mut line, context)?;
+                    write!(line, ") as t )")?;
+                }
+
+                write!(line, " AS {}", new_path)?;
+
+                if primitives.peek().is_some() {
+                    write!(line, ",")?;
+                }
             }
         }
 
-        sub_f.write_line("FROM")?;
-        self.source.fmt(sub_sub_f.clone(), context)?;
+        f.write_line("FROM")?;
+        self.source.fmt(sub_f.clone(), context)?;
 
         if let Some(where_clause) = &self.where_clause {
-            let mut line = sub_f.line()?;
+            let mut line = f.line()?;
             line.write_str("WHERE ")?;
             where_clause.fmt(&mut line, context)?;
         }
 
         if let Some(group_by_clause) = &self.group_by_clause {
-            let mut line = sub_f.line()?;
+            let mut line = f.line()?;
             line.write_str("GROUP BY ")?;
             let mut items = group_by_clause.sorting.iter().peekable();
             while let Some(expr) = items.next() {
@@ -455,7 +480,7 @@ impl Selection {
         }
 
         if let Some(having_clause) = &self.having_clause {
-            let mut line = sub_f.line()?;
+            let mut line = f.line()?;
             line.write_str("HAVING ")?;
             having_clause.fmt(&mut line, context)?;
         }
@@ -467,7 +492,7 @@ impl Selection {
             };
             if !order_by_clause.is_empty() || offset_fetch_clause.is_some() {
                 {
-                    let mut line = sub_f.line()?;
+                    let mut line = f.line()?;
                     line.write_str("ORDER BY ")?;
                     if order_by_clause.is_empty() {
                         // TODO Проброс ошибок из генератора
@@ -486,7 +511,7 @@ impl Selection {
                     }
                 }
                 if let Some((count, offset)) = offset_fetch_clause {
-                    sub_f.write_line(format_args!("OFFSET {} ROWS FETCH NEXT {} ROWS ONLY", offset, count))?;
+                    f.write_line(format_args!("OFFSET {} ROWS FETCH NEXT {} ROWS ONLY", offset, count))?;
                 }
             }
         }

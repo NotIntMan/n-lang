@@ -1,5 +1,4 @@
 use helpers::{
-    Extractor,
     parse_index,
     Path,
     PathBuf,
@@ -938,12 +937,24 @@ impl Expression {
             }
         }
     }
-    pub fn get_property(&self, path: Path) -> Option<&Expression> {
+    pub fn get_property(&self, path: Path) -> Option<Expression> {
         match &self.body {
             ExpressionBody::PropertyAccess(expr, local_path) => {
                 let mut deeper_path = local_path.path.clone();
                 deeper_path.append(path);
-                expr.get_property(deeper_path.as_path())
+                if let Some(sub_expr) = expr.get_property(deeper_path.as_path()) {
+                    return Some(sub_expr);
+                }
+                if let Ok(data_type) = self.data_type.property_type(self.pos, path) {
+                    return Some(Expression {
+                        pos: self.pos,
+                        data_type,
+                        body: ExpressionBody::PropertyAccess(expr.clone(), ItemPath {
+                            pos: self.pos,
+                            path: deeper_path,
+                        }),
+                    });
+                }
             }
             ExpressionBody::Set(expressions) => {
                 let index = {
@@ -953,12 +964,22 @@ impl Expression {
                     parse_index(first)?
                 };
                 if expressions.len() > index {
-                    Some(&expressions[index])
-                } else {
-                    None
+                    return Some(expressions[index].clone());
                 }
             }
-            _ => None,
+            _ => {},
+        }
+        if let Ok(data_type) = self.data_type.property_type(self.pos, path) {
+            return Some(Expression {
+                pos: self.pos,
+                data_type,
+                body: ExpressionBody::PropertyAccess(box self.clone(), ItemPath {
+                    pos: self.pos,
+                    path: path.into(),
+                }),
+            });
+        } else {
+            None
         }
     }
     pub fn fmt_variable(
@@ -971,6 +992,68 @@ impl Expression {
         } else {
             write!(f, "@{}#", name)
         }
+    }
+    pub fn fmt_data_list(
+        f: &mut impl fmt::Write,
+        data_type: &DataType,
+        var_name: &str,
+        var_is_automatic: bool,
+        last_comma: bool,
+    ) -> Result<bool, fmt::Error> {
+        let primitives = data_type.primitives(PathBuf::new("#"));
+
+        let mut primitives = primitives.into_iter().peekable();
+        while let Some(primitive) = primitives.next() {
+            if var_is_automatic {
+                write!(f, "{}.", var_name)?;
+            } else {
+                write!(f, "@{}#", var_name)?;
+            }
+            write!(f, "{path} AS {path}", path = primitive.path.data)?;
+            if last_comma || primitives.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+        Ok(true)
+    }
+    pub fn fmt_variable_data(
+        f: &mut impl fmt::Write,
+        var: &FunctionVariable,
+    ) -> fmt::Result {
+        let data_type = var.data_type()
+            .expect("Variables cannot have unknown data-type at generate-time");
+
+        f.write_str("(SELECT ")?;
+
+        if let Some(sub_type) = data_type.as_array() {
+            // Если в переменной лежит таблица - нужно выбрать все записи
+            if !Expression::fmt_data_list(
+                f,
+                sub_type,
+                "t",
+                true,
+                false,
+            )? {
+                f.write_char('0')?;
+            }
+
+            if !var.is_automatic() {
+                write!(f, " FROM @{} as t", var.name())?;
+            }
+        } else {
+            // Если нет - одну запись той же структуры, что и переменная
+            if !Expression::fmt_data_list(
+                f,
+                data_type,
+                var.name(),
+                var.is_automatic(),
+                false,
+            )? {
+                f.write_char('0')?;
+            }
+        }
+
+        f.write_str(")")
     }
     pub fn fmt_property_access(
         f: &mut impl fmt::Write,
@@ -987,6 +1070,7 @@ impl Expression {
         if let Some(sub_expr) = expr.get_property(path) {
             return sub_expr.fmt(f, context)
         }
+        write!(f, "(SELECT ")?;
         write!(f, "(SELECT t#{} from", path_buf.data)?;
         expr.fmt(f, context)?;
         f.write_str(" as t)")
@@ -1000,47 +1084,7 @@ impl Expression {
             ExpressionBody::Literal(lit) => lit.fmt(f),
             ExpressionBody::Variable(var) => {
                 let var_guard = var.read();
-                let data_type = var_guard.data_type()
-                    .expect("Variables cannot have unknown data-type at generate-time");
-
-                f.write_str("(SELECT ")?;
-
-                if let Some(sub_type) = data_type.as_array() {
-                    // Если в переменной лежит таблица - нужно выбрать все записи
-                    context.primitives_buffer.clear();
-                    sub_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
-                    if context.primitives_buffer.is_empty() {
-                        f.write_char('0')?;
-                    } else {
-                        let mut primitives = Extractor::new(&mut context.primitives_buffer).peekable();
-                        while let Some(primitive) = primitives.next() {
-                            f.write_str(primitive.path.data.as_str())?;
-                            if primitives.peek().is_some() {
-                                f.write_str(", ")?;
-                            }
-                        }
-                        f.write_str(" FROM @")?;
-                        f.write_str(var_guard.name())?;
-                    }
-                } else {
-                    // Если нет - одну запись той же структуры, что и переменная
-                    context.primitives_buffer.clear();
-                    data_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
-                    if context.primitives_buffer.is_empty() {
-                        f.write_char('0')?;
-                    } else {
-                        let mut primitives = Extractor::new(&mut context.primitives_buffer).peekable();
-                        while let Some(primitive) = primitives.next() {
-                            Expression::fmt_variable(f, &*var_guard)?;
-                            write!(f, "{path} AS {path}", path = primitive.path.data)?;
-                            if primitives.peek().is_some() {
-                                f.write_str(", ")?;
-                            }
-                        }
-                    }
-                }
-
-                f.write_str(")")
+                Expression::fmt_variable_data(f, &*var_guard)
             }
             ExpressionBody::BinaryOperation(left, op, right) => {
                 f.write_str("( ")?;
@@ -1090,18 +1134,21 @@ impl Expression {
                 f.write_str(")")
             }
             ExpressionBody::FunctionCall(function, arguments) => {
-                write!(f, "[{}](", function.read().get_path().data)?;
-                let mut arguments = arguments.iter().peekable();
-                while let Some(argument) = arguments.next() {
-                    argument.fmt(f, context)?;
-                    if arguments.peek().is_some() {
-                        f.write_str(", ")?;
-                    }
-                }
-                f.write_str(")")
+//                write!(f, "[{}](", function.read().get_path().data)?;
+//                let mut arguments = arguments.iter().peekable();
+//                while let Some(argument) = arguments.next() {
+//                    argument.fmt(f, context)?;
+//                    if arguments.peek().is_some() {
+//                        f.write_str(", ")?;
+//                    }
+//                }
+//                f.write_str(")")
+                let var = context.add_pre_calc_call(function.clone(), arguments.clone());
+                let var_guard = var.read();
+                Expression::fmt_variable_data(f, &*var_guard)
             }
             ExpressionBody::StdFunctionCall(function, arguments) => {
-                write!(f, "[{}](", function.name)?;
+                write!(f, "{}(", function.name)?;
                 let mut arguments = arguments.iter().peekable();
                 while let Some(argument) = arguments.next() {
                     argument.fmt(f, context)?;

@@ -1,6 +1,5 @@
 use helpers::{
     BlockFormatter,
-    Extractor,
     Path,
     PathBuf,
     Resolve,
@@ -504,14 +503,13 @@ impl Statement {
                 let var_guard = target.var.read();
                 let data_type = var_guard.data_type()
                     .expect("Variable cannot have undefined data-type at generate-time");
-                context.primitives_buffer.clear();
                 if let Some(sub_type) = data_type.as_array() {
                     {
                         let mut line = f.line()?;
                         write!(line, "INSERT INTO @{} (", var_guard.name())?;
-                        context.primitives_buffer.clear();
-                        sub_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
-                        let mut primitives = Extractor::new(&mut context.primitives_buffer).peekable();
+//                        let mut select_wrapper = String::from("SELECT ");
+//
+                        let mut primitives = sub_type.primitives(PathBuf::new("#")).into_iter().peekable();
                         while let Some(primitive) = primitives.next() {
                             line.write_str(primitive.path.data.as_str())?;
                             if primitives.peek().is_some() {
@@ -520,6 +518,7 @@ impl Statement {
                         }
                         line.write_str(")")?;
                     }
+                    // TODO Обернуть выражение-источник выборкой для правильного порядка записи.
                     match source {
                         StatementSource::Expression(expr) => {
                             let mut sub_f = f.sub_block();

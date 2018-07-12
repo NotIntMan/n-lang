@@ -1,6 +1,5 @@
 use helpers::{
     BlockFormatter,
-    Extractor,
     Generate,
     NameUniquer,
     Path,
@@ -15,17 +14,20 @@ use language::{
     AttributeAST,
     DataType,
     DataTypeAST,
+    Expression,
     FieldPrimitive,
     find_attribute_ast,
     Statement,
     StatementAST,
     TableDefinition,
 };
+use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
 use project_analysis::{
     FunctionContext,
     FunctionVariable,
     FunctionVariableScope,
+    Item,
     Module,
     SemanticError,
     SemanticItemType,
@@ -64,6 +66,7 @@ pub struct FunctionDefinitionAST<'source> {
     pub arguments: Vec<(Identifier<'source>, DataTypeAST<'source>)>,
     pub result: Option<DataTypeAST<'source>>,
     pub body: FunctionBodyAST<'source>,
+    pub pos: ItemPosition,
 }
 
 impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for FunctionDefinitionAST<'source> {
@@ -137,6 +140,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
             body,
             context,
             is_lite_weight,
+            pos: self.pos,
         })
     }
 }
@@ -149,16 +153,18 @@ pub struct FunctionDefinition {
     pub body: FunctionBody,
     pub context: SyncRef<FunctionContext>,
     pub is_lite_weight: bool,
+    pub pos: ItemPosition,
 }
 
 impl FunctionDefinition {
     pub fn fmt_primitives_as_args(
         mut f: BlockFormatter<impl fmt::Write>,
+        primitives: Vec<FieldPrimitive>,
         context: &mut TSQLFunctionContext,
         last_comma: bool,
         is_output: bool,
     ) -> fmt::Result {
-        let mut arguments = Extractor::new(&mut context.primitives_buffer).peekable();
+        let mut arguments = primitives.into_iter().peekable();
         while let Some(primitive) = arguments.next() {
             let mut line = f.line()?;
             line.write(format_args!("@{} {}", primitive.path.data, TSQL(&primitive.field_type, context.parameters.clone())))?;
@@ -185,27 +191,28 @@ impl FunctionDefinition {
                 let new_name = context.names.add_name(argument_guard.name().into());
                 argument_guard.set_name(new_name);
                 prefix.push(argument_name.as_str());
-                context.primitives_buffer.clear();
-                argument_guard.data_type()
+                let primitives = argument_guard.data_type()
                     .expect("Function argument cannot have unknown data-type")
-                    .make_primitives(prefix, &mut context.primitives_buffer);
+                    .primitives(prefix);
                 FunctionDefinition::fmt_primitives_as_args(
                     sub_f.clone(),
+                    primitives,
                     context,
                     is_procedure || arguments.peek().is_some(),
                     false,
                 )?;
             }
         }
+        let table = if context.function.result.can_be_table() {
+            context.function.result.as_table_type(context.make_result_variable_prefix())
+        } else {
+            None
+        };
         if is_procedure {
-            context.primitives_buffer.clear();
-            if context.function.result.can_be_table()
-                && context.function.result.make_table_type(
-                context.make_result_variable_prefix(),
-                &mut context.primitives_buffer,
-            ) {
+            if let Some(primitives) = table {
                 FunctionDefinition::fmt_primitives_as_args(
                     sub_f,
+                    primitives,
                     context,
                     false,
                     true,
@@ -221,15 +228,11 @@ impl FunctionDefinition {
                 line.write(" OUTPUT")?;
             }
         } else {
-            context.primitives_buffer.clear();
-            if context.function.result.can_be_table()
-                && context.function.result.make_table_type(
-                PathBuf::new("#"),
-                &mut context.primitives_buffer,
-            ) {
+            if let Some(primitives) = table {
                 f.write_line(format_args!("RETURNS @{} TABLE", context.make_result_variable_name()))?;
                 FunctionDefinition::fmt_primitives_as_args(
                     sub_f,
+                    primitives,
                     context,
                     false,
                     false,
@@ -263,22 +266,19 @@ impl FunctionDefinition {
         // TODO Адекватный проброс ошибок наверх
         let data_type = var.data_type()
             .expect("Variable must have determined data-type in generate-time");
-        context.primitives_buffer.clear();
         if let DataType::Array(sub_type) = data_type {
-            sub_type.make_primitives(PathBuf::new("#"), &mut context.primitives_buffer);
             f.write_line(format_args!("DECLARE @{} TABLE (", var.name()))?;
             TableDefinition::fmt_primitives_as_columns(
                 f.sub_block(),
                 context.parameters.clone(),
-                Extractor::new(&mut context.primitives_buffer),
+                sub_type.primitives(PathBuf::new("#")),
                 false,
             )?;
             f.write_line(");")?;
         } else {
             let mut prefix = PathBuf::new("#");
             prefix.push(var.name());
-            data_type.make_primitives(prefix, &mut context.primitives_buffer);
-            for primitive in Extractor::new(&mut context.primitives_buffer) {
+            for primitive in data_type.primitives(prefix) {
                 f.write_line(format_args!("DECLARE @{} {};", primitive.path, TSQL(&primitive.field_type, context.parameters.clone())))?;
             }
         }
@@ -327,21 +327,25 @@ impl<'a> Generate<TSQLParameters<'a>> for FunctionDefinition {
 pub struct TSQLFunctionContext<'a, 'b> {
     pub function: &'a FunctionDefinition,
     pub parameters: TSQLParameters<'b>,
-    pub primitives_buffer: Vec<FieldPrimitive>,
     pub names: NameUniquer,
     pub function_name: Option<PathBuf>,
     pub result_variable_name: Option<String>,
+    // TODO Учесть пре-вызовы перед каждой вставкой выражения
+    pub temp_vars_scope: SyncRef<FunctionVariableScope>,
+    pub pre_calc_calls: Vec<(SyncRef<FunctionVariable>, SyncRef<Item>, Vec<Expression>)>,
 }
 
 impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
     pub fn new(function: &'a FunctionDefinition, parameters: TSQLParameters<'b>) -> Self {
+        let temp_vars_scope = function.context.root().child();
         Self {
             function,
             parameters,
-            primitives_buffer: Vec::new(),
             names: NameUniquer::new(),
             function_name: None,
             result_variable_name: None,
+            temp_vars_scope,
+            pre_calc_calls: Vec::new(),
         }
     }
     pub fn make_function_name<'x>(&'x mut self) -> Path<'x> {
@@ -368,5 +372,22 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
         let mut prefix = PathBuf::new("#");
         prefix.push(self.make_result_variable_name());
         prefix
+    }
+    pub fn add_pre_calc_call(&mut self, function: SyncRef<Item>, arguments: Vec<Expression>) -> SyncRef<FunctionVariable> {
+        let result_name = self.names.add_name("t".into());
+        let result_data_type = {
+            let function_guard = function.read();
+            let inner_function = function_guard.get_function()
+                .expect("Not-functions in function calls should not exist at generate-time");
+            inner_function.result.clone()
+        };
+        let var = self.temp_vars_scope.new_variable(
+            self.function.pos,
+            result_name,
+            Some(result_data_type),
+        )
+            .expect("Temp variable should not fail while initializing");
+        self.pre_calc_calls.push((var.clone(), function, arguments));
+        var
     }
 }

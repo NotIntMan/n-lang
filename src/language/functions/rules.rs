@@ -8,7 +8,9 @@ use parser_basics::{
     comma_list,
     identifier,
     Identifier,
+    item_position,
     keyword,
+    symbol_position,
     symbols,
 };
 use parser_basics::ParserResult;
@@ -42,12 +44,15 @@ parser_rule!(arguments(i) -> Vec<(Identifier<'source>, DataTypeAST<'source>)> {
 pub fn function_definition<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, FunctionDefinitionAST<'source>> {
     alt!(input,
         do_parse!(
+            begin: symbol_position >>
             apply!(keyword, "extern") >>
             apply!(keyword, "fn") >>
             name: identifier >>
             arguments: arguments >>
             result: opt!(type_of) >>
+            pos: apply!(item_position, begin) >>
             (FunctionDefinitionAST {
+                pos,
                 name,
                 arguments,
                 result,
@@ -55,12 +60,15 @@ pub fn function_definition<'token, 'source>(input: &'token [Token<'source>]) -> 
             })
         )
         | do_parse!(
+            begin: symbol_position >>
             apply!(keyword, "fn") >>
             name: identifier >>
             arguments: arguments >>
             result: opt!(type_of) >>
             body: block >>
+            pos: apply!(item_position, begin) >>
             (FunctionDefinitionAST {
+                pos,
                 name,
                 arguments,
                 result,
