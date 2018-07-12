@@ -334,9 +334,12 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
             }
         }
 
-        let result_data_type = DataType::Array(Arc::new(
-            SelectionExpression::type_of_expression_set(result.as_slice())
-        ));
+        let result_data_type = SelectionExpression::type_of_expression_set(result.as_slice());
+        let result_data_type = if is_aggregate_query && group_by_clause.is_none() {
+            result_data_type
+        } else {
+            DataType::Array(Arc::new(result_data_type))
+        };
 
         if errors.is_empty() {
             Ok(Selection {
