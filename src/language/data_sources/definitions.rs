@@ -261,9 +261,9 @@ impl DataSource {
             DataSource::Join { join_type, condition, left, right } => {
                 left.fmt(f.clone(), context)?;
                 let class = match join_type {
-                    JoinType::Cross => "cross join",
-                    JoinType::Left => "left join",
-                    JoinType::Right => "right join",
+                    JoinType::Cross => "CROSS JOIN",
+                    JoinType::Left => "LEFT JOIN",
+                    JoinType::Right => "RIGHT JOIN",
                     JoinType::Full => {
                         f.write_line("(")?;
                         let mut sub_f = f.sub_block();
@@ -289,7 +289,8 @@ impl DataSource {
                         return f.write_line(")");
                     }
                 };
-                f.write_line(class)?;
+                f.write_line(format_args!("{} ON <unimplemented condition>", class))?;
+                // TODO Отображения условия объединения
                 right.fmt(f, context)
             }
             DataSource::Selection { query, alias: _, var: _ } => query.fmt(f, context),
