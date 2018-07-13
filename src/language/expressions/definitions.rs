@@ -938,6 +938,9 @@ impl Expression {
         }
     }
     pub fn get_property(&self, path: Path) -> Option<Expression> {
+        if path.is_empty() {
+            return Some(self.clone());
+        }
         match &self.body {
             ExpressionBody::PropertyAccess(expr, local_path) => {
                 let mut deeper_path = local_path.path.clone();
