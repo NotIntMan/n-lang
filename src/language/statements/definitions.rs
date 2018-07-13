@@ -547,7 +547,57 @@ impl Statement {
                         }
                     }
                 } else {
-                    f.write_line("<unimplemented statement>")
+                    let as_primitive = if data_type == source.type_of() {
+                        data_type.as_primitive()
+                    } else {
+                        None
+                    };
+                    if as_primitive.is_some() {
+                        match source {
+                            StatementSource::Expression(expr) => {
+                                let mut line = f.line()?;
+                                write!(line, "SET @{} = ", var_guard.name())?;
+                                expr.fmt(&mut line, context)?;
+                                line.write_char(';')?;
+                            }
+                            StatementSource::Selection(query) => {
+                                f.write_line(format_args!("SET @{} = (", var_guard.name()))?;
+                                query.fmt(f.sub_block(), context)?;
+                                f.write_line(");")?;
+                            }
+                        }
+                        return Ok(());
+                    }
+                    f.write_line("SELECT")?;
+
+                    let mut primitives = data_type.primitives(PathBuf::new("#"))
+                        .into_iter()
+                        .peekable();
+
+                    let mut sub_f = f.sub_block();
+                    let mut sub_sub_f = sub_f.sub_block();
+
+                    while let Some(primitive) = primitives.next() {
+                        let mut line = sub_sub_f.line()?;
+                        write!(line, "@{var}#{path} = t.{path}", var = var_guard.name(), path = primitive.path)?;
+                        if primitives.peek().is_some() {
+                            line.write_char(',')?;
+                        }
+                    }
+
+                    sub_f.write_line("FROM (")?;
+
+                    match source {
+                        StatementSource::Expression(expr) => {
+                            let mut line = sub_sub_f.line()?;
+                            expr.fmt(&mut line, context)?;
+                        }
+                        StatementSource::Selection(query) => {
+                            query.fmt(sub_sub_f, context)?;
+                        }
+                    }
+
+                    sub_f.write_line(") as t;")
                 }
             }
             _ => f.write_line("<unimplemented statement>"),

@@ -42,4 +42,6 @@ fn wrong() {
     let a := select * from Users u;
     let b := select * from a join Users us;
     let c := 2 + 2 + 2;
+    let d := select max(a.u.person_info.age) from a;
+    let e := d.component0;
 }
