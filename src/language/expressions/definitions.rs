@@ -1075,6 +1075,22 @@ impl Expression {
         expr.fmt(f, context)?;
         f.write_str(" as t)")
     }
+    pub fn fmt_function_call(
+        f: &mut impl fmt::Write,
+        function: &SyncRef<Item>,
+        arguments: &[Expression],
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        write!(f, "[{}](", function.read().get_path().data)?;
+        let mut arguments = arguments.iter().peekable();
+        while let Some(argument) = arguments.next() {
+            argument.fmt(f, context)?;
+            if arguments.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+        f.write_str(")")
+    }
     pub fn fmt(
         &self,
         f: &mut impl fmt::Write,
@@ -1134,18 +1150,27 @@ impl Expression {
                 f.write_str(")")
             }
             ExpressionBody::FunctionCall(function, arguments) => {
-//                write!(f, "[{}](", function.read().get_path().data)?;
-//                let mut arguments = arguments.iter().peekable();
-//                while let Some(argument) = arguments.next() {
-//                    argument.fmt(f, context)?;
-//                    if arguments.peek().is_some() {
-//                        f.write_str(", ")?;
-//                    }
-//                }
-//                f.write_str(")")
-                let var = context.add_pre_calc_call(function.clone(), arguments.clone());
-                let var_guard = var.read();
-                Expression::fmt_variable_data(f, &*var_guard)
+                let is_primitive = {
+                    let function_guard = function.read();
+                    if let Some(function_def) = function_guard.get_function() {
+                        function_def.result.as_primitive()
+                            .is_some()
+                    } else {
+                        false
+                    }
+                };
+                if is_primitive {
+                    Expression::fmt_function_call(
+                        f,
+                        function,
+                        &arguments,
+                        context,
+                    )
+                } else {
+                    let var = context.add_pre_calc_call(function.clone(), arguments.clone());
+                    let var_guard = var.read();
+                    Expression::fmt_variable_data(f, &*var_guard)
+                }
             }
             ExpressionBody::StdFunctionCall(function, arguments) => {
                 write!(f, "{}(", function.name)?;

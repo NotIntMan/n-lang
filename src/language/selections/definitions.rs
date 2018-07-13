@@ -473,6 +473,19 @@ impl Selection {
         f.write_line("FROM")?;
         self.source.fmt(sub_f.clone(), context)?;
 
+        while let Some((var, function, arguments)) = context.extract_pre_calc_call() {
+            let mut line = sub_f.line()?;
+            line.write_str("OUTER APPLY ")?;
+            Expression::fmt_function_call(
+                &mut line,
+                &function,
+                &arguments,
+                context,
+            )?;
+            var.mark_as_automatic();
+            write!(line, " AS {}", var.read().name())?;
+        }
+
         if let Some(where_clause) = &self.where_clause {
             let mut line = f.line()?;
             line.write_str("WHERE ")?;

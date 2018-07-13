@@ -395,7 +395,11 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
             Some(result_data_type),
         )
             .expect("Temp variable should not fail while initializing");
+        var.make_read_only();
         self.pre_calc_calls.push((var.clone(), function, arguments));
         var
+    }
+    pub fn extract_pre_calc_call(&mut self) -> Option<(SyncRef<FunctionVariable>, SyncRef<Item>, Vec<Expression>)> {
+        self.pre_calc_calls.pop()
     }
 }
