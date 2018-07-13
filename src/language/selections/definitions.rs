@@ -134,7 +134,22 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionResultAST<'so
                 let scope_guard = scope.read();
                 let mut results = Vec::new();
                 let mut errors = Vec::new();
-                for var in scope_guard.variables() {
+                let parent;
+                let parent_guard;
+                let variables = {
+                    let parent_variables = match scope.parent() {
+                        Some(parent_ref) => {
+                            parent = parent_ref;
+                            parent_guard = parent.read();
+                            parent_guard.variables()
+                        }
+                        None => &[][..],
+                    };
+                    scope_guard.variables()
+                        .iter()
+                        .chain(parent_variables.iter())
+                };
+                for var in variables {
                     match var.data_type(*pos) {
                         Ok(data_type) => {
                             if errors.is_empty() {
@@ -418,12 +433,9 @@ impl Selection {
 
         let mut sub_f = f.sub_block();
 
-        for result_item in self.result.iter() {
+        for (i, result_item) in self.result.iter().enumerate() {
             let mut primitives = {
                 let mut prefix = PathBuf::new(".");
-                if let Some(alias) = &result_item.alias {
-                    prefix.push(&alias);
-                }
                 result_item.expr.data_type.primitives(prefix)
                     .into_iter()
                     .peekable()
@@ -441,6 +453,13 @@ impl Selection {
                     write!(line, "( SELECT t.{} FROM (", new_path)?;
                     result_item.expr.fmt(&mut line, context)?;
                     write!(line, ") as t )")?;
+                }
+
+                let mut new_path = new_path;
+                if let Some(alias) = result_item.can_be_named() {
+                    new_path.push_back(alias);
+                } else {
+                    new_path.push_back(format_args!("component{}", i));
                 }
 
                 write!(line, " AS {}", new_path)?;

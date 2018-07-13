@@ -39,5 +39,7 @@ fn old_all_users(increment: unsigned tiny integer) {
 }
 
 fn wrong() {
-    let a := select u from Users u;
+    let a := select * from Users u;
+    let b := select * from a join Users us;
+    let c := 2 + 2 + 2;
 }

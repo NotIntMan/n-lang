@@ -57,11 +57,19 @@ impl PathBuf {
         }
         self.data.push_str(component);
     }
-    pub fn push_fmt(&mut self, component: fmt::Arguments) -> fmt::Result {
+    pub fn push_fmt(&mut self, component: impl fmt::Display) -> fmt::Result {
+        self.data.reserve_exact(16 + self.delimiter.len());
         if !self.data.is_empty() {
             self.data.push_str(&self.delimiter);
         }
-        self.data.write_fmt(component)
+        self.data.write_fmt(format_args!("{}", component))
+    }
+    pub fn push_back(&mut self, component: impl ToString) {
+        self.data.reserve_exact(16 + self.delimiter.len());
+        if !self.data.is_empty() {
+            self.data.replace_range(0..0, &self.delimiter);
+        }
+        self.data.replace_range(0..0, &component.to_string());
     }
 }
 

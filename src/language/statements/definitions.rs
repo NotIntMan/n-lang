@@ -504,31 +504,46 @@ impl Statement {
                 let data_type = var_guard.data_type()
                     .expect("Variable cannot have undefined data-type at generate-time");
                 if let Some(sub_type) = data_type.as_array() {
-                    {
+                    let select_wrapper = {
                         let mut line = f.line()?;
                         write!(line, "INSERT INTO @{} (", var_guard.name())?;
-//                        let mut select_wrapper = String::from("SELECT ");
-//
+                        let mut select_wrapper = String::from("SELECT ");
+
                         let mut primitives = sub_type.primitives(PathBuf::new("#")).into_iter().peekable();
                         while let Some(primitive) = primitives.next() {
                             line.write_str(primitive.path.data.as_str())?;
+                            select_wrapper.write_str("t.")?;
+                            select_wrapper.write_str(primitive.path.data.as_str())?;
                             if primitives.peek().is_some() {
                                 line.write_str(", ")?;
+                                select_wrapper.write_str(", ")?;
                             }
                         }
                         line.write_str(")")?;
-                    }
+
+                        select_wrapper.write_str(" FROM (")?;
+                        select_wrapper
+                    };
+
+                    let mut source_f = f.sub_block();
                     // TODO Обернуть выражение-источник выборкой для правильного порядка записи.
                     match source {
                         StatementSource::Expression(expr) => {
-                            let mut sub_f = f.sub_block();
+                            source_f.write_line(select_wrapper)?;
+                            let mut sub_f = source_f.sub_block();
                             let mut line = sub_f.line()?;
                             expr.fmt(&mut line, context)?;
-                            line.write_str(";")
+                            source_f.write_line(") as t;")
                         }
                         StatementSource::Selection(query) => {
-                            query.fmt(f.sub_block(), context)?;
-                            f.write_line(";")
+                            if Some(&query.result_data_type) == var_guard.data_type() {
+                                query.fmt(source_f.sub_block(), context)?;
+                                source_f.write_line(";")
+                            } else {
+                                source_f.write_line(select_wrapper)?;
+                                query.fmt(source_f.sub_block(), context)?;
+                                source_f.write_line(") as t;")
+                            }
                         }
                     }
                 } else {
