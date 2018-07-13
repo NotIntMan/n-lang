@@ -64,7 +64,7 @@ impl PathBuf {
         }
         self.data.write_fmt(format_args!("{}", component))
     }
-    pub fn push_back(&mut self, component: impl ToString) {
+    pub fn push_front(&mut self, component: impl ToString) {
         self.data.reserve_exact(16 + self.delimiter.len());
         if !self.data.is_empty() {
             self.data.replace_range(0..0, &self.delimiter);

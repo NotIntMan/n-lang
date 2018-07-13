@@ -741,7 +741,7 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum DataType {
     Array(Arc<DataType>),
     Compound(CompoundDataType),
@@ -949,9 +949,14 @@ impl DataType {
         }
     }
     #[inline]
-    pub fn as_primitive(&self) -> Option<&PrimitiveDataType> {
+    pub fn as_primitive(&self) -> Option<PrimitiveDataType> {
         match self {
-            DataType::Primitive(x) => Some(x),
+            DataType::Primitive(x) => Some(x.clone()),
+            DataType::Reference(item) => {
+                let item_guard = item.read();
+                let references_data_type = item_guard.get_data_type()?;
+                references_data_type.body.as_primitive()
+            }
             _ => None,
         }
     }
@@ -999,6 +1004,37 @@ impl fmt::Display for DataType {
                 }
             }
             DataType::Void => write!(f, "!"),
+        }
+    }
+}
+
+impl PartialEq for DataType {
+    fn eq(&self, rhs: &DataType) -> bool {
+        if let DataType::Reference(item) = rhs {
+            let item_guard = item.read();
+            return match item_guard.get_data_type() {
+                Some(rhs) => *self == rhs.body,
+                None => false,
+            };
+        }
+        match self {
+            DataType::Array(lhs_sub_type) => if let DataType::Array(rhs_sub_type) = rhs {
+                *lhs_sub_type == *rhs_sub_type
+            } else { false }
+            DataType::Compound(lhs_compound) => if let DataType::Compound(rhs_compound) = rhs {
+                *lhs_compound == *rhs_compound
+            } else { false }
+            DataType::Primitive(lhs_primitive) => if let DataType::Primitive(rhs_primitive) = rhs {
+                *lhs_primitive == *rhs_primitive
+            } else { false }
+            DataType::Reference(item) => {
+                let item_guard = item.read();
+                match item_guard.get_data_type() {
+                    Some(lhs) => lhs.body == *rhs,
+                    None => false,
+                }
+            }
+            DataType::Void => if let DataType::Void = rhs { true } else { false }
         }
     }
 }

@@ -1,5 +1,7 @@
 use helpers::{
     BlockFormatter,
+    CodeFormatter,
+    Extractor,
     Generate,
     NameUniquer,
     Path,
@@ -221,7 +223,7 @@ impl FunctionDefinition {
                 let mut line = sub_f.line()?;
                 line.write(format_args!("@{} ", context.make_result_variable_name()))?;
                 if let Some(result) = context.function.result.as_primitive() {
-                    line.write(TSQL(result, context.parameters.clone()))?;
+                    line.write(TSQL(&result, context.parameters.clone()))?;
                 } else {
                     line.write("bit")?;
                 }
@@ -239,7 +241,7 @@ impl FunctionDefinition {
                 )?;
             } else {
                 if let Some(result) = context.function.result.as_primitive() {
-                    f.write_line(format_args!("RETURNS {}", TSQL(result, context.parameters.clone())))?;
+                    f.write_line(format_args!("RETURNS {}", TSQL(&result, context.parameters.clone())))?;
                 } else {
                     f.write_line("RETURNS bit")?;
                 }
@@ -304,6 +306,21 @@ impl FunctionDefinition {
             FunctionDefinition::fmt_variable(sub_f.clone(), context, &*variable_guard)?;
         }
 
+        {
+            let array;
+            let statements = if let Some(statements) = body.as_block() {
+                statements
+            } else {
+                array = [body.clone()];
+                &array[..]
+            };
+            Statement::fmt_block_without_parens(
+                sub_f.clone(),
+                context,
+                statements,
+            )?;
+        }
+
         if let Some(statements) = body.as_block() {
             for statement in statements {
                 statement.fmt(sub_f.clone(), context)?;
@@ -340,7 +357,7 @@ pub struct TSQLFunctionContext<'a, 'b> {
     pub result_variable_name: Option<String>,
     // TODO Учесть пре-вызовы перед каждой вставкой выражения
     pub temp_vars_scope: SyncRef<FunctionVariableScope>,
-    pub pre_calc_calls: Vec<(SyncRef<FunctionVariable>, SyncRef<Item>, Vec<Expression>)>,
+    pub pre_calc_calls: Vec<String>,
 }
 
 impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
@@ -381,7 +398,7 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
         prefix.push(self.make_result_variable_name());
         prefix
     }
-    pub fn add_pre_calc_call(&mut self, function: SyncRef<Item>, arguments: Vec<Expression>) -> SyncRef<FunctionVariable> {
+    pub fn add_pre_calc_call(&mut self, function: &SyncRef<Item>, arguments: &[Expression]) -> Result<SyncRef<FunctionVariable>, fmt::Error> {
         let result_name = self.names.add_name("t".into());
         let result_data_type = {
             let function_guard = function.read();
@@ -396,10 +413,30 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
         )
             .expect("Temp variable should not fail while initializing");
         var.make_read_only();
-        self.pre_calc_calls.push((var.clone(), function, arguments));
-        var
+        let mut buffer = String::new();
+        {
+            // FIXME Нет разложения на примитивы.
+            let mut code_formatter = CodeFormatter::new(&mut buffer);
+            code_formatter.indent_size = 4;
+            let f = code_formatter.root_block();
+            FunctionDefinition::fmt_variable(
+                f.clone(),
+                self,
+                &*var.read(),
+            )?;
+            Statement::fmt_pre_call(
+                f,
+                Some(&var),
+                function,
+                arguments,
+                self,
+            )?;
+        }
+        self.pre_calc_calls.push(buffer);
+        Ok(var)
     }
-    pub fn extract_pre_calc_call(&mut self) -> Option<(SyncRef<FunctionVariable>, SyncRef<Item>, Vec<Expression>)> {
-        self.pre_calc_calls.pop()
+    #[inline]
+    pub fn extract_pre_calc_calls(&mut self) -> Extractor<String> {
+        Extractor::new(&mut self.pre_calc_calls)
     }
 }

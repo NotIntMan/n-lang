@@ -159,8 +159,8 @@ impl Literal {
                 f.write_str(self.text.as_str()),
             LiteralType::KeywordLiteral(keyword) =>
                 f.write_str(match keyword {
-                    KeywordLiteralType::True => "true",
-                    KeywordLiteralType::False => "false",
+                    KeywordLiteralType::True => "1",
+                    KeywordLiteralType::False => "0",
                     KeywordLiteralType::Null => "null",
                 })
         }
@@ -1158,6 +1158,7 @@ impl Expression {
                     if let Some(function_def) = function_guard.get_function() {
                         function_def.result.as_primitive()
                             .is_some()
+                            && function_def.is_lite_weight
                     } else {
                         false
                     }
@@ -1170,7 +1171,7 @@ impl Expression {
                         context,
                     )
                 } else {
-                    let var = context.add_pre_calc_call(function.clone(), arguments.clone());
+                    let var = context.add_pre_calc_call(function, &arguments)?;
                     let var_guard = var.read();
                     Expression::fmt_variable_data(f, &*var_guard)
                 }

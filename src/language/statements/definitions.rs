@@ -1,5 +1,6 @@
 use helpers::{
     BlockFormatter,
+    CodeFormatter,
     Path,
     PathBuf,
     Resolve,
@@ -27,6 +28,7 @@ use parser_basics::Identifier;
 use project_analysis::{
     FunctionVariable,
     FunctionVariableScope,
+    Item,
     SemanticError,
     StatementFlowControlJumping,
     StatementFlowControlPosition,
@@ -493,6 +495,114 @@ impl Statement {
             _ => None,
         }
     }
+    pub fn fmt_pre_call(
+        mut f: BlockFormatter<impl fmt::Write>,
+        target: Option<&SyncRef<FunctionVariable>>,
+        function: &SyncRef<Item>,
+        arguments: &[Expression],
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let function_guard = function.read();
+        let function_def = function_guard.get_function()
+            .expect("item argument of Statement::fmt_pre_call is not a function!");
+        let mut sub_f = f.sub_block();
+        let mut sub_sub_f = sub_f.sub_block();
+        if function_def.is_lite_weight {
+            let var_guard = if let Some(target) = target {
+                target.read()
+            } else {
+                let mut line = sub_sub_f.line()?;
+                Expression::fmt_function_call(&mut line, function, arguments, context)?;
+                return line.write_char(';');
+            };
+            let var_data_type = var_guard.data_type()
+                .expect("Variables cannot have unknown data-type at generate-time");
+            f.write_line("SELECT")?;
+
+            let mut primitives = var_data_type.primitives(PathBuf::new("#"))
+                .into_iter()
+                .peekable();
+            while let Some(primitive) = primitives.next() {
+                let mut line = sub_sub_f.line()?;
+                write!(line, "@{var}#{path} = t.{path}", var = var_guard.name(), path = primitive.path)?;
+                if primitives.peek().is_some() {
+                    line.write_char(',')?;
+                }
+            }
+
+            sub_f.write_line("FROM (")?;
+
+            Expression::fmt_function_call(&mut sub_sub_f.line()?, function, arguments, context)?;
+
+            sub_f.write_line(") AS t;")?;
+        } else {
+            let var_guard = target.map(|var| var.read());
+
+            f.write_line(format_args!("EXECUTE [{}]", function_guard.get_path()))?;
+
+            let mut arguments = arguments.into_iter().peekable();
+            while let Some(argument) = arguments.next() {
+                let mut line = sub_f.line()?;
+                argument.fmt(&mut line, context)?;
+                if arguments.peek().is_some() {
+                    line.write_char(',')?;
+                } else {
+                    line.write_char(if var_guard.is_some() {
+                        ','
+                    } else {
+                        ';'
+                    })?;
+                }
+            }
+
+            if let Some(var_guard) = var_guard {
+                sub_f.write_line(format_args!("@{} OUTPUT;", var_guard.name()))?;
+            }
+        }
+        Ok(())
+    }
+    pub fn fmt_block_without_parens(
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        statements: &[Statement],
+    ) -> fmt::Result {
+        let mut buffer = String::new();
+        for statement in statements {
+            {
+                let mut buffer_f = {
+                    let mut formatter = CodeFormatter::new(&mut buffer);
+                    formatter.indent_size = 4;
+                    formatter.root_block()
+                };
+                statement.fmt(buffer_f, context)?;
+            }
+            for pre_call in context.extract_pre_calc_calls() {
+                for line in pre_call.lines() {
+                    println!("Writing pre-call's line: {}", line);
+                    f.write_line(line)?;
+                }
+            }
+            for line in buffer.lines() {
+                f.write_line(line)?;
+            }
+            buffer.clear();
+        }
+        Ok(())
+    }
+    pub fn fmt_block(
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        statements: &[Statement],
+    ) -> fmt::Result
+    {
+        f.write_line("BEGIN")?;
+        Statement::fmt_block_without_parens(
+            f.clone(),
+            context,
+            statements,
+        )?;
+        f.write_line("END")
+    }
     pub fn fmt(
         &self,
         mut f: BlockFormatter<impl fmt::Write>,
@@ -503,10 +613,14 @@ impl Statement {
                 let var_guard = target.var.read();
                 let data_type = var_guard.data_type()
                     .expect("Variable cannot have undefined data-type at generate-time");
+                let data_type = data_type.property_type(self.pos, target.property.as_path())
+                    .expect("Property path should be checked at semantic-check-time");
+                let mut var_path = target.property.as_path().into_new_buf("#");
+                var_path.push_front(var_guard.name());
                 if let Some(sub_type) = data_type.as_array() {
                     let select_wrapper = {
                         let mut line = f.line()?;
-                        write!(line, "INSERT INTO @{} (", var_guard.name())?;
+                        write!(line, "INSERT INTO @{} (", var_path)?;
                         let mut select_wrapper = String::from("SELECT ");
 
                         let mut primitives = sub_type.primitives(PathBuf::new("#")).into_iter().peekable();
@@ -546,21 +660,17 @@ impl Statement {
                         }
                     }
                 } else {
-                    let as_primitive = if data_type == source.type_of() {
-                        data_type.as_primitive()
-                    } else {
-                        None
-                    };
+                    let as_primitive = data_type.as_primitive();
                     if as_primitive.is_some() {
                         match source {
                             StatementSource::Expression(expr) => {
                                 let mut line = f.line()?;
-                                write!(line, "SET @{} = ", var_guard.name())?;
+                                write!(line, "SET @{} = ", var_path)?;
                                 expr.fmt(&mut line, context)?;
                                 line.write_char(';')?;
                             }
                             StatementSource::Selection(query) => {
-                                f.write_line(format_args!("SET @{} = (", var_guard.name()))?;
+                                f.write_line(format_args!("SET @{} = (", var_path))?;
                                 query.fmt(f.sub_block(), context)?;
                                 f.write_line(");")?;
                             }
@@ -578,7 +688,7 @@ impl Statement {
 
                     while let Some(primitive) = primitives.next() {
                         let mut line = sub_sub_f.line()?;
-                        write!(line, "@{var}#{path} = t.{path}", var = var_guard.name(), path = primitive.path)?;
+                        write!(line, "@{var}#{path} = t.{path}", var = var_path, path = primitive.path)?;
                         if primitives.peek().is_some() {
                             line.write_char(',')?;
                         }
@@ -596,22 +706,7 @@ impl Statement {
                         }
                     }
 
-                    sub_f.write_line(") as t")?;
-
-                    while let Some((var, function, arguments)) = context.extract_pre_calc_call() {
-                        let mut line = sub_f.line()?;
-                        line.write_str("OUTER APPLY ")?;
-                        Expression::fmt_function_call(
-                            &mut line,
-                            &function,
-                            &arguments,
-                            context,
-                        )?;
-                        var.mark_as_automatic();
-                        write!(line, " AS {}", var.read().name())?;
-                    }
-
-                    sub_f.write_line(";")
+                    sub_f.write_line(") as t;")
                 }
             }
             _ => f.write_line("<unimplemented statement>"),

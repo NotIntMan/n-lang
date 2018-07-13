@@ -38,10 +38,19 @@ fn old_all_users(increment: unsigned tiny integer) {
     update Users u set u.person_info.age = user_age(u) + 1;
 }
 
+fn sum(a: small integer, b: small integer): small integer {
+    return a + b;
+}
+
 fn wrong() {
     let a := select * from Users u;
     let b := select * from a join Users us;
     let c := 2 + 2 + 2;
     let d := select max(a.u.person_info.age) from a;
     let e := d.component0;
+    let f := sum(5, 10);
+    let info: PersonInfo;
+    info.age := 18;
+    info.sex.is_male := true;
+    let g := add_user(info);
 }
