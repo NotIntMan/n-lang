@@ -526,7 +526,6 @@ impl Statement {
                     };
 
                     let mut source_f = f.sub_block();
-                    // TODO Обернуть выражение-источник выборкой для правильного порядка записи.
                     match source {
                         StatementSource::Expression(expr) => {
                             source_f.write_line(select_wrapper)?;
