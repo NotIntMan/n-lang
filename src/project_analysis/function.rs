@@ -96,11 +96,11 @@ impl SyncRef<FunctionVariable> {
         self.write().make_read_only()
     }
     #[inline]
-    pub fn is_argument(&self) -> bool {
+    pub fn is_automatic(&self) -> bool {
         self.read().is_automatic()
     }
     #[inline]
-    pub fn mark_as_argument(&self) {
+    pub fn mark_as_automatic(&self) {
         self.write().mark_as_automatic()
     }
 }

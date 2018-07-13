@@ -75,6 +75,7 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                         if var.is_read_only() {
                             new_var.make_read_only();
                         }
+                        new_var.mark_as_automatic();
                         return Ok(DataSource::Variable { var });
                     }
                 }
@@ -215,12 +216,12 @@ impl DataSource {
         match self {
             DataSource::Variable { var } => {
                 let var_guard = var.read();
-                f.write_line(format_args!("@{}", var_guard.name()))
+                f.write_line(format_args!("@{name} AS {name}", name = var_guard.name()))
             }
             DataSource::Table { item, var } => {
                 let item_guard = item.read();
                 let var_guard = var.read();
-                f.write_line(format_args!("[{}] as {}", item_guard.get_path().data, var_guard.name()))
+                f.write_line(format_args!("[{}] AS {}", item_guard.get_path().data, var_guard.name()))
             }
             DataSource::Join { join_type, condition, left, right } => {
                 left.fmt(f.clone(), context)?;
