@@ -597,7 +597,22 @@ impl Statement {
                         }
                     }
 
-                    sub_f.write_line(") as t;")
+                    sub_f.write_line(") as t")?;
+
+                    while let Some((var, function, arguments)) = context.extract_pre_calc_call() {
+                        let mut line = sub_f.line()?;
+                        line.write_str("OUTER APPLY ")?;
+                        Expression::fmt_function_call(
+                            &mut line,
+                            &function,
+                            &arguments,
+                            context,
+                        )?;
+                        var.mark_as_automatic();
+                        write!(line, " AS {}", var.read().name())?;
+                    }
+
+                    sub_f.write_line(";")
                 }
             }
             _ => f.write_line("<unimplemented statement>"),
