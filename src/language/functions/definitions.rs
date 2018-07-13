@@ -294,7 +294,7 @@ impl FunctionDefinition {
         };
 
         f.write_line("BEGIN")?;
-        let sub_f = f.sub_block();
+        let mut sub_f = f.sub_block();
 
         for variable in context.function.context.get_all_variables() {
             if variable.is_automatic() { continue; }
@@ -309,7 +309,14 @@ impl FunctionDefinition {
                 statement.fmt(sub_f.clone(), context)?;
             }
         } else {
-            body.fmt(sub_f, context)?;
+            body.fmt(sub_f.clone(), context)?;
+        }
+
+        if context.function.result == DataType::Void {
+            if let Some(var_name) = &context.result_variable_name {
+                sub_f.write_line(format_args!("SET @{} = 0;", var_name))?;
+            }
+            sub_f.write_line("RETURN 0;")?;
         }
 
         f.write_line("END")
