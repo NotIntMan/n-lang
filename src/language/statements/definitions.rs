@@ -593,7 +593,7 @@ impl Statement {
         let mut buffer = String::new();
         for statement in statements {
             {
-                let mut buffer_f = {
+                let buffer_f = {
                     let mut formatter = CodeFormatter::new(&mut buffer);
                     formatter.indent_size = 4;
                     formatter.root_block()
@@ -602,7 +602,6 @@ impl Statement {
             }
             for pre_call in context.extract_pre_calc_calls() {
                 for line in pre_call.lines() {
-                    println!("Writing pre-call's line: {}", line);
                     f.write_line(line)?;
                 }
             }
@@ -633,6 +632,7 @@ impl Statement {
         context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
         match &self.body {
+            StatementBody::Nothing => Ok(()),
             StatementBody::VariableAssignment { target, source } => {
                 let var_guard = target.var.read();
                 let data_type = var_guard.data_type()
