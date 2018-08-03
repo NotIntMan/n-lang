@@ -321,14 +321,6 @@ impl FunctionDefinition {
             )?;
         }
 
-        if let Some(statements) = body.as_block() {
-            for statement in statements {
-                statement.fmt(sub_f.clone(), context)?;
-            }
-        } else {
-            body.fmt(sub_f.clone(), context)?;
-        }
-
         if context.function.result == DataType::Void {
             if let Some(var_name) = &context.result_variable_name {
                 sub_f.write_line(format_args!("SET @{} = 0;", var_name))?;

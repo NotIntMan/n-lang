@@ -621,7 +621,7 @@ impl Statement {
     {
         f.write_line("BEGIN")?;
         Statement::fmt_block_without_parens(
-            f.clone(),
+            f.sub_block(),
             context,
             statements,
         )?;
@@ -732,6 +732,9 @@ impl Statement {
 
                     sub_f.write_line(") as t;")
                 }
+            }
+            StatementBody::Block { statements } => {
+                Statement::fmt_block(f, context, statements)
             }
             _ => f.write_line("<unimplemented statement>"),
         }
