@@ -733,6 +733,19 @@ impl Statement {
                     sub_f.write_line(") as t;")
                 }
             }
+            StatementBody::Condition { condition, then_body, else_body } => {
+                {
+                    let mut cond_line = f.line()?;
+                    cond_line.write_str("IF ")?;
+                    condition.fmt(&mut cond_line, context)?;
+                }
+                then_body.fmt(f.sub_block(), context)?;
+                if let Some(else_body) = else_body {
+                    f.write_line("ELSE")?;
+                    else_body.fmt(f.sub_block(), context)?;
+                }
+                Ok(())
+            }
             StatementBody::Block { statements } => {
                 Statement::fmt_block(f, context, statements)
             }

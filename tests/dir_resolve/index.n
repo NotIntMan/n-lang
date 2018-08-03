@@ -38,6 +38,19 @@ fn old_all_users(increment: unsigned tiny integer) {
     update Users u set u.person_info.age = user_age(u) + 1;
 }
 
+fn user_info(user: Users::entity): PersonInfo {
+    return user.person_info;
+}
+
+fn max_of_ages(a: Users::entity, b: Users::entity): unsigned tiny integer {
+    let info_a := user_info(a);
+    if info_a.age > user_info(b).age {
+        return user_age(a);
+    } else {
+        return user_age(b);
+    }
+}
+
 fn sum(a: small integer, b: small integer): small integer {
     return a + b;
 }
