@@ -1039,6 +1039,15 @@ impl Expression {
         let data_type = var.data_type()
             .expect("Variables cannot have unknown data-type at generate-time");
 
+        if data_type.as_primitive().is_some() {
+            if var.is_automatic() {
+                write!(f, "{}", var.name())?;
+            } else {
+                write!(f, "@{}", var.name())?;
+            }
+            return Ok(());
+        }
+
         f.write_str("(SELECT ")?;
 
         if let Some(sub_type) = data_type.as_array() {
