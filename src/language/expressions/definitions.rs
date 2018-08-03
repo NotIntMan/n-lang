@@ -1097,12 +1097,32 @@ impl Expression {
         arguments: &[Expression],
         context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
+        let function_guard = function.read();
+        let function_def = function_guard.get_function()
+            .expect("item argument of Statement::fmt_pre_call is not a function!");
         write!(f, "[{}](", function.read().get_path().data)?;
-        let mut arguments = arguments.iter().peekable();
-        while let Some(argument) = arguments.next() {
-            argument.fmt(f, context)?;
-            if arguments.peek().is_some() {
-                f.write_str(", ")?;
+        let mut arguments = arguments.iter()
+            .enumerate()
+            .peekable();
+        while let Some((i, argument)) = arguments.next() {
+            let (_, argument_target) = function_def.arguments.get_index(i)
+                .expect("Arguments should not have different count at generate-time.");
+            let argument_target_guard = argument_target.read();
+            let argument_target_data_type = argument_target_guard.data_type()
+                .expect("Arguments cannot have unknown data-type at generate-time");
+
+            let mut primitives = argument_target_data_type.primitives(PathBuf::new("#"))
+                .into_iter()
+                .peekable();
+
+            while let Some(primitive) = primitives.next() {
+                match argument.get_property(primitive.path.as_path()) {
+                    Some(sub_expr) => sub_expr.fmt(f, context)?,
+                    None => argument.fmt(f, context)?,
+                }
+                if arguments.peek().is_some() || primitives.peek().is_some() {
+                    f.write_char(',')?;
+                }
             }
         }
         f.write_str(")")

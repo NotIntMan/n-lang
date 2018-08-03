@@ -540,23 +540,47 @@ impl Statement {
 
             f.write_line(format_args!("EXECUTE [{}]", function_guard.get_path()))?;
 
-            let mut arguments = arguments.into_iter().peekable();
-            while let Some(argument) = arguments.next() {
-                let mut line = sub_f.line()?;
-                argument.fmt(&mut line, context)?;
-                if arguments.peek().is_some() {
-                    line.write_char(',')?;
-                } else {
-                    line.write_char(if var_guard.is_some() {
-                        ','
+            let mut arguments = arguments.into_iter().enumerate().peekable();
+            while let Some((i, argument)) = arguments.next() {
+
+                let (_, argument_target) = function_def.arguments.get_index(i)
+                    .expect("Arguments should not have different count at generate-time.");
+                let argument_target_guard = argument_target.read();
+
+                let argument_target_data_type = argument_target_guard.data_type()
+                    .expect("Arguments cannot have unknown data-type at generate-time");
+
+                let mut primitives = argument_target_data_type.primitives(PathBuf::new("#"))
+                    .into_iter()
+                    .peekable();
+
+                while let Some(primitive) = primitives.next() {
+                    let mut line = sub_f.line()?;
+                    match argument.get_property(primitive.path.as_path()) {
+                        Some(sub_expr) => sub_expr.fmt(&mut line, context)?,
+                        None => argument.fmt(&mut line, context)?,
+                    }
+                    if var_guard.is_some() || arguments.peek().is_some() || primitives.peek().is_some() {
+                        line.write_char(',')?;
                     } else {
-                        ';'
-                    })?;
+                        line.write_char(';')?;
+                    }
                 }
             }
 
             if let Some(var_guard) = var_guard {
-                sub_f.write_line(format_args!("@{} OUTPUT;", var_guard.name()))?;
+                let mut primitives = function_def.result.primitives(PathBuf::new("#"))
+                    .into_iter()
+                    .peekable();
+                while let Some(primitive) = primitives.next() {
+                    let mut line = sub_f.line()?;
+                    write!(line, "@{}#{} OUTPUT", var_guard.name(), primitive.path)?;
+                    if primitives.peek().is_some() {
+                        line.write_char(',')?;
+                    } else {
+                        line.write_char(';')?;
+                    }
+                }
             }
         }
         Ok(())
