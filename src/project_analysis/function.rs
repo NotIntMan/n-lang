@@ -23,6 +23,7 @@ pub struct FunctionVariable {
     pos: ItemPosition,
     data_type: Option<DataType>,
     is_read_only: bool,
+    is_argument: bool,
     is_automatic: bool,
 }
 
@@ -34,6 +35,7 @@ impl FunctionVariable {
             pos,
             data_type,
             is_read_only: false,
+            is_argument: false,
             is_automatic: false,
         })
     }
@@ -59,6 +61,14 @@ impl FunctionVariable {
     #[inline]
     pub fn make_read_only(&mut self) {
         self.is_read_only = true
+    }
+    #[inline]
+    pub fn is_argument(&self) -> bool {
+        self.is_argument
+    }
+    #[inline]
+    pub fn mark_as_argument(&mut self) {
+        self.is_argument = true
     }
     #[inline]
     pub fn is_automatic(&self) -> bool {
@@ -94,6 +104,14 @@ impl SyncRef<FunctionVariable> {
     #[inline]
     pub fn make_read_only(&self) {
         self.write().make_read_only()
+    }
+    #[inline]
+    pub fn is_argument(&self) -> bool {
+        self.read().is_argument()
+    }
+    #[inline]
+    pub fn mark_as_argument(&self) {
+        self.write().mark_as_argument()
     }
     #[inline]
     pub fn is_automatic(&self) -> bool {

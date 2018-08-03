@@ -106,7 +106,7 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
                 }
             };
             var.make_read_only();
-            var.mark_as_automatic();
+            var.mark_as_argument();
             arguments.insert(name.to_string(), var);
         }
 
@@ -264,7 +264,7 @@ impl FunctionDefinition {
         context: &mut TSQLFunctionContext,
         var: &FunctionVariable,
     ) -> fmt::Result {
-        if var.is_automatic() { return Ok(()); }
+        if var.is_automatic() || var.is_argument() { return Ok(()); }
         // TODO Адекватный проброс ошибок наверх
         let data_type = var.data_type()
             .expect("Variable must have determined data-type in generate-time");
@@ -299,7 +299,7 @@ impl FunctionDefinition {
         let mut sub_f = f.sub_block();
 
         for variable in context.function.context.get_all_variables() {
-            if variable.is_automatic() { continue; }
+            if variable.is_automatic() || variable.is_argument() { continue; }
             let mut variable_guard = variable.write();
             let new_name = context.names.add_name(variable_guard.name().into());
             variable_guard.set_name(new_name);
