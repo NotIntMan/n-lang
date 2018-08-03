@@ -556,7 +556,7 @@ impl Statement {
 
                 while let Some(primitive) = primitives.next() {
                     let mut line = sub_f.line()?;
-                    match argument.get_property(primitive.path.as_path()) {
+                    match argument.get_property_or_wrap(primitive.path.as_path()) {
                         Some(sub_expr) => sub_expr.fmt(&mut line, context)?,
                         None => argument.fmt(&mut line, context)?,
                     }

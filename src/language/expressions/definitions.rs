@@ -958,6 +958,7 @@ impl Expression {
                         }),
                     });
                 }
+                return None;
             }
             ExpressionBody::Set(expressions) => {
                 let index = {
@@ -972,6 +973,12 @@ impl Expression {
             }
             _ => {},
         }
+        None
+    }
+    pub fn get_property_or_wrap(&self, path: Path) -> Option<Expression> {
+        if let Some(result) = self.get_property(path.clone()) {
+            return Some(result);
+        }
         if let Ok(data_type) = self.data_type.property_type(self.pos, path) {
             return Some(Expression {
                 pos: self.pos,
@@ -981,9 +988,8 @@ impl Expression {
                     path: path.into(),
                 }),
             });
-        } else {
-            None
         }
+        None
     }
     pub fn fmt_variable(
         f: &mut impl fmt::Write,
@@ -1125,7 +1131,7 @@ impl Expression {
                 .peekable();
 
             while let Some(primitive) = primitives.next() {
-                match argument.get_property(primitive.path.as_path()) {
+                match argument.get_property_or_wrap(primitive.path.as_path()) {
                     Some(sub_expr) => sub_expr.fmt(f, context)?,
                     None => argument.fmt(f, context)?,
                 }
