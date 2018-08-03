@@ -1003,7 +1003,20 @@ impl Expression {
         var_is_automatic: bool,
         last_comma: bool,
     ) -> Result<bool, fmt::Error> {
+        if data_type.as_primitive().is_some() {
+            if var_is_automatic {
+                write!(f, "{}", var_name)?;
+            } else {
+                write!(f, "@{}", var_name)?;
+            }
+            return Ok(true);
+        }
+
         let primitives = data_type.primitives(PathBuf::new("#"));
+
+        if primitives.is_empty() {
+            return Ok(false);
+        }
 
         let mut primitives = primitives.into_iter().peekable();
         while let Some(primitive) = primitives.next() {
