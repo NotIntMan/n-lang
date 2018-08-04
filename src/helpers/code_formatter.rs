@@ -74,6 +74,11 @@ impl<'a, T: 'a + Write> BlockFormatter<'a, T> {
         self.target.borrow_mut()
     }
     #[inline]
+    pub unsafe fn write(&mut self, v: impl Display) -> fmt::Result {
+        let mut f = self.target.borrow_mut();
+        f.write(v)
+    }
+    #[inline]
     pub fn write_line(&mut self, line: impl Display) -> fmt::Result {
         let mut f = self.target.borrow_mut();
         f.write_line(self.indent_level, line)
