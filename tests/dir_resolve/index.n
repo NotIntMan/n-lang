@@ -55,6 +55,28 @@ fn sum(a: small integer, b: small integer): small integer {
     return a + b;
 }
 
+fn fibo(n: small integer): small integer {
+    let a: small integer := 1;
+    let b: small integer := 1;
+    let i: small integer := 1;
+    while n > i {
+        i := i + 1;
+        let t := a;
+        a := b;
+        b := b + t;
+    };
+    do {
+        i := i + 1;
+        let t := a;
+        a := b;
+        b := b + t;
+    } while n > i;
+    loop {
+        i := i + 1;
+    };
+    return a;
+}
+
 fn wrong() {
     let a := select * from Users u;
     let b := select * from a join Users us;

@@ -585,30 +585,45 @@ impl Statement {
         }
         Ok(())
     }
-    pub fn fmt_block_without_parens(
+    pub fn fmt_something_with_pre_calls(
         mut f: BlockFormatter<impl fmt::Write>,
+        buffer: &mut String,
+        context: &mut TSQLFunctionContext,
+        action: impl Fn(BlockFormatter<String>, &mut TSQLFunctionContext) -> fmt::Result,
+    ) -> fmt::Result {
+        buffer.clear();
+        {
+            let buffer_f = {
+                let mut formatter = CodeFormatter::new(buffer);
+                formatter.indent_size = 4;
+                formatter.root_block()
+            };
+            action(buffer_f, context)?;
+        }
+        for pre_call in context.extract_pre_calc_calls() {
+            for line in pre_call.lines() {
+                f.write_line(line)?;
+            }
+        }
+        for line in buffer.lines() {
+            f.write_line(line)?;
+        }
+        buffer.clear();
+        Ok(())
+    }
+    pub fn fmt_block_without_parens(
+        f: BlockFormatter<impl fmt::Write>,
         context: &mut TSQLFunctionContext,
         statements: &[Statement],
     ) -> fmt::Result {
         let mut buffer = String::new();
         for statement in statements {
-            {
-                let buffer_f = {
-                    let mut formatter = CodeFormatter::new(&mut buffer);
-                    formatter.indent_size = 4;
-                    formatter.root_block()
-                };
-                statement.fmt(buffer_f, context)?;
-            }
-            for pre_call in context.extract_pre_calc_calls() {
-                for line in pre_call.lines() {
-                    f.write_line(line)?;
-                }
-            }
-            for line in buffer.lines() {
-                f.write_line(line)?;
-            }
-            buffer.clear();
+            Statement::fmt_something_with_pre_calls(
+                f.clone(),
+                &mut buffer,
+                context,
+                |buffer_f, context| statement.fmt(buffer_f, context)
+            )?;
         }
         Ok(())
     }
@@ -745,6 +760,46 @@ impl Statement {
                     else_body.fmt(f.sub_block(), context)?;
                 }
                 Ok(())
+            }
+            StatementBody::Cycle { cycle_type: CycleType::Simple, body } => {
+                f.write_line("WHILE TRUE")?;
+                body.fmt(f.sub_block(), context)
+            }
+            StatementBody::Cycle { cycle_type: CycleType::PrePredicated(predicate), body } => {
+                f.write_line("WHILE TRUE BEGIN")?;
+                let mut buffer = String::new();
+                let mut sub_f = f.sub_block();
+                Statement::fmt_something_with_pre_calls(
+                    sub_f.clone(),
+                    &mut buffer,
+                    context,
+                    |mut buffer_f, context| {
+                        let mut predicate_line = buffer_f.line()?;
+                        predicate_line.write_str("IF ")?;
+                        predicate.fmt(&mut predicate_line, context)
+                    }
+                )?;
+                body.fmt(sub_f.clone(), context)?;
+                sub_f.write_line("ELSE BREAK;")?;
+                f.write_line("END")
+            }
+            StatementBody::Cycle { cycle_type: CycleType::PostPredicated(predicate), body } => {
+                f.write_line("WHILE TRUE BEGIN")?;
+                let mut sub_f = f.sub_block();
+                body.fmt(sub_f.clone(), context)?;
+                let mut buffer = String::new();
+                Statement::fmt_something_with_pre_calls(
+                    sub_f.clone(),
+                    &mut buffer,
+                    context,
+                    |mut buffer_f, context| {
+                        let mut predicate_line = buffer_f.line()?;
+                        predicate_line.write_str("IF NOT ")?;
+                        predicate.fmt(&mut predicate_line, context)?;
+                        predicate_line.write_str(" BREAK;")
+                    }
+                )?;
+                f.write_line("END")
             }
             StatementBody::Block { statements } => {
                 Statement::fmt_block(f, context, statements)
