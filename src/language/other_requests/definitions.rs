@@ -126,13 +126,12 @@ impl UpdatingAssignment {
                 target_path.append(primitive.path.as_path());
 
                 write!(line, ".{} = ", target_path)?;
-                if let Some(sub_expr) = self.value.get_property_or_wrap(primitive.path.as_path()) {
-                    sub_expr.fmt(&mut line, context)?;
-                } else {
-                    write!(line, "( SELECT t.{} FROM (", primitive.path)?;
-                    self.value.fmt(&mut line, context)?;
-                    write!(line, ") as t )")?;
-                }
+                Expression::fmt_property_access(
+                    &mut line,
+                    &self.value,
+                    primitive.path.as_path(),
+                    context,
+                )?;
                 if last_comma || primitives.peek().is_some() {
                     line.write_char(',')?;
                 }
