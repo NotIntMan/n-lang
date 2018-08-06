@@ -407,7 +407,6 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
         var.make_read_only();
         let mut buffer = String::new();
         {
-            // FIXME Нет разложения на примитивы.
             let mut code_formatter = CodeFormatter::new(&mut buffer);
             code_formatter.indent_size = 4;
             let f = code_formatter.root_block();
