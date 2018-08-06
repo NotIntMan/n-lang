@@ -51,8 +51,6 @@ pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResul
     do_parse!(input,
         begin: symbol_position >>
         apply!(keyword, "update") >>
-        low_priority: opt!(apply!(keyword, "low_priority")) >>
-        ignore: opt!(apply!(keyword, "ignore")) >>
         source: data_source >>
         apply!(keyword, "set") >>
         assignments: apply!(comma_list, updating_assignment) >>
@@ -61,8 +59,6 @@ pub fn updating<'token, 'source>(input: &'token [Token<'source>]) -> ParserResul
         limit_clause: opt!(limit_clause) >>
         pos: apply!(item_position, begin) >>
         (UpdatingAST {
-            low_priority: low_priority.is_some(),
-            ignore: ignore.is_some(),
             source,
             assignments,
             where_clause,

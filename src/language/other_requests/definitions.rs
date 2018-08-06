@@ -95,8 +95,6 @@ impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignme
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UpdatingAST<'source> {
-    pub low_priority: bool,
-    pub ignore: bool,
     pub source: DataSourceAST<'source>,
     pub assignments: Vec<UpdatingAssignmentAST<'source>>,
     pub where_clause: Option<ExpressionAST<'source>>,
@@ -134,8 +132,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAST<'source> {
         };
 
         Ok(Updating {
-            low_priority: self.low_priority,
-            ignore: self.ignore,
             source,
             assignments,
             where_clause,
@@ -147,8 +143,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAST<'source> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Updating {
-    pub low_priority: bool,
-    pub ignore: bool,
     pub source: DataSource,
     pub assignments: Vec<UpdatingAssignment>,
     pub where_clause: Option<Expression>,
