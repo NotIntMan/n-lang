@@ -994,13 +994,21 @@ impl Expression {
     pub fn fmt_variable(
         f: &mut impl fmt::Write,
         var: &FunctionVariable,
+        access: bool,
     ) -> fmt::Result {
         let name = var.name();
         if var.is_automatic() {
-            write!(f, "{}.", name)
+            f.write_str(name)?;
+            if access {
+                f.write_char('.')?;
+            }
         } else {
-            write!(f, "@{}#", name)
+            write!(f, "@{}", name)?;
+            if access {
+                f.write_char('#')?;
+            }
         }
+        Ok(())
     }
     pub fn fmt_data_list(
         f: &mut impl fmt::Write,
@@ -1095,7 +1103,7 @@ impl Expression {
         let path_buf = path.into_new_buf("#");
         if let ExpressionBody::Variable(var) = &expr.body {
             let var_guard = var.read();
-            Expression::fmt_variable(f, &*var_guard)?;
+            Expression::fmt_variable(f, &*var_guard, !path_buf.is_empty())?;
             return f.write_str(&path_buf.data)
         }
         if let Some(sub_expr) = expr.get_property(path) {

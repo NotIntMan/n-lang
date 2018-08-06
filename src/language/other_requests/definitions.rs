@@ -367,11 +367,23 @@ impl<'source, 'a> Resolve<InsertSourceContext<'a>> for InsertingSourceAST<'sourc
                                         Ok(assignment)
                                     })
                             )?;
-                            Some(assignments)
+                            assignments
                         }
                         None => {
-                            query_result_type.should_cast_to(query.pos, &ctx.target.get_datatype_for_insert(query.pos)?)?;
-                            None
+                            let var = ctx.target.get_target_for_insert(query.pos)?;
+                            let target_data_type = var.data_type(query.pos)?;
+                            query_result_type.should_cast_to(query.pos, &target_data_type)?;
+                            let mut primitives_prefix = PathBuf::new(".");
+                            primitives_prefix.push(var.read().name());
+                            let properties: Result<_, _> = target_data_type.primitives(primitives_prefix)
+                                .into_iter()
+                                .map(|primitive| AssignmentTarget::new_in_scope(
+                                    ctx.scope,
+                                    query.pos,
+                                    primitive.path.as_path(),
+                                ))
+                                .collect();
+                            properties?
                         }
                     }
                 };
@@ -388,9 +400,117 @@ pub enum InsertingSource {
         lists: Vec<Vec<Expression>>,
     },
     Selection {
-        properties: Option<Vec<AssignmentTarget>>,
+        properties: Vec<AssignmentTarget>,
         query: Selection,
     },
+}
+
+impl InsertingSource {
+    pub fn fmt_target_list(
+        target: &[AssignmentTarget],
+        line: &mut impl fmt::Write,
+    ) -> fmt::Result {
+        line.write_char('(')?;
+
+        let mut properties = target.iter()
+            .peekable();
+        while let Some(property) = properties.next() {
+            let var_guard = property.var.read();
+            let mut primitives = var_guard.data_type()
+                .expect("Variable data-type should be known at generate time")
+                .property_type(ItemPosition::default(), property.property.as_path())
+                .expect("Property existing should be already checked at generate time.")
+                .primitives(property.property.as_path().into_new_buf("#"))
+                .into_iter()
+                .peekable();
+            while let Some(primitive) = primitives.next() {
+                if !var_guard.is_automatic() {
+                    line.write_char('@')?;
+                }
+                write!(line, "{}.{}", var_guard.name(), primitive.path)?;
+                if primitives.peek().is_some() || properties.peek().is_some() {
+                    line.write_str(", ")?;
+                }
+            }
+        }
+
+        line.write_char(')')
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let mut sub_f = f.sub_block();
+        match self {
+            InsertingSource::ValueLists { properties, lists } => {
+                InsertingSource::fmt_target_list(&properties, &mut f.line()?)?;
+                f.write_line("VALUES")?;
+                let mut lists_iter = lists.iter()
+                    .peekable();
+                while let Some(list) = lists_iter.next() {
+                    f.write_line("(")?;
+                    let mut expressions = list.iter()
+                        .enumerate()
+                        .peekable();
+                    while let Some((i, expression)) = expressions.next() {
+                        let property = &properties[i];
+                        let var_guard = property.var.read();
+                        let mut primitives = var_guard.data_type()
+                            .expect("Variable data-type should be known at generate time")
+                            .property_type(ItemPosition::default(), property.property.as_path())
+                            .expect("Property existing should be already checked at generate time.")
+                            .primitives(PathBuf::new("#"))
+                            .into_iter()
+                            .peekable();
+                        while let Some(primitive) = primitives.next() {
+                            let mut line = sub_f.line()?;
+                            Expression::fmt_property_access(
+                                &mut line,
+                                expression,
+                                primitive.path.as_path(),
+                                context,
+                            )?;
+                            if primitives.peek().is_some() || expressions.peek().is_some() {
+                                line.write_char(',')?;
+                            }
+                        }
+                    }
+                    if lists_iter.peek().is_some() {
+                        f.write_line("),")?;
+                    } else {
+                        f.write_line(")")?;
+                    }
+                }
+                Ok(())
+            }
+            InsertingSource::Selection { properties, query } => {
+                f.write_line("SELECT")?;
+                let mut properties_iter = properties.iter()
+                    .peekable();
+                while let Some(property) = properties_iter.next() {
+                    let var_guard = property.var.read();
+                    let mut primitives = var_guard.data_type()
+                        .expect("Variable data-type should be known at generate time")
+                        .property_type(ItemPosition::default(), property.property.as_path())
+                        .expect("Property existing should be already checked at generate time.")
+                        .primitives(property.property.as_path().into_new_buf("#"))
+                        .into_iter()
+                        .peekable();
+                    while let Some(primitive) = primitives.next() {
+                        let mut line = sub_f.line()?;
+                        write!(line, "t.{path} as {path}", path = primitive.path)?;
+                        if primitives.peek().is_some() || properties_iter.peek().is_some() {
+                            line.write_char(',')?;
+                        }
+                    }
+                }
+                f.write_line("FROM (")?;
+                query.fmt(sub_f, context)?;
+                f.write_line(") as t")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -430,6 +550,17 @@ impl Inserting {
     #[inline]
     pub fn is_lite_weight(&self) -> bool {
         self.target.is_local()
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        f.write_line("INSERT INTO")?;
+        let sub_f = f.sub_block();
+        self.target.fmt(sub_f.clone(), context)?;
+        self.source.fmt(sub_f, context)?;
+        f.write_line(";")
     }
 }
 

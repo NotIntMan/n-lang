@@ -171,10 +171,10 @@ impl DataSource {
             DataSource::Selection { query: _, alias: _, var: _ } => false,
         }
     }
-    pub fn get_datatype_for_insert(&self, pos: ItemPosition) -> Result<DataType, SemanticError> {
+    pub fn get_target_for_insert(&self, pos: ItemPosition) -> Result<SyncRef<FunctionVariable>, SemanticError> {
         match self {
-            DataSource::Variable { var } => var.data_type(pos),
-            DataSource::Table { item: _, var } => var.data_type(pos),
+            DataSource::Variable { var } => Ok(var.clone()),
+            DataSource::Table { item: _, var } => Ok(var.clone()),
             DataSource::Join { join_type: _, condition: _, left: _, right: _ } =>
                 return Err(SemanticError::not_allowed_inside(pos, "insertion", "JOIN of data sources")),
             DataSource::Selection { query: _, alias: _, var: _ } =>
