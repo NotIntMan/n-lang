@@ -414,7 +414,6 @@ pub enum InsertingSource {
 pub struct InsertingAST<'source> {
     pub target: DataSourceAST<'source>,
     pub source: InsertingSourceAST<'source>,
-    pub on_duplicate_key_update: Option<Vec<UpdatingAssignmentAST<'source>>>,
 }
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> {
@@ -422,30 +421,18 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> 
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
         let target = self.target.resolve(scope)?;
-        let mut errors = Vec::new();
 
         let source = {
             let ctx = InsertSourceContext {
                 scope,
                 target: &target,
             };
-            self.source.accumulative_resolve(&ctx, &mut errors)
-        };
-        let on_duplicate_key_update = self.on_duplicate_key_update.accumulative_resolve(scope, &mut errors);
-
-        let source = match source {
-            Some(x) => x,
-            None => return Err(errors)
-        };
-        let on_duplicate_key_update = match on_duplicate_key_update {
-            Some(x) => x,
-            None => return Err(errors)
+            self.source.resolve(&ctx)?
         };
 
         Ok(Inserting {
             target,
             source,
-            on_duplicate_key_update,
         })
     }
 }
@@ -454,7 +441,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> 
 pub struct Inserting {
     pub target: DataSource,
     pub source: InsertingSource,
-    pub on_duplicate_key_update: Option<Vec<UpdatingAssignment>>,
 }
 
 impl Inserting {

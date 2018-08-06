@@ -114,16 +114,16 @@ parser_rule!(inserting_source(i) -> InsertingSourceAST<'source> {
     )
 });
 
-parser_rule!(inserting_on_duplicate_key_update(i) -> Vec<UpdatingAssignmentAST<'source>> {
-    do_parse!(i,
-        apply!(keyword, "on") >>
-        apply!(keyword, "duplicate") >>
-        apply!(keyword, "key") >>
-        apply!(keyword, "update") >>
-        assignments: apply!(comma_list, updating_assignment) >>
-        (assignments)
-    )
-});
+//parser_rule!(inserting_on_duplicate_key_update(i) -> Vec<UpdatingAssignmentAST<'source>> {
+//    do_parse!(i,
+//        apply!(keyword, "on") >>
+//        apply!(keyword, "duplicate") >>
+//        apply!(keyword, "key") >>
+//        apply!(keyword, "update") >>
+//        assignments: apply!(comma_list, updating_assignment) >>
+//        (assignments)
+//    )
+//});
 
 /// Выполняет разбор запроса записи
 pub fn inserting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResult<'token, 'source, InsertingAST<'source>> {
@@ -132,11 +132,9 @@ pub fn inserting<'token, 'source>(input: &'token [Token<'source>]) -> ParserResu
         apply!(keyword, "into") >>
         target: data_source >>
         source: inserting_source >>
-        on_duplicate_key_update: opt!(inserting_on_duplicate_key_update) >>
         (InsertingAST {
             target,
             source,
-            on_duplicate_key_update,
         })
     )
 }
