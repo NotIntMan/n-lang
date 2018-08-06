@@ -20,7 +20,6 @@ use project_analysis::{
     Module,
 };
 use std::{
-    collections::HashMap,
     fmt::{
         self,
         Write,
@@ -34,7 +33,7 @@ pub struct DataClass {
 }
 
 impl DataClass {
-    pub fn for_data_type(path: PathBuf, reflection_target: &DataType, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) {
+    pub fn for_data_type(path: PathBuf, reflection_target: &DataType, data_classes: &mut Map<PathBuf, Option<DataClass>>) {
         if data_classes.contains_key(&path) { return; }
         data_classes.insert(path.clone(), None);
         match reflection_target {
@@ -71,7 +70,7 @@ impl DataClass {
             _ => {}
         }
     }
-    pub fn for_item(item: &Item, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) {
+    pub fn for_item(item: &Item, data_classes: &mut Map<PathBuf, Option<DataClass>>) {
         match item.body() {
             ItemBody::DataType { def } => {
                 DataClass::for_data_type(item.get_path(), &def.body, data_classes);
@@ -84,7 +83,7 @@ impl DataClass {
         }
     }
     #[inline]
-    pub fn for_shared_item(item: &SyncRef<Item>, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) {
+    pub fn for_shared_item(item: &SyncRef<Item>, data_classes: &mut Map<PathBuf, Option<DataClass>>) {
         let item = item.read();
         DataClass::for_item(&*item, data_classes);
     }
@@ -97,7 +96,7 @@ pub struct RPCModule {
 }
 
 impl RPCModule {
-    pub fn new(source: &Module, data_classes: &mut HashMap<PathBuf, Option<DataClass>>) -> Self {
+    pub fn new(source: &Module, data_classes: &mut Map<PathBuf, Option<DataClass>>) -> Self {
         let module_path = source.path().read();
         let mut result = Self {
             path: module_path.clone(),
@@ -123,20 +122,21 @@ impl RPCModule {
                 result.functions.push(function);
             }
         }
+        result.functions.sort_by(|a, b| a.name.cmp(&b.name));
         result
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RPCProject {
-    rpc_modules: HashMap<PathBuf, RPCModule>,
-    data_classes: HashMap<PathBuf, DataClass>,
+    rpc_modules: Map<PathBuf, RPCModule>,
+    data_classes: Map<PathBuf, DataClass>,
 }
 
 impl RPCProject {
     pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
-        let mut data_classes = HashMap::new();
-        let mut rpc_modules = HashMap::new();
+        let mut data_classes = Map::new();
+        let mut rpc_modules = Map::new();
 
         for (module_path, module) in project.iter() {
             let module_guard = module.read();
@@ -150,11 +150,15 @@ impl RPCProject {
                 RPCModule::new(&*module_guard, &mut data_classes),
             );
         }
-        let data_classes = data_classes.into_iter()
+        let mut data_classes: Map<_, _> = data_classes.into_iter()
             .filter_map(|(path, data_class)|
                 data_class.map(move |inner_data_class| (path, inner_data_class))
             )
-            .collect::<HashMap<_, _>>();
+            .collect();
+
+        data_classes.sort();
+        rpc_modules.sort();
+
         Self {
             data_classes,
             rpc_modules,
@@ -193,6 +197,8 @@ impl DatabaseModule {
                 continue;
             }
         }
+        result.tables.sort_by(|a, b| a.name.cmp(&b.name));
+        result.functions.sort_by(|a, b| a.name.cmp(&b.name));
         result
     }
     pub fn generate_tables(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
@@ -216,18 +222,19 @@ impl DatabaseModule {
 
 #[derive(Debug, Clone)]
 pub struct DatabaseProject {
-    modules: HashMap<PathBuf, DatabaseModule>,
+    modules: Map<PathBuf, DatabaseModule>,
 }
 
 impl DatabaseProject {
     pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
-        let mut modules = HashMap::new();
+        let mut modules = Map::new();
         for (module_path, module) in project.iter() {
             modules.insert(
                 module_path.read().clone(),
                 DatabaseModule::new(module),
             );
         }
+        modules.sort();
         Self {
             modules,
         }

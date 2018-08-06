@@ -45,7 +45,7 @@ impl<K: Eq, V> Map<K, V> {
         }
         None
     }
-    pub fn has(&self, k: &impl PartialEq<K>) -> bool {
+    pub fn contains_key(&self, k: &impl PartialEq<K>) -> bool {
         self.get(k).is_some()
     }
     pub fn insert(&mut self, k: impl Into<K> + PartialEq<K>, value: impl Into<V>) -> Option<V> {
@@ -55,6 +55,11 @@ impl<K: Eq, V> Map<K, V> {
         }
         self.pairs.push((k.into(), value));
         None
+    }
+    pub fn sort<'s>(&'s mut self)
+        where K: Ord
+    {
+        self.pairs.sort_by(|(a_k, _), (b_k, _)| a_k.cmp(b_k))
     }
 }
 

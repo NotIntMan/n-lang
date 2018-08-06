@@ -109,8 +109,7 @@ fn resolve_directory(stdlib: StdLib, directory: &str) -> Result<IndexMap<SyncRef
     project.resolve(&source)
 }
 
-#[test]
-fn dir_resolve() {
+fn resolve_project() -> (DatabaseProject, RPCProject) {
     let project = match resolve_directory(get_test_stdlib(), "dir_resolve") {
         Ok(project) => project,
         Err(errors) => {
@@ -121,11 +120,37 @@ fn dir_resolve() {
             panic!("Resolved some errors");
         }
     };
-    let db = DatabaseProject::new(&project);
-    let _rpc = RPCProject::new(&project);
+    (
+        DatabaseProject::new(&project),
+        RPCProject::new(&project),
+    )
+}
+
+#[test]
+fn dir_resolve() {
+    let (db, _rpc) = resolve_project();
 
     let db_code = db.generate_string()
         .expect("Cannot generate output for database");
 
     println!("{}", db_code);
+}
+
+#[test]
+fn item_order_should_always_be_the_same() {
+    let db_code = {
+        let (db, _rpc) = resolve_project();
+        let db_code = db.generate_string()
+            .expect("Cannot generate output for database");
+        db_code
+    };
+
+    for _ in 0..100 {
+        let (db, _rpc) = resolve_project();
+        assert_eq!(
+            db_code,
+            db.generate_string()
+                .expect("Cannot generate output for database")
+        );
+    }
 }

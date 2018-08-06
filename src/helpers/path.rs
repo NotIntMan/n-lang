@@ -112,6 +112,23 @@ impl<'a> cmp::PartialEq<PathBuf> for Path<'a> {
     }
 }
 
+impl cmp::PartialOrd for PathBuf {
+    fn partial_cmp(&self, other: &PathBuf) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl cmp::Ord for PathBuf {
+    fn cmp(&self, other: &PathBuf) -> cmp::Ordering {
+        match self.data.cmp(&other.data) {
+            cmp::Ordering::Equal => {
+                self.delimiter.cmp(&other.delimiter)
+            }
+            o => o,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, Hash)]
 pub struct Path<'a> {
     pub data: &'a str,
@@ -246,6 +263,23 @@ impl<'a> cmp::PartialEq<[&'a str]> for Path<'a> {
 impl<'a> Into<PathBuf> for Path<'a> {
     fn into(self) -> PathBuf {
         self.into_buf()
+    }
+}
+
+impl<'a> cmp::PartialOrd for Path<'a> {
+    fn partial_cmp(&self, other: &Path<'a>) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> cmp::Ord for Path<'a> {
+    fn cmp(&self, other: &Path<'a>) -> cmp::Ordering {
+        match self.data.cmp(&other.data) {
+            cmp::Ordering::Equal => {
+                self.delimiter.cmp(&other.delimiter)
+            }
+            o => o,
+        }
     }
 }
 
