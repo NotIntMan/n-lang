@@ -71,6 +71,10 @@ impl PathBuf {
         }
         self.data.replace_range(0..0, &component.to_string());
     }
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.as_path().is_empty()
+    }
 }
 
 impl fmt::Debug for PathBuf {

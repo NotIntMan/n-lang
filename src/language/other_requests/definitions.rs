@@ -1,7 +1,9 @@
 use helpers::{
     accumulative_result_collect,
     Assertion,
+    BlockFormatter,
     deep_result_collect,
+    PathBuf,
     Resolve,
     SyncRef,
 };
@@ -17,12 +19,18 @@ use language::{
     SelectionAST,
     SelectionSortingItem,
     SelectionSortingItemAST,
+    SelectionSortingOrder,
+    TSQLFunctionContext,
 };
 use lexeme_scanner::ItemPosition;
 use project_analysis::{
     FunctionVariableScope,
     InsertSourceContext,
     SemanticError,
+};
+use std::fmt::{
+    self,
+    Write,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,6 +81,65 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAssignmentAST<
 pub struct UpdatingAssignment {
     pub target: AssignmentTarget,
     pub value: Expression,
+}
+
+impl UpdatingAssignment {
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        last_comma: bool,
+    ) -> fmt::Result {
+        let var_guard = self.target.var.read();
+        let var_data_type = var_guard.data_type()
+            .expect("Variable cannot have unknown data-type at generate time.")
+            .property_type(self.target.pos, self.target.property.as_path())
+            .expect("Property existing should be already checked at generate time.");
+
+        if var_data_type.as_primitive().is_some() {
+            let mut line = f.line()?;
+            if !var_guard.is_automatic() {
+                line.write_char('@')?;
+            }
+            line.write_str(var_guard.name())?;
+            if !self.target.property.is_empty() {
+                write!(line, ".{}", self.target.property.as_path().into_new_buf("#"))?;
+            }
+            line.write_str(" = ")?;
+            self.value.fmt(&mut line, context)?;
+            if last_comma {
+                line.write_char(',')?;
+            }
+        } else {
+            let mut primitives = var_data_type.primitives(PathBuf::new("#"))
+                .into_iter()
+                .peekable();
+
+            while let Some(primitive) = primitives.next() {
+                let mut line = f.line()?;
+                if !var_guard.is_automatic() {
+                    line.write_char('@')?;
+                }
+                line.write_str(var_guard.name())?;
+
+                let mut target_path = self.target.property.as_path().into_new_buf("#");
+                target_path.append(primitive.path.as_path());
+
+                write!(line, ".{} = ", target_path)?;
+                if let Some(sub_expr) = self.value.get_property_or_wrap(primitive.path.as_path()) {
+                    sub_expr.fmt(&mut line, context)?;
+                } else {
+                    write!(line, "( SELECT t.{} FROM (", primitive.path)?;
+                    self.value.fmt(&mut line, context)?;
+                    write!(line, ") as t )")?;
+                }
+                if last_comma || primitives.peek().is_some() {
+                    line.write_char(',')?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignmentAST<'source> {
@@ -154,6 +221,52 @@ impl Updating {
     #[inline]
     pub fn is_lite_weight(&self) -> bool {
         self.source.is_local()
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        f.write_line("UPDATE")?;
+        let mut sub_f = f.sub_block();
+        let sub_sub_f = sub_f.sub_block();
+        if let Some(limit) = &self.limit_clause {
+            sub_f.write_line(format_args!("TOP({})", limit))?;
+        }
+        self.source.fmt(sub_sub_f.clone(), context)?;
+        sub_f.write_line("SET")?;
+        {
+            let mut assignments = self.assignments.iter()
+                .peekable();
+            while let Some(assignment) = assignments.next() {
+                assignment.fmt(
+                    sub_sub_f.clone(),
+                    context,
+                    assignments.peek().is_some(),
+                )?;
+            }
+        }
+        if let Some(where_clause) = &self.where_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("WHERE ")?;
+            where_clause.fmt(&mut line, context)?;
+        }
+        if let Some(order_by_clause) = &self.order_by_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("ORDER BY ")?;
+            let mut items = order_by_clause.iter().peekable();
+            while let Some(expr) = items.next() {
+                expr.expr.fmt(&mut line, context)?;
+                line.write_str(match &expr.order {
+                    SelectionSortingOrder::Asc => " ASC",
+                    SelectionSortingOrder::Desc => " DESC",
+                })?;
+                if items.peek().is_some() {
+                    line.write_str(", ")?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
