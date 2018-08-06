@@ -716,10 +716,10 @@ impl Expression {
                     .into_err_vec(),
             };
 
-            if scope.is_lite_weight() && !function.is_lite_weight {
+            if scope.is_lite_weight() && function.result.as_primitive().is_none() {
                 return SemanticError::not_allowed_here(
                     pos,
-                    "not lite-weight functions",
+                    "non-primitive function call",
                 )
                     .into_err_vec();
             }

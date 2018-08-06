@@ -35,7 +35,7 @@ fn new_person_info(age: unsigned tiny integer): PersonInfo {
 }
 
 fn old_all_users(increment: unsigned tiny integer) {
-    update Users u set u.person_info = new_person_info(user_age(u) + 1);
+    update Users u set u.person_info.age = user_age(u) + 1;
 }
 
 fn user_info(user: Users::entity): PersonInfo {
