@@ -281,9 +281,6 @@ pub enum InsertingSourceASTBody<'source> {
         properties: Option<Vec<ItemPath>>,
         lists: Vec<ValueList<'source>>,
     },
-    AssignmentList {
-        assignments: Vec<UpdatingAssignmentAST<'source>>,
-    },
     Selection {
         properties: Option<Vec<ItemPath>>,
         query: SelectionAST<'source>,
@@ -344,17 +341,6 @@ impl<'source, 'a> Resolve<InsertSourceContext<'a>> for InsertingSourceAST<'sourc
                     lists,
                 })
             }
-            InsertingSourceASTBody::AssignmentList { assignments } => {
-                let assignments = accumulative_result_collect(assignments.iter().map(|assignment_ast| {
-                    let assignment = assignment_ast.resolve(ctx.scope)?;
-                    if !ctx.target.is_target_belongs_to_source(&assignment.target) {
-                        return SemanticError::not_allowed_inside(assignment_ast.pos, "assignment not belonging to the target data source", "INSERT query")
-                            .into_err_vec();
-                    }
-                    Ok(assignment)
-                }))?;
-                Ok(InsertingSource::AssignmentList { assignments })
-            }
             InsertingSourceASTBody::Selection { properties, query } => {
                 let query = query.resolve(ctx.scope)?;
                 let properties = {
@@ -400,9 +386,6 @@ pub enum InsertingSource {
     ValueLists {
         properties: Vec<AssignmentTarget>,
         lists: Vec<Vec<Expression>>,
-    },
-    AssignmentList {
-        assignments: Vec<UpdatingAssignment>,
     },
     Selection {
         properties: Option<Vec<AssignmentTarget>>,

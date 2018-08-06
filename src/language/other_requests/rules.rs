@@ -99,11 +99,6 @@ parser_rule!(inserting_source(i) -> InsertingSourceAST<'source> {
                 (InsertingSourceASTBody::ValueLists { properties, lists })
             )
             | do_parse!(
-                apply!(keyword, "set") >>
-                assignments: apply!(comma_list, updating_assignment) >>
-                (InsertingSourceASTBody::AssignmentList { assignments })
-            )
-            | do_parse!(
                 properties: opt!(property_list) >>
                 query: selection >>
                 (InsertingSourceASTBody::Selection { properties, query })
