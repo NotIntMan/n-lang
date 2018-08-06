@@ -270,14 +270,6 @@ impl Updating {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InsertingPriority {
-    Usual,
-    Low,
-    Delayed,
-    High,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct ValueList<'source> {
     pub values: Vec<ExpressionAST<'source>>,
@@ -421,8 +413,6 @@ pub enum InsertingSource {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct InsertingAST<'source> {
-    pub priority: InsertingPriority,
-    pub ignore: bool,
     pub target: DataSourceAST<'source>,
     pub source: InsertingSourceAST<'source>,
     pub on_duplicate_key_update: Option<Vec<UpdatingAssignmentAST<'source>>>,
@@ -454,8 +444,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> 
         };
 
         Ok(Inserting {
-            priority: self.priority,
-            ignore: self.ignore,
             target,
             source,
             on_duplicate_key_update,
@@ -465,8 +453,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> 
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Inserting {
-    pub priority: InsertingPriority,
-    pub ignore: bool,
     pub target: DataSource,
     pub source: InsertingSource,
     pub on_duplicate_key_update: Option<Vec<UpdatingAssignment>>,
@@ -481,9 +467,6 @@ impl Inserting {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeletingAST<'source> {
-    pub low_priority: bool,
-    pub quick: bool,
-    pub ignore: bool,
     pub source: DataSourceAST<'source>,
     pub where_clause: Option<ExpressionAST<'source>>,
     pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
@@ -510,9 +493,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DeletingAST<'source> {
         };
 
         Ok(Deleting {
-            low_priority: self.low_priority,
-            quick: self.quick,
-            ignore: self.ignore,
             source,
             where_clause,
             order_by_clause,
@@ -523,9 +503,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DeletingAST<'source> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Deleting {
-    pub low_priority: bool,
-    pub quick: bool,
-    pub ignore: bool,
     pub source: DataSource,
     pub where_clause: Option<Expression>,
     pub order_by_clause: Option<Vec<SelectionSortingItem>>,
