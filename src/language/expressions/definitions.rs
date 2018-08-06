@@ -1101,10 +1101,9 @@ impl Expression {
         if let Some(sub_expr) = expr.get_property(path) {
             return sub_expr.fmt(f, context)
         }
-        write!(f, "(SELECT ")?;
-        write!(f, "(SELECT t#{} from", path_buf.data)?;
+        write!(f, "( SELECT t.{} FROM ", path_buf.data)?;
         expr.fmt(f, context)?;
-        f.write_str(" as t)")
+        f.write_str(" as t )")
     }
     pub fn fmt_function_call(
         f: &mut impl fmt::Write,
