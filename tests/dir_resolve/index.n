@@ -93,5 +93,6 @@ fn wrong() {
 }
 
 fn delete_user(id: unsigned integer) {
+    2 + 2;
     delete from Users u where u.id = id;
 }

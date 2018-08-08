@@ -862,6 +862,11 @@ impl Statement {
             StatementBody::Block { statements } => {
                 Statement::fmt_block(f, context, statements)
             }
+            StatementBody::Expression { expression } => {
+                let mut line = f.line()?;
+                expression.fmt(&mut line, context)?;
+                line.write_char(';')
+            }
             StatementBody::DeletingRequest { request } => {
                 request.fmt(f, context)
             }
@@ -871,7 +876,6 @@ impl Statement {
             StatementBody::UpdatingRequest { request } => {
                 request.fmt(f, context)
             }
-            _ => f.write_line("<unimplemented statement>"),
         }
     }
 }
