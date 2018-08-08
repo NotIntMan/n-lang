@@ -1104,23 +1104,36 @@ impl Expression {
         context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
         let path_buf = path.into_new_buf("#");
+        let property_data_type = expr.data_type
+            .property_type(ItemPosition::default(), path.clone())
+            .expect("Property existing should be already checked at generate-time");
         if let ExpressionBody::Variable(var) = &expr.body {
             let var_guard = var.read();
-            if var_guard.data_type()
-                .expect("Variable can not have unknown data-type at generate-time")
-                .property_type(ItemPosition::default(), path.clone())
-                .expect("Property existing should be already checked at generate-time")
-                .as_primitive()
-                .is_some()
-                {
-                    Expression::fmt_variable(f, &*var_guard, !path_buf.is_empty())?;
-                    return f.write_str(&path_buf.data);
-                }
+            if property_data_type.as_primitive().is_some() {
+                Expression::fmt_variable(f, &*var_guard, !path_buf.is_empty())?;
+                return f.write_str(&path_buf.data);
+            }
         }
         if let Some(sub_expr) = expr.get_property(path) {
             return sub_expr.fmt(f, context);
         }
-        write!(f, "( SELECT t.{} FROM ", path_buf.data)?;
+
+        if property_data_type.as_primitive().is_some() {
+            write!(f, "( SELECT t.{}", path_buf.data)?;
+        } else {
+            f.write_str("( SELECT ")?;
+            let mut primitives = property_data_type.primitives(PathBuf::new("#"))
+                .into_iter()
+                .peekable();
+            while let Some(primitive) = primitives.next() {
+                write!(f, "t.{prop}#{name} as {name}", prop = path, name = primitive.path)?;
+                if primitives.peek().is_some() {
+                    f.write_str(", ")?;
+                }
+            }
+        }
+
+        write!(f, " FROM ")?;
         expr.fmt(f, context)?;
         f.write_str(" as t )")
     }
