@@ -214,6 +214,7 @@ impl DatabaseModule {
         let parameters = TSQLParameters::new(self.path.as_path());
         for function in self.functions.iter() {
             Generate::fmt(function, f.clone(), parameters.clone())?;
+            f.write_line("GO")?;
             f.write_line("")?;
         }
         Ok(())
