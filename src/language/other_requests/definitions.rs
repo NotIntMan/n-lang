@@ -613,4 +613,22 @@ impl Deleting {
     pub fn is_lite_weight(&self) -> bool {
         self.source.is_local()
     }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        match &self.limit_clause {
+            Some(limit) => f.write_line(format_args!("DELETE TOP({}) FROM", limit))?,
+            None => f.write_line("DELETE FROM")?,
+        }
+        let mut sub_f = f.sub_block();
+        self.source.fmt(sub_f.sub_block(), context)?;
+        if let Some(where_clause) = &self.where_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("WHERE ")?;
+            where_clause.fmt(&mut line, context)?;
+        }
+        sub_f.write_line(';')
+    }
 }

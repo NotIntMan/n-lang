@@ -91,3 +91,7 @@ fn wrong() {
         let g := add_user(info);
     }
 }
+
+fn delete_user(id: unsigned integer) {
+    delete from Users u where u.id = id;
+}

@@ -45,6 +45,12 @@ fn get_test_stdlib() -> StdLib {
         size: 16,
     }));
 
+    let unsigned_integer = DataType::Primitive(PrimitiveDataType::Number(NumberType::Integer {
+        unsigned: true,
+        zerofill: false,
+        size: 32,
+    }));
+
     let boolean = DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean));
 
     stdlib.reg_binary_operation(StdLibBinaryOperation {
@@ -65,6 +71,13 @@ fn get_test_stdlib() -> StdLib {
         operator: BinaryOperator::MoreThan,
         left: small_integer.clone(),
         right: small_integer.clone(),
+        output: boolean.clone(),
+    });
+
+    stdlib.reg_binary_operation(StdLibBinaryOperation {
+        operator: BinaryOperator::Equals,
+        left: unsigned_integer.clone(),
+        right: unsigned_integer.clone(),
         output: boolean.clone(),
     });
 

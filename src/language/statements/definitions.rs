@@ -862,6 +862,9 @@ impl Statement {
             StatementBody::Block { statements } => {
                 Statement::fmt_block(f, context, statements)
             }
+            StatementBody::DeletingRequest { request } => {
+                request.fmt(f, context)
+            }
             StatementBody::InsertingRequest { request } => {
                 request.fmt(f, context)
             }
