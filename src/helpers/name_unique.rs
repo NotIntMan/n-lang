@@ -20,6 +20,20 @@ pub fn class_style(name: &str) -> String {
         .collect()
 }
 
+pub fn generate_name(filter: impl Fn(&str) -> bool, mut name: String) -> String {
+    let original_length = name.len();
+    let mut counter: u128 = 0;
+    while !filter(&name) {
+        while name.len() > original_length {
+            name.pop();
+        }
+        name.write_fmt(format_args!("_{}", counter))
+            .expect("I/O error while writing in buffer string. WTF? OOM may be?");
+        counter += 1;
+    }
+    name
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NameUniquer {
     names: HashSet<String>,
@@ -32,17 +46,11 @@ impl NameUniquer {
             names: HashSet::new(),
         }
     }
-    pub fn add_name(&mut self, mut name: String) -> String {
-        let original_length = name.len();
-        let mut counter: u128 = 0;
-        while self.names.contains(&name) {
-            while name.len() > original_length {
-                name.pop();
-            }
-            name.write_fmt(format_args!("_{}", counter))
-                .expect("I/O error while writing in buffer string. WTF? OOM may be?");
-            counter += 1;
-        }
+    pub fn add_name(&mut self, name: String) -> String {
+        let name = generate_name(
+            |name| !self.names.contains(name),
+            name,
+        );
         self.names.insert(name.clone());
         name
     }

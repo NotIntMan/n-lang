@@ -433,10 +433,12 @@ impl Selection {
 
         let mut sub_f = f.sub_block();
 
-        for (i, result_item) in self.result.iter().enumerate() {
+        let mut result_items = self.result.iter()
+            .enumerate()
+            .peekable();
+        while let Some((i, result_item)) = result_items.next() {
             let mut primitives = {
-                let mut prefix = PathBuf::new(".");
-                result_item.expr.data_type.primitives(prefix)
+                result_item.expr.data_type.primitives(PathBuf::new("."))
                     .into_iter()
                     .peekable()
             };
@@ -464,14 +466,14 @@ impl Selection {
 
                 write!(line, " AS {}", new_path)?;
 
-                if primitives.peek().is_some() {
+                if primitives.peek().is_some() || result_items.peek().is_some() {
                     write!(line, ",")?;
                 }
             }
         }
 
         f.write_line("FROM")?;
-        self.source.fmt(sub_f.clone(), context)?;
+        self.source.fmt(sub_f.clone(), context, true)?;
 
 //        while let Some((var, function, arguments)) = context.extract_pre_calc_calls() {
 //            let mut line = sub_f.line()?;

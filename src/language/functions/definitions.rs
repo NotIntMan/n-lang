@@ -36,7 +36,10 @@ use project_analysis::{
     StatementFlowControlJumping,
     StatementFlowControlPosition,
 };
-use std::fmt;
+use std::fmt::{
+    self,
+    Write,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionBodyAST<'source> {
@@ -163,13 +166,17 @@ impl FunctionDefinition {
         mut f: BlockFormatter<impl fmt::Write>,
         primitives: Vec<FieldPrimitive>,
         context: &mut TSQLFunctionContext,
+        is_automatic: bool,
         last_comma: bool,
         is_output: bool,
     ) -> fmt::Result {
         let mut arguments = primitives.into_iter().peekable();
         while let Some(primitive) = arguments.next() {
             let mut line = f.line()?;
-            line.write(format_args!("@{} {}", primitive.path.data, TSQL(&primitive.field_type, context.parameters.clone())))?;
+            if !is_automatic {
+                line.write_char('@')?;
+            }
+            line.write(format_args!("{} {}", primitive.path.data, TSQL(&primitive.field_type, context.parameters.clone())))?;
             if is_output {
                 line.write(" OUTPUT")?;
             }
@@ -184,6 +191,9 @@ impl FunctionDefinition {
         context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
         let is_procedure = !context.function.is_lite_weight;
+        if !is_procedure {
+            f.write_line('(')?;
+        }
         let mut sub_f = f.sub_block();
         {
             let mut arguments = context.function.arguments.iter().peekable();
@@ -200,22 +210,24 @@ impl FunctionDefinition {
                     sub_f.clone(),
                     primitives,
                     context,
+                    false,
                     is_procedure || arguments.peek().is_some(),
                     false,
                 )?;
             }
         }
-        let table = if context.function.result.can_be_table() {
-            context.function.result.as_table_type(context.make_result_variable_prefix())
-        } else {
-            None
-        };
         if is_procedure {
+            let table = if context.function.result.can_be_table() {
+                context.function.result.as_table_type(context.make_result_variable_prefix())
+            } else {
+                None
+            };
             if let Some(primitives) = table {
                 FunctionDefinition::fmt_primitives_as_args(
                     sub_f,
                     primitives,
                     context,
+                    false,
                     false,
                     true,
                 )?;
@@ -230,20 +242,27 @@ impl FunctionDefinition {
                 line.write(" OUTPUT")?;
             }
         } else {
+            let table = if context.function.result.can_be_table() {
+                context.function.result.as_table_type(PathBuf::new("#"))
+            } else {
+                None
+            };
             if let Some(primitives) = table {
-                f.write_line(format_args!("RETURNS @{} TABLE", context.make_result_variable_name()))?;
+                f.write_line(format_args!(") RETURNS @{} TABLE (", context.make_result_variable_name()))?;
                 FunctionDefinition::fmt_primitives_as_args(
                     sub_f,
                     primitives,
                     context,
+                    true,
                     false,
                     false,
                 )?;
+                f.write_line(')')?;
             } else {
                 if let Some(result) = context.function.result.as_primitive() {
-                    f.write_line(format_args!("RETURNS {}", TSQL(&result, context.parameters.clone())))?;
+                    f.write_line(format_args!(") RETURNS {}", TSQL(&result, context.parameters.clone())))?;
                 } else {
-                    f.write_line("RETURNS bit")?;
+                    f.write_line(") RETURNS bit")?;
                 }
             }
         }
@@ -256,7 +275,7 @@ impl FunctionDefinition {
         let sub_f = f.sub_block();
         // TODO Добавить переменную-результат в контекст (в случае табличных данных на выходе)
         let class = if context.function.is_lite_weight { "FUNCTION" } else { "PROCEDURE" };
-        f.write_line(format_args!("CREATE OR ALTER {} [{}]", class, context.make_function_name().data))?;
+        f.write_line(format_args!("CREATE OR ALTER {} dbo.[{}]", class, context.make_function_name().data))?;
         FunctionDefinition::fmt_arguments(sub_f.clone(), context)
     }
     pub fn fmt_variable(
@@ -295,7 +314,7 @@ impl FunctionDefinition {
             FunctionBody::External => return Ok(()),
         };
 
-        f.write_line("BEGIN")?;
+        f.write_line("AS BEGIN")?;
         let mut sub_f = f.sub_block();
 
         for variable in context.function.context.get_all_variables() {
@@ -325,7 +344,13 @@ impl FunctionDefinition {
             if let Some(var_name) = &context.result_variable_name {
                 sub_f.write_line(format_args!("SET @{} = 0;", var_name))?;
             }
-            sub_f.write_line("RETURN 0;")?;
+        }
+        if context.function.is_lite_weight {
+            if context.function.result.as_primitive().is_some() {
+                sub_f.write_line("RETURN 0;")?;
+            } else {
+                sub_f.write_line("RETURN;")?;
+            }
         }
 
         f.write_line("END")

@@ -1,4 +1,5 @@
 use helpers::{
+    generate_name,
     ID,
     IDPull,
     Path,
@@ -202,6 +203,16 @@ impl SyncRef<FunctionVariableScope> {
         let var = FunctionVariable::new(pos, name, data_type);
         self.write().variables.push(var.clone());
         Ok(var)
+    }
+    pub fn new_temp_variable(&self, pos: ItemPosition, data_type: DataType) -> SyncRef<FunctionVariable> {
+        let guard = self.read();
+        let name = generate_name(
+            |name| guard.find_variable(name).is_none(),
+            "t".to_string(),
+        );
+        let var = FunctionVariable::new(pos, name, Some(data_type));
+        self.write().variables.push(var.clone());
+        var
     }
     #[inline]
     pub fn context(&self) -> SyncRef<FunctionContext> {

@@ -98,12 +98,10 @@ impl UpdatingAssignment {
 
         if var_data_type.as_primitive().is_some() {
             let mut line = f.line()?;
-            if !var_guard.is_automatic() {
-                line.write_char('@')?;
-            }
-            line.write_str(var_guard.name())?;
-            if !self.target.property.is_empty() {
-                write!(line, ".{}", self.target.property.as_path().into_new_buf("#"))?;
+            let access = !self.target.property.is_empty();
+            Expression::fmt_variable(&mut line, &*var_guard, access)?;
+            if access {
+                write!(line, "{}", self.target.property.as_path().into_new_buf("#"))?;
             }
             line.write_str(" = ")?;
             self.value.fmt(&mut line, context)?;
@@ -117,15 +115,12 @@ impl UpdatingAssignment {
 
             while let Some(primitive) = primitives.next() {
                 let mut line = f.line()?;
-                if !var_guard.is_automatic() {
-                    line.write_char('@')?;
-                }
-                line.write_str(var_guard.name())?;
+                Expression::fmt_variable(&mut line, &*var_guard, true)?;
 
                 let mut target_path = self.target.property.as_path().into_new_buf("#");
                 target_path.append(primitive.path.as_path());
 
-                write!(line, ".{} = ", target_path)?;
+                write!(line, "{} = ", target_path)?;
                 Expression::fmt_property_access(
                     &mut line,
                     &self.value,
@@ -232,7 +227,7 @@ impl Updating {
         if let Some(limit) = &self.limit_clause {
             sub_f.write_line(format_args!("TOP({})", limit))?;
         }
-        self.source.fmt(sub_sub_f.clone(), context)?;
+        self.source.fmt(sub_sub_f.clone(), context, false)?;
         sub_f.write_line("SET")?;
         {
             let mut assignments = self.assignments.iter()
@@ -424,10 +419,8 @@ impl InsertingSource {
                 .into_iter()
                 .peekable();
             while let Some(primitive) = primitives.next() {
-                if !var_guard.is_automatic() {
-                    line.write_char('@')?;
-                }
-                write!(line, "{}.{}", var_guard.name(), primitive.path)?;
+                Expression::fmt_variable(line, &*var_guard, true)?;
+                write!(line, "{}", primitive.path)?;
                 if primitives.peek().is_some() || properties.peek().is_some() {
                     line.write_str(", ")?;
                 }
@@ -558,7 +551,7 @@ impl Inserting {
     ) -> fmt::Result {
         f.write_line("INSERT INTO")?;
         let sub_f = f.sub_block();
-        self.target.fmt(sub_f.clone(), context)?;
+        self.target.fmt(sub_f.clone(), context, false)?;
         self.source.fmt(sub_f, context)?;
         f.write_line(";")
     }
@@ -623,7 +616,7 @@ impl Deleting {
             None => f.write_line("DELETE FROM")?,
         }
         let mut sub_f = f.sub_block();
-        self.source.fmt(sub_f.sub_block(), context)?;
+        self.source.fmt(sub_f.sub_block(), context, false)?;
         if let Some(where_clause) = &self.where_clause {
             let mut line = sub_f.line()?;
             line.write_str("WHERE ")?;

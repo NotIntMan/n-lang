@@ -874,7 +874,14 @@ impl DataType {
                     field_type: primitive.clone(),
                 });
             }
-            DataType::Void => {}
+            DataType::Void => {
+                target.push(FieldPrimitive {
+                    path: prefix,
+                    field_type: PrimitiveDataType::Number(NumberType::Bit {
+                        size: Some(0),
+                    }),
+                });
+            }
             DataType::Compound(CompoundDataType::Tuple(fields)) => {
                 for (i, field) in fields.iter().enumerate() {
                     let mut path = prefix.clone();
@@ -956,6 +963,11 @@ impl DataType {
                 let item_guard = item.read();
                 let references_data_type = item_guard.get_data_type()?;
                 references_data_type.body.as_primitive()
+            }
+            DataType::Void => {
+                Some(PrimitiveDataType::Number(NumberType::Bit {
+                    size: Some(0),
+                }))
             }
             _ => None,
         }

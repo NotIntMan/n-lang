@@ -265,8 +265,14 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
             }
             StatementASTBody::Expression { expression } => {
                 let expression = expression.resolve(ctx)?;
-                StatementBody::Expression {
-                    expression,
+                let var = ctx.new_temp_variable(self.pos, expression.data_type.clone());
+                StatementBody::VariableAssignment {
+                    target: AssignmentTarget {
+                        var,
+                        property: PathBuf::empty(),
+                        pos: self.pos,
+                    },
+                    source: StatementSource::Expression(expression),
                 }
             }
             StatementASTBody::DeletingRequest { request } => {
@@ -353,9 +359,9 @@ pub enum StatementBody {
     Block {
         statements: Vec<Statement>,
     },
-    Expression {
-        expression: Expression,
-    },
+    //    Expression {
+//        expression: Expression,
+//    },
     DeletingRequest {
         request: Deleting,
     },
@@ -404,7 +410,7 @@ impl Statement {
             },
             StatementBody::Block { statements } => statements.iter()
                 .all(|stmt| stmt.is_lite_weight()),
-            StatementBody::Expression { expression } => expression.is_lite_weight(),
+//            StatementBody::Expression { expression } => expression.is_lite_weight(),
             StatementBody::DeletingRequest { request } => request.is_lite_weight(),
             StatementBody::InsertingRequest { request } => request.is_lite_weight(),
             StatementBody::UpdatingRequest { request } => request.is_lite_weight(),
@@ -481,7 +487,7 @@ impl Statement {
                     Err(errors)
                 }
             }
-            StatementBody::Expression { expression: _ } |
+//            StatementBody::Expression { expression: _ } |
             StatementBody::DeletingRequest { request: _ } |
             StatementBody::InsertingRequest { request: _ } |
             StatementBody::UpdatingRequest { request: _ } |
@@ -530,19 +536,18 @@ impl Statement {
                 }
             }
 
-            sub_f.write_line("FROM (")?;
+            sub_f.write_line("FROM")?;
 
             Expression::fmt_function_call(&mut sub_sub_f.line()?, function, arguments, context)?;
 
-            sub_f.write_line(") AS t;")?;
+            sub_f.write_line("AS t;")?;
         } else {
             let var_guard = target.map(|var| var.read());
 
-            f.write_line(format_args!("EXECUTE [{}]", function_guard.get_path()))?;
+            f.write_line(format_args!("EXECUTE dbo.[{}]", function_guard.get_path()))?;
 
             let mut arguments = arguments.into_iter().enumerate().peekable();
             while let Some((i, argument)) = arguments.next() {
-
                 let (_, argument_target) = function_def.arguments.get_index(i)
                     .expect("Arguments should not have different count at generate-time.");
                 let argument_target_guard = argument_target.read();
@@ -622,7 +627,7 @@ impl Statement {
                 f.clone(),
                 &mut buffer,
                 context,
-                |buffer_f, context| statement.fmt(buffer_f, context)
+                |buffer_f, context| statement.fmt(buffer_f, context),
             )?;
         }
         Ok(())
@@ -645,54 +650,68 @@ impl Statement {
         mut f: BlockFormatter<impl fmt::Write>,
         target_path: &str,
         target_data_type: &DataType,
+        is_can_be_table: bool,
         source: &StatementSource,
         context: &mut TSQLFunctionContext,
     ) -> fmt::Result {
-        if let Some(sub_type) = target_data_type.as_array() {
-            let select_wrapper = {
-                let mut line = f.line()?;
-                write!(line, "INSERT INTO @{} (", target_path)?;
-                let mut select_wrapper = String::from("SELECT ");
+        let target_data_type_as_complex = if is_can_be_table {
+            match target_data_type.as_table_type(PathBuf::new("#")) {
+                Some(primitives) => Ok(primitives),
+                None => Err(target_data_type.as_primitive()),
+            }
+        } else {
+            match target_data_type.as_array() {
+                Some(sub_type) => Ok(sub_type.primitives(PathBuf::new("#"))),
+                None => Err(target_data_type.as_primitive()),
+            }
+        };
+        match target_data_type_as_complex {
+            Ok(primitives) => {
+                let select_wrapper = {
+                    let mut line = f.line()?;
+                    write!(line, "INSERT INTO @{} (", target_path)?;
+                    let mut select_wrapper = String::from("SELECT ");
 
-                let mut primitives = sub_type.primitives(PathBuf::new("#")).into_iter().peekable();
-                while let Some(primitive) = primitives.next() {
-                    line.write_str(primitive.path.data.as_str())?;
-                    select_wrapper.write_str("t.")?;
-                    select_wrapper.write_str(primitive.path.data.as_str())?;
-                    if primitives.peek().is_some() {
-                        line.write_str(", ")?;
-                        select_wrapper.write_str(", ")?;
+                    let mut primitives = primitives.into_iter().peekable();
+                    while let Some(primitive) = primitives.next() {
+                        line.write_str(primitive.path.data.as_str())?;
+                        select_wrapper.write_str("t.")?;
+                        select_wrapper.write_str(primitive.path.data.as_str())?;
+                        if primitives.peek().is_some() {
+                            line.write_str(", ")?;
+                            select_wrapper.write_str(", ")?;
+                        }
                     }
-                }
-                line.write_str(")")?;
+                    line.write_str(")")?;
 
-                select_wrapper.write_str(" FROM (")?;
-                select_wrapper
-            };
+                    select_wrapper.write_str(" FROM (")?;
+                    select_wrapper
+                };
 
-            let mut source_f = f.sub_block();
-            match source {
-                StatementSource::Expression(expr) => {
-                    source_f.write_line(select_wrapper)?;
-                    let mut sub_f = source_f.sub_block();
-                    let mut line = sub_f.line()?;
-                    expr.fmt(&mut line, context)?;
-                    source_f.write_line(") as t;")
-                }
-                StatementSource::Selection(query) => {
-                    if query.result_data_type == *target_data_type {
-                        query.fmt(source_f.sub_block(), context)?;
-                        source_f.write_line(";")
-                    } else {
+                let mut source_f = f.sub_block();
+                match source {
+                    StatementSource::Expression(expr) => {
                         source_f.write_line(select_wrapper)?;
-                        query.fmt(source_f.sub_block(), context)?;
+                        let mut sub_f = source_f.sub_block();
+                        {
+                            let mut line = sub_f.line()?;
+                            expr.fmt(&mut line, context)?;
+                        }
                         source_f.write_line(") as t;")
+                    }
+                    StatementSource::Selection(query) => {
+                        if query.result_data_type == *target_data_type {
+                            query.fmt(source_f.sub_block(), context)?;
+                            source_f.write_line(";")
+                        } else {
+                            source_f.write_line(select_wrapper)?;
+                            query.fmt(source_f.sub_block(), context)?;
+                            source_f.write_line(") as t;")
+                        }
                     }
                 }
             }
-        } else {
-            let as_primitive = target_data_type.as_primitive();
-            if as_primitive.is_some() {
+            Err(Some(_)) => {
                 match source {
                     StatementSource::Expression(expr) => {
                         let mut line = f.line()?;
@@ -706,38 +725,39 @@ impl Statement {
                         f.write_line(");")?;
                     }
                 }
-                return Ok(());
+                Ok(())
             }
-            f.write_line("SELECT")?;
+            Err(None) => {
+                f.write_line("SELECT")?;
 
-            let mut primitives = target_data_type.primitives(PathBuf::new("#"))
-                .into_iter()
-                .peekable();
+                let mut primitives = target_data_type.primitives(PathBuf::new("#"))
+                    .into_iter()
+                    .peekable();
 
-            let mut sub_f = f.sub_block();
-            let mut sub_sub_f = sub_f.sub_block();
+                let mut sub_f = f.sub_block();
+                let mut sub_sub_f = sub_f.sub_block();
 
-            while let Some(primitive) = primitives.next() {
-                let mut line = sub_sub_f.line()?;
-                write!(line, "@{var}#{path} = t.{path}", var = target_path, path = primitive.path)?;
-                if primitives.peek().is_some() {
-                    line.write_char(',')?;
-                }
-            }
-
-            sub_f.write_line("FROM (")?;
-
-            match source {
-                StatementSource::Expression(expr) => {
+                while let Some(primitive) = primitives.next() {
                     let mut line = sub_sub_f.line()?;
-                    expr.fmt(&mut line, context)?;
+                    write!(line, "@{var}#{path} = t.{path}", var = target_path, path = primitive.path)?;
+                    if primitives.peek().is_some() {
+                        line.write_char(',')?;
+                    }
                 }
-                StatementSource::Selection(query) => {
-                    query.fmt(sub_sub_f, context)?;
+
+                match source {
+                    StatementSource::Expression(expr) => {
+                        sub_f.write_line("FROM")?;
+                        expr.fmt(&mut sub_sub_f.line()?, context)?;
+                        sub_f.write_line(" as t;")
+                    }
+                    StatementSource::Selection(query) => {
+                        sub_f.write_line("FROM (")?;
+                        query.fmt(sub_sub_f, context)?;
+                        sub_f.write_line(") as t;")
+                    }
                 }
             }
-
-            sub_f.write_line(") as t;")
         }
     }
     pub fn fmt(
@@ -759,16 +779,22 @@ impl Statement {
                     f,
                     &var_path.data,
                     &data_type,
+                    data_type.as_array().is_some(),
                     source,
                     context,
                 )
             }
             StatementBody::Condition { condition, then_body, else_body } => {
-                {
-                    let mut cond_line = f.line()?;
-                    cond_line.write_str("IF ")?;
-                    condition.fmt(&mut cond_line, context)?;
-                }
+                Statement::fmt_something_with_pre_calls(
+                    f.clone(),
+                    &mut String::new(),
+                    context,
+                    |mut f, context| {
+                        let mut cond_line = f.line()?;
+                        cond_line.write_str("IF ")?;
+                        condition.fmt(&mut cond_line, context)
+                    },
+                )?;
                 then_body.fmt(f.sub_block(), context)?;
                 if let Some(else_body) = else_body {
                     f.write_line("ELSE")?;
@@ -777,11 +803,11 @@ impl Statement {
                 Ok(())
             }
             StatementBody::Cycle { cycle_type: CycleType::Simple, body } => {
-                f.write_line("WHILE TRUE")?;
+                f.write_line("WHILE 1 = 1")?;
                 body.fmt(f.sub_block(), context)
             }
             StatementBody::Cycle { cycle_type: CycleType::PrePredicated(predicate), body } => {
-                f.write_line("WHILE TRUE BEGIN")?;
+                f.write_line("WHILE 1 = 1 BEGIN")?;
                 let mut buffer = String::new();
                 let mut sub_f = f.sub_block();
                 Statement::fmt_something_with_pre_calls(
@@ -792,14 +818,14 @@ impl Statement {
                         let mut predicate_line = buffer_f.line()?;
                         predicate_line.write_str("IF ")?;
                         predicate.fmt(&mut predicate_line, context)
-                    }
+                    },
                 )?;
                 body.fmt(sub_f.clone(), context)?;
                 sub_f.write_line("ELSE BREAK;")?;
                 f.write_line("END")
             }
             StatementBody::Cycle { cycle_type: CycleType::PostPredicated(predicate), body } => {
-                f.write_line("WHILE TRUE BEGIN")?;
+                f.write_line("WHILE 1 = 1 BEGIN")?;
                 let mut sub_f = f.sub_block();
                 body.fmt(sub_f.clone(), context)?;
                 let mut buffer = String::new();
@@ -812,7 +838,7 @@ impl Statement {
                         predicate_line.write_str("IF NOT ")?;
                         predicate.fmt(&mut predicate_line, context)?;
                         predicate_line.write_str(" BREAK;")
-                    }
+                    },
                 )?;
                 f.write_line("END")
             }
@@ -833,19 +859,19 @@ impl Statement {
                                 line.write_char(';')?;
                             }
                             StatementSource::Selection(selection) => {
-                                unsafe { f.write("RETURN ")?; }
+                                f.write_line("RETURN")?;
                                 let mut sub_f = f.sub_block();
                                 selection.fmt(sub_f.clone(), context)?;
                                 sub_f.write_line(";")?;
                             }
                         }
                     } else {
-                        unsafe { f.write(' ')?; }
                         let result_name = context.make_result_variable_name().to_string();
                         Statement::fmt_assignment(
                             f.clone(),
                             &result_name,
                             &context.function.result,
+                            context.function.is_lite_weight,
                             value,
                             context,
                         )?;
@@ -862,11 +888,11 @@ impl Statement {
             StatementBody::Block { statements } => {
                 Statement::fmt_block(f, context, statements)
             }
-            StatementBody::Expression { expression } => {
-                let mut line = f.line()?;
-                expression.fmt(&mut line, context)?;
-                line.write_char(';')
-            }
+//            StatementBody::Expression { expression } => {
+//                let mut line = f.line()?;
+//                expression.fmt(&mut line, context)?;
+//                line.write_char(';')
+//            }
             StatementBody::DeletingRequest { request } => {
                 request.fmt(f, context)
             }

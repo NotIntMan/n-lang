@@ -212,19 +212,30 @@ impl DataSource {
         &self,
         mut f: BlockFormatter<impl fmt::Write>,
         context: &mut TSQLFunctionContext,
+        aliases: bool,
     ) -> fmt::Result {
         match self {
             DataSource::Variable { var } => {
                 let var_guard = var.read();
-                f.write_line(format_args!("@{name} AS {name}", name = var_guard.name()))
+                if aliases {
+                    f.write_line(format_args!("@{name} AS {name}", name = var_guard.name()))
+                } else {
+                    f.write_line(format_args!("@{name}", name = var_guard.name()))
+                }
             }
             DataSource::Table { item, var } => {
                 let item_guard = item.read();
-                let var_guard = var.read();
-                f.write_line(format_args!("[{}] AS {}", item_guard.get_path().data, var_guard.name()))
+                if aliases {
+                    let var_guard = var.read();
+                    f.write_line(format_args!("[{}] AS {}", item_guard.get_path(), var_guard.name()))
+                } else {
+                    let mut var_guard = var.write();
+                    var_guard.set_name("".to_string());
+                    f.write_line(format_args!("[{}]", item_guard.get_path()))
+                }
             }
             DataSource::Join { join_type, condition, left, right } => {
-                left.fmt(f.clone(), context)?;
+                left.fmt(f.clone(), context, aliases)?;
                 {
                     let mut line = f.line()?;
                     line.write_str(match join_type {
@@ -237,9 +248,15 @@ impl DataSource {
                         condition.fmt(&mut line, context)?;
                     }
                 }
-                right.fmt(f, context)
+                right.fmt(f, context, aliases)
             }
-            DataSource::Selection { query, alias: _, var: _ } => query.fmt(f, context),
+            DataSource::Selection { query, alias, var: _ } => {
+                query.fmt(f.clone(), context)?;
+                if aliases {
+                    f.sub_block().write_line(format_args!("AS {}", alias))?;
+                }
+                Ok(())
+            }
         }
     }
 }

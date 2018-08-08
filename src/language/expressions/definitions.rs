@@ -971,7 +971,7 @@ impl Expression {
                     return Some(expressions[index].clone());
                 }
             }
-            _ => {},
+            _ => {}
         }
         None
     }
@@ -997,6 +997,9 @@ impl Expression {
         access: bool,
     ) -> fmt::Result {
         let name = var.name();
+        if name.is_empty() {
+            return Ok(());
+        }
         if var.is_automatic() {
             f.write_str(name)?;
             if access {
@@ -1103,11 +1106,19 @@ impl Expression {
         let path_buf = path.into_new_buf("#");
         if let ExpressionBody::Variable(var) = &expr.body {
             let var_guard = var.read();
-            Expression::fmt_variable(f, &*var_guard, !path_buf.is_empty())?;
-            return f.write_str(&path_buf.data)
+            if var_guard.data_type()
+                .expect("Variable can not have unknown data-type at generate-time")
+                .property_type(ItemPosition::default(), path.clone())
+                .expect("Property existing should be already checked at generate-time")
+                .as_primitive()
+                .is_some()
+                {
+                    Expression::fmt_variable(f, &*var_guard, !path_buf.is_empty())?;
+                    return f.write_str(&path_buf.data);
+                }
         }
         if let Some(sub_expr) = expr.get_property(path) {
-            return sub_expr.fmt(f, context)
+            return sub_expr.fmt(f, context);
         }
         write!(f, "( SELECT t.{} FROM ", path_buf.data)?;
         expr.fmt(f, context)?;
@@ -1122,7 +1133,7 @@ impl Expression {
         let function_guard = function.read();
         let function_def = function_guard.get_function()
             .expect("item argument of Statement::fmt_pre_call is not a function!");
-        write!(f, "[{}](", function.read().get_path().data)?;
+        write!(f, "dbo.[{}](", function.read().get_path().data)?;
         let mut arguments = arguments.iter()
             .enumerate()
             .peekable();
@@ -1211,8 +1222,10 @@ impl Expression {
                 let is_primitive = {
                     let function_guard = function.read();
                     if let Some(function_def) = function_guard.get_function() {
-                        function_def.result.as_primitive()
-                            .is_some()
+                        (
+                            (function_def.result == DataType::Void)
+                                || function_def.result.as_primitive().is_some()
+                        )
                             && function_def.is_lite_weight
                     } else {
                         false
