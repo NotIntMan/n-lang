@@ -21,7 +21,7 @@ impl<K: Eq, V> Map<K, V> {
             pairs: Vec::with_capacity(capacity),
         }
     }
-    pub fn iter<'s>(&'s self) -> impl Iterator<Item=(&'s K, &'s V)> {
+    pub fn iter(&self) -> impl Iterator<Item=(&K, &V)> {
         self.pairs.iter()
             .map(|(key, value)| (key, value))
     }
@@ -29,7 +29,7 @@ impl<K: Eq, V> Map<K, V> {
         self.pairs.iter_mut()
             .map(|(key, value)| (&*key, value))
     }
-    pub fn get<'s>(&'s self, k: &impl PartialEq<K>) -> Option<&'s V> {
+    pub fn get(&self, k: &impl PartialEq<K>) -> Option<&V> {
         for (key, value) in self.iter() {
             if *k == *key {
                 return Some(value);
@@ -37,7 +37,7 @@ impl<K: Eq, V> Map<K, V> {
         }
         None
     }
-    pub fn get_mut<'s>(&'s mut self, k: &impl PartialEq<K>) -> Option<&'s mut V> {
+    pub fn get_mut(&mut self, k: &impl PartialEq<K>) -> Option<&mut V> {
         for (key, value) in self.iter_mut() {
             if *k == *key {
                 return Some(value);
@@ -56,7 +56,7 @@ impl<K: Eq, V> Map<K, V> {
         self.pairs.push((k.into(), value));
         None
     }
-    pub fn sort<'s>(&'s mut self)
+    pub fn sort(&mut self)
         where K: Ord
     {
         self.pairs.sort_by(|(a_k, _), (b_k, _)| a_k.cmp(b_k))

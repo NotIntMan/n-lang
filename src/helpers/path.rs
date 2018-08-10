@@ -38,7 +38,7 @@ impl PathBuf {
         buf
     }
     #[inline]
-    pub fn as_path<'a>(&'a self) -> Path<'a> {
+    pub fn as_path(&self) -> Path {
         Path {
             data: &self.data,
             delimiter: &self.delimiter,
@@ -74,6 +74,10 @@ impl PathBuf {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.as_path().is_empty()
+    }
+    #[inline]
+    pub fn the_only(&self) -> Option<&str> {
+        self.as_path().the_only()
     }
 }
 

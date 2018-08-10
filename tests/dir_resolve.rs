@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use n_lang::{
     code_generation::{
         DatabaseProject,
-        RPCProject,
+        RPCModule,
     },
     helpers::{
         PathBuf,
@@ -122,7 +122,7 @@ fn resolve_directory(stdlib: StdLib, directory: &str) -> Result<IndexMap<SyncRef
     project.resolve(&source)
 }
 
-fn resolve_project() -> (DatabaseProject, RPCProject) {
+fn resolve_project() -> (DatabaseProject, RPCModule) {
     let project = match resolve_directory(get_test_stdlib(), "dir_resolve") {
         Ok(project) => project,
         Err(errors) => {
@@ -135,18 +135,16 @@ fn resolve_project() -> (DatabaseProject, RPCProject) {
     };
     (
         DatabaseProject::new(&project),
-        RPCProject::new(&project),
+        RPCModule::top(&project),
     )
 }
 
 #[test]
 fn dir_resolve() {
-    let (db, _rpc) = resolve_project();
+    let (db, rpc) = resolve_project();
 
-    let db_code = db.generate_string()
-        .expect("Cannot generate output for database");
-
-    println!("{}", db_code);
+    println!("{}", db.generate_string().expect("Cannot generate output for database"));
+    println!("{}", rpc.generate_string().expect("Cannot generate output for RPC"));
 }
 
 #[test]

@@ -3,22 +3,18 @@ use helpers::{
     CodeFormatter,
     Generate,
     Map,
+    Path,
     PathBuf,
     SyncRef,
     TSQLParameters,
 };
 use indexmap::IndexMap;
 use language::{
-    CompoundDataType,
     DataType,
     FunctionDefinition,
     TableDefinition,
 };
-use project_analysis::{
-    Item,
-    ItemBody,
-    Module,
-};
+use project_analysis::Module;
 use std::{
     fmt::{
         self,
@@ -27,142 +23,98 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
-pub struct DataClass {
-    path: PathBuf,
-    fields: Map<String, DataType>,
-}
-
-impl DataClass {
-    pub fn for_data_type(path: PathBuf, reflection_target: &DataType, data_classes: &mut Map<PathBuf, Option<DataClass>>) {
-        if data_classes.contains_key(&path) { return; }
-        data_classes.insert(path.clone(), None);
-        match reflection_target {
-            DataType::Compound(CompoundDataType::Structure(fields)) => {
-                let mut result_fields = Map::new();
-                for (field_name, field) in fields.iter() {
-                    let mut sub_path = path.clone();
-                    sub_path.push(field_name.as_str());
-                    DataClass::for_data_type(sub_path, &field.field_type, data_classes);
-                    result_fields.insert(field_name.as_str(), field.field_type.clone());
-                }
-                data_classes.insert(path.clone(), Some(Self {
-                    path,
-                    fields: result_fields,
-                }));
-            }
-            DataType::Compound(CompoundDataType::Tuple(fields)) => {
-                let mut result_fields = Map::new();
-                for (index, field) in fields.iter().enumerate() {
-                    let field_name = format!("component{}", index);
-                    let mut sub_path = path.clone();
-                    sub_path.push(field_name.as_str());
-                    DataClass::for_data_type(sub_path, &field.field_type, data_classes);
-                    result_fields.insert(field_name, field.field_type.clone());
-                }
-                data_classes.insert(path.clone(), Some(Self {
-                    path,
-                    fields: result_fields,
-                }));
-            }
-            DataType::Reference(item) => {
-                DataClass::for_shared_item(item, data_classes);
-            }
-            _ => {}
-        }
-    }
-    pub fn for_item(item: &Item, data_classes: &mut Map<PathBuf, Option<DataClass>>) {
-        match item.body() {
-            ItemBody::DataType { def } => {
-                DataClass::for_data_type(item.get_path(), &def.body, data_classes);
-            }
-            ItemBody::Table { entity, primary_key, .. } => {
-                DataClass::for_shared_item(entity, data_classes);
-                DataClass::for_shared_item(primary_key, data_classes);
-            }
-            _ => {}
-        }
-    }
-    #[inline]
-    pub fn for_shared_item(item: &SyncRef<Item>, data_classes: &mut Map<PathBuf, Option<DataClass>>) {
-        let item = item.read();
-        DataClass::for_item(&*item, data_classes);
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct RPCModule {
-    path: PathBuf,
-    functions: Vec<FunctionDefinition>,
+    data_types: Map<String, DataType>,
+    functions: Map<String, FunctionDefinition>,
+    sub_modules: Map<String, RPCModule>,
 }
 
 impl RPCModule {
-    pub fn new(source: &Module, data_classes: &mut Map<PathBuf, Option<DataClass>>) -> Self {
-        let module_path = source.path().read();
-        let mut result = Self {
-            path: module_path.clone(),
-            functions: Vec::new(),
-        };
-        for (item_name, item) in source.items().iter() {
-            let item = item.value.read();
-            if let Some(function) = item.get_function() {
-                let mut function = function.clone();
-                function.name = item_name.clone();
-                let mut function_path = module_path.clone();
-                function_path.push(function.name.as_str());
-                for (argument_name, argument) in function.arguments.iter() {
-                    let mut sub_path = function_path.clone();
-                    sub_path.push(argument_name.as_str());
-                    let argument_guard = argument.read();
-                    let argument_type = argument_guard.data_type()
-                        .expect("Function arguments cannot have undefined data type");
-                    DataClass::for_data_type(sub_path, argument_type, data_classes);
-                }
-                function_path.push("result");
-                DataClass::for_data_type(function_path, &function.result, data_classes);
-                result.functions.push(function);
+    pub fn top(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
+        let mut sub_modules = Map::new();
+        for (path, module) in project {
+            let path_guard = path.read();
+            if let Some(name) = path_guard.the_only() {
+                sub_modules.insert(name, RPCModule::new(module, project));
             }
         }
-        result.functions.sort_by(|a, b| a.name.cmp(&b.name));
-        result
+        sub_modules.sort();
+        RPCModule {
+            data_types: Map::new(),
+            functions: Map::new(),
+            sub_modules,
+        }
     }
-}
+    pub fn new(source: &SyncRef<Module>, project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
+        let source_guard = source.read();
 
-#[derive(Debug, Clone)]
-pub struct RPCProject {
-    rpc_modules: Map<PathBuf, RPCModule>,
-    data_classes: Map<PathBuf, DataClass>,
-}
+        let mut data_types = Map::new();
+        let mut functions = Map::new();
+        let mut sub_modules = Map::new();
 
-impl RPCProject {
-    pub fn new(project: &IndexMap<SyncRef<PathBuf>, SyncRef<Module>>) -> Self {
-        let mut data_classes = Map::new();
-        let mut rpc_modules = Map::new();
-
-        for (module_path, module) in project.iter() {
-            let module_guard = module.read();
-
-            for (_, item) in module_guard.items().iter() {
-                DataClass::for_shared_item(&item.value, &mut data_classes);
+        for (item_name, item) in source_guard.items() {
+            let item_guard = item.value.read();
+            if let Some(data_type) = item_guard.get_data_type() {
+                data_types.insert(item_name.as_str(), data_type.body.clone());
+            } else if let Some(function) = item_guard.get_function() {
+                functions.insert(item_name.as_str(), function.clone());
+            } else if let Some(table) = item_guard.get_table() {
+                sub_modules.insert(item_name.as_str(), RPCModule::for_table(table));
             }
-
-            rpc_modules.insert(
-                module_path.read().clone(),
-                RPCModule::new(&*module_guard, &mut data_classes),
-            );
         }
-        let mut data_classes: Map<_, _> = data_classes.into_iter()
-            .filter_map(|(path, data_class)|
-                data_class.map(move |inner_data_class| (path, inner_data_class))
-            )
-            .collect();
 
-        data_classes.sort();
-        rpc_modules.sort();
+        let source_path_guard = source_guard.path().read();
+        let source_path = source_path_guard.as_path();
 
-        Self {
-            data_classes,
-            rpc_modules,
+        for (module_path, module) in project {
+            let module_path_guard = module_path.read();
+            if let Some(name) = source_path.is_begin_of(module_path_guard.as_path())
+                .and_then(Path::the_only)
+                {
+                    sub_modules.insert(name, RPCModule::new(module, project));
+                }
         }
+        data_types.sort();
+        functions.sort();
+        sub_modules.sort();
+        RPCModule {
+            data_types,
+            functions,
+            sub_modules,
+        }
+    }
+    pub fn for_table(table: &TableDefinition) -> Self {
+        let mut data_types = Map::new();
+        data_types.insert("entity", table.entity.clone());
+        data_types.insert("primary_key", table.primary_key.clone());
+        RPCModule {
+            data_types,
+            functions: Map::new(),
+            sub_modules: Map::new(),
+        }
+    }
+    pub fn fmt(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
+        for (module_name, module) in self.sub_modules.iter() {
+            f.write_line(format_args!("export module {} {{", module_name))?;
+            module.fmt(f.sub_block())?;
+            f.write_line("}")?;
+        }
+        for (name, _data_type) in self.data_types.iter() {
+            f.write_line(format_args!("export type {};", name))?;
+        }
+        for (name, _function) in self.functions.iter() {
+            f.write_line(format_args!("export function {} ();", name))?;
+        }
+        Ok(())
+    }
+    pub fn generate_string(&self) -> Result<String, fmt::Error> {
+        let mut result = String::new();
+        {
+            let mut formatter = CodeFormatter::new(&mut result);
+            formatter.indent_size = 4;
+            self.fmt(formatter.root_block())?;
+        }
+        Ok(result)
     }
 }
 
