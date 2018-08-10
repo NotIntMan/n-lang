@@ -5,6 +5,7 @@ use helpers::{
     Map,
     Path,
     PathBuf,
+    SimpleFormatter,
     SyncRef,
     TSQLParameters,
 };
@@ -93,27 +94,23 @@ impl RPCModule {
             sub_modules: Map::new(),
         }
     }
-    pub fn fmt(&self, mut f: BlockFormatter<impl Write>) -> fmt::Result {
+    pub fn fmt(&self, f: &mut SimpleFormatter) -> fmt::Result {
         for (module_name, module) in self.sub_modules.iter() {
-            f.write_line(format_args!("export module {} {{", module_name))?;
-            module.fmt(f.sub_block())?;
-            f.write_line("}")?;
+            writeln!(f, "export module {} {{", module_name)?;
+            module.fmt(&mut f.sub_block())?;
+            writeln!(f, "}}")?;
         }
-        for (name, _data_type) in self.data_types.iter() {
-            f.write_line(format_args!("export type {};", name))?;
+        for (name, data_type) in self.data_types.iter() {
+            data_type.fmt_export(f, &name)?;
         }
         for (name, _function) in self.functions.iter() {
-            f.write_line(format_args!("export function {} ();", name))?;
+            writeln!(f, "export function {} ();", name)?;
         }
         Ok(())
     }
     pub fn generate_string(&self) -> Result<String, fmt::Error> {
         let mut result = String::new();
-        {
-            let mut formatter = CodeFormatter::new(&mut result);
-            formatter.indent_size = 4;
-            self.fmt(formatter.root_block())?;
-        }
+        self.fmt(&mut SimpleFormatter::new(&mut result, 4))?;
         Ok(result)
     }
 }

@@ -10,6 +10,7 @@ use helpers::{
     Path,
     PathBuf,
     Resolve,
+    SimpleFormatter,
     SyncRef,
     TSQLParameters,
 };
@@ -977,6 +978,106 @@ impl DataType {
         match self {
             DataType::Array(sub_type) => Some(sub_type),
             _ => None,
+        }
+    }
+    pub fn fmt(
+        &self,
+        f: &mut SimpleFormatter,
+    ) -> fmt::Result {
+        match self {
+            DataType::Array(sub_type) => {
+                sub_type.fmt(f)?;
+                f.write_str("[]")
+            }
+            DataType::Compound(CompoundDataType::Structure(fields)) => {
+                if fields.is_empty() {
+                    return f.write_str("{}");
+                }
+                writeln!(f, "{{")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for (field_name, field) in fields.iter() {
+                        write!(sub_f, "{}: ", field_name)?;
+                        field.field_type.fmt(&mut sub_f)?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            DataType::Compound(CompoundDataType::Tuple(fields)) => {
+                if fields.is_empty() {
+                    return f.write_str("[]");
+                }
+                writeln!(f, "[")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for field in fields.iter() {
+                        field.field_type.fmt(&mut sub_f)?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            DataType::Primitive(PrimitiveDataType::Null) => {
+                f.write_str("null")
+            }
+            DataType::Primitive(PrimitiveDataType::Number(NumberType::Bit { size })) => {
+                f.write_str(match size {
+                    Some(0) => "void",
+                    Some(1) => "boolean",
+                    _ => "number",
+                })
+            }
+            DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean)) => {
+                f.write_str("boolean")
+            }
+            DataType::Primitive(PrimitiveDataType::Number(_)) => {
+                f.write_str("number")
+            }
+            DataType::Primitive(PrimitiveDataType::DateTime(_)) => {
+                f.write_str("Date")
+            }
+            DataType::Primitive(PrimitiveDataType::Year(_)) => {
+                f.write_str("number")
+            }
+            DataType::Primitive(PrimitiveDataType::String(_)) => {
+                f.write_str("string")
+            }
+            DataType::Reference(reference) => {
+                let guard = reference.read();
+                guard.get_data_type()
+                    .expect("Data-type should not contains wrong references at generate-time")
+                    .body.fmt(f)
+            }
+            DataType::Void => {
+                f.write_str("void")
+            }
+        }
+    }
+    pub fn fmt_export(
+        &self,
+        f: &mut SimpleFormatter,
+        name: &str,
+    ) -> fmt::Result {
+        match self {
+            DataType::Array(_) |
+            DataType::Primitive(_) |
+            DataType::Void => {
+                write!(f, "export type {} = ", name)?;
+                self.fmt(f)?;
+                writeln!(f, ";")
+            }
+            DataType::Compound(_) => {
+                write!(f, "export interface {} ", name)?;
+                self.fmt(f)?;
+                writeln!(f, "")
+            }
+            DataType::Reference(reference) => {
+                let guard = reference.read();
+                guard.get_data_type()
+                    .expect("Data-type should not contains wrong references at generate-time")
+                    .body.fmt_export(f, name)
+            }
         }
     }
 }
