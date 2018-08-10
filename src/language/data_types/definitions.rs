@@ -1045,9 +1045,12 @@ impl DataType {
             }
             DataType::Reference(reference) => {
                 let guard = reference.read();
-                guard.get_data_type()
-                    .expect("Data-type should not contains wrong references at generate-time")
-                    .body.fmt(f)
+                f.write_str(
+                    guard.get_path()
+                        .as_path()
+                        .into_new_buf(".")
+                        .data.as_str()
+                )
             }
             DataType::Void => {
                 f.write_str("void")
@@ -1062,6 +1065,7 @@ impl DataType {
         match self {
             DataType::Array(_) |
             DataType::Primitive(_) |
+            DataType::Reference(_) |
             DataType::Void => {
                 write!(f, "export type {} = ", name)?;
                 self.fmt(f)?;
@@ -1071,12 +1075,6 @@ impl DataType {
                 write!(f, "export interface {} ", name)?;
                 self.fmt(f)?;
                 writeln!(f, "")
-            }
-            DataType::Reference(reference) => {
-                let guard = reference.read();
-                guard.get_data_type()
-                    .expect("Data-type should not contains wrong references at generate-time")
-                    .body.fmt_export(f, name)
             }
         }
     }
