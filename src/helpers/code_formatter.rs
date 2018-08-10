@@ -149,6 +149,112 @@ impl<'a, 'b, T: 'a + Write> Drop for LineFormatter<'a, 'b, T> {
     }
 }
 
+#[derive(Debug)]
+pub struct SimpleFormatter<'a, T: 'a + Write> {
+    target: &'a mut T,
+    buffer: String,
+    started: bool,
+    indent_size: usize,
+}
+
+impl<'a, T: 'a + Write> SimpleFormatter<'a, T> {
+    #[inline]
+    pub fn new(target: &'a mut T, indent_size: usize) -> Self {
+        Self {
+            target,
+            started: false,
+            buffer: String::new(),
+            indent_size,
+        }
+    }
+    #[inline]
+    pub fn sub_block(&mut self) -> SimpleFormatter<Self> {
+        let indent_size = self.indent_size;
+        SimpleFormatter::new(self, indent_size)
+    }
+    pub fn write(&mut self, value: impl fmt::Display) -> fmt::Result {
+        self.buffer.write_fmt(format_args!("{}", value))?;
+        {
+            let mut chunks = self.buffer.split('\n')
+                .peekable();
+            while let Some(chunk) = chunks.next() {
+                if !chunk.is_empty() && !self.started {
+                    for _ in 0..self.indent_size {
+                        self.target.write_char(' ')?;
+                    }
+                    self.started = true;
+                }
+                self.target.write_str(chunk)?;
+                if chunks.peek().is_some() {
+                    self.target.write_char('\n')?;
+                    self.started = false;
+                }
+            }
+        }
+        self.buffer.clear();
+        Ok(())
+    }
+}
+
+impl<'a, T: 'a + Write> Write for SimpleFormatter<'a, T> {
+    #[inline]
+    fn write_str(&mut self, str: &str) -> fmt::Result {
+        self.write(str)
+    }
+
+    #[inline]
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.write(c)
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+        self.write(args)
+    }
+}
+
+#[derive(Debug)]
+pub struct SimpleFormatterTop<'a, T: 'a + Write> {
+    target: &'a mut T,
+    indent_size: usize,
+}
+
+impl<'a, T: 'a + Write> SimpleFormatterTop<'a, T> {
+    #[inline]
+    pub fn new(target: &'a mut T, indent_size: usize) -> Self {
+        Self {
+            target,
+            indent_size,
+        }
+    }
+    #[inline]
+    pub fn sub_block(&mut self) -> SimpleFormatter<Self> {
+        let indent_size = self.indent_size;
+        SimpleFormatter::new(self, indent_size)
+    }
+    #[inline]
+    pub fn write(&mut self, value: impl fmt::Display) -> fmt::Result {
+        self.write_fmt(format_args!("{}", value))
+    }
+}
+
+impl<'a, T: 'a + Write> Write for SimpleFormatterTop<'a, T> {
+    #[inline]
+    fn write_str(&mut self, str: &str) -> fmt::Result {
+        self.target.write_str(str)
+    }
+
+    #[inline]
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.target.write_char(c)
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+        self.target.write_fmt(args)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,6 +282,26 @@ mod tests {
         \n  }\
         \n}\
         \n", result);
+        Ok(())
+    }
+
+    #[test]
+    fn test_simple_f() -> fmt::Result {
+        let mut result = String::new();
+        {
+            let mut f = SimpleFormatterTop::new(&mut result, 4);
+            writeln!(f, "export interface Bla {{")?;
+            {
+                let mut sub_f = f.sub_block();
+                writeln!(sub_f, "Bla, bla, bla.")?;
+            }
+            writeln!(f, "}}")?;
+        }
+        assert_eq!(result, "\
+            export interface Bla {\
+            \n    Bla, bla, bla.\
+            \n}\
+        \n");
         Ok(())
     }
 }
