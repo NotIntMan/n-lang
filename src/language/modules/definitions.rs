@@ -120,11 +120,15 @@ impl TableDefinition {
         parameters: TSQLParameters,
         columns: impl IntoIterator<Item=FieldPrimitive>,
         last_comma: bool,
+        postfix: Option<&str>,
     ) -> fmt::Result {
         let mut columns = columns.into_iter().peekable();
         while let Some(primitive) = columns.next() {
             let mut line = f.line()?;
             line.write(format_args!("{} {}", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
+            if let Some(postfix) = &postfix {
+                line.write(format_args!(" {}", postfix))?;
+            }
             if last_comma || columns.peek().is_some() {
                 line.write(",")?;
             }
@@ -150,12 +154,15 @@ impl<'a> Generate<TSQLParameters<'a>> for TableDefinition {
         for (field_name, field) in self.body.iter() {
             let mut prefix = PathBuf::new("#");
             prefix.push(field_name.as_str());
+            let modifier = find_attribute(&field.attributes, "auto_increment")
+                .map(|_| "IDENTITY");
             field.field_type.make_primitives(prefix, &mut primitives);
             TableDefinition::fmt_primitives_as_columns(
                 columns.clone(),
                 parameters.clone(),
                 Extractor::new(&mut primitives),
                 true,
+                modifier,
             )?;
         }
 

@@ -294,6 +294,7 @@ impl FunctionDefinition {
                 context.parameters.clone(),
                 sub_type.primitives(PathBuf::new("#")),
                 false,
+                None,
             )?;
             f.write_line(");")?;
         } else {
