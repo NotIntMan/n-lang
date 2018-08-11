@@ -113,9 +113,9 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
             arguments.insert(name.to_string(), var);
         }
 
-        let result = match &self.result {
-            Some(data_type) => data_type.resolve(&ctx.0)?,
-            None => DataType::Void,
+        let (result_pos, result) = match &self.result {
+            Some(data_type) => (data_type.pos, data_type.resolve(&ctx.0)?),
+            None => (self.pos, DataType::Void),
         };
 
         let body = self.body.resolve(&root)?;
@@ -137,6 +137,11 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
                 stmt.is_lite_weight()
             }
         };
+
+        if !is_lite_weight && result.as_array().is_some() {
+            return SemanticError::not_allowed_inside(result_pos, "array type", "function with side effects")
+                .into_err_vec();
+        }
 
         Ok(FunctionDefinition {
             name: self.name.to_string(),

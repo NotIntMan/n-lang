@@ -668,9 +668,20 @@ pub struct DataTypeAST<'source> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DataTypeASTBody<'source> {
+    Array(Box<DataTypeAST<'source>>),
     Compound(CompoundDataTypeAST<'source>),
     Primitive(PrimitiveDataType),
     Reference(ItemPath),
+}
+
+impl<'source> DataTypeAST<'source> {
+    pub fn array(self) -> Self {
+        let pos = self.pos;
+        Self {
+            pos,
+            body: DataTypeASTBody::Array(box self),
+        }
+    }
 }
 
 impl<'source> Assertion for DataTypeAST<'source> {
@@ -715,6 +726,9 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
         match &self.body {
+            DataTypeASTBody::Array(sub_type) => Ok(DataType::Array(
+                Arc::new((**sub_type).resolve(ctx)?)
+            )),
             DataTypeASTBody::Compound(value) => Ok(DataType::Compound(value.resolve(ctx)?)),
             DataTypeASTBody::Primitive(value) => {
                 if let Err(kind) = value.check() {

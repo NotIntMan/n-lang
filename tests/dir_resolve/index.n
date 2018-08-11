@@ -96,3 +96,7 @@ fn delete_user(id: unsigned integer) {
     wrong();
     delete from Users u where u.id = id;
 }
+
+fn get_user(id: unsigned integer): {user: Users::entity}[] {
+    return select * from Users user where user.id = id;
+}
