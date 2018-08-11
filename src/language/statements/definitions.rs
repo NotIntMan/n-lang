@@ -523,14 +523,33 @@ impl Statement {
             };
             let var_data_type = var_guard.data_type()
                 .expect("Variables cannot have unknown data-type at generate-time");
+            let (is_table, primitives) = if let Some(sub_type) = var_data_type.as_array() {
+                (true, sub_type.primitives(PathBuf::new("#")))
+            } else {
+                (false, var_data_type.primitives(PathBuf::new("#")))
+            };
+            if is_table {
+                let mut line = f.line()?;
+                write!(line, "INSERT INTO @{} (", var_guard.name())?;
+
+                let mut primitives = primitives.iter().peekable();
+                while let Some(primitive) = primitives.next() {
+                    line.write_str(primitive.path.data.as_str())?;
+                    if primitives.peek().is_some() {
+                        line.write_str(", ")?;
+                    }
+                }
+                line.write_str(")")?;
+            }
             f.write_line("SELECT")?;
 
-            let mut primitives = var_data_type.primitives(PathBuf::new("#"))
-                .into_iter()
-                .peekable();
+            let mut primitives = primitives.into_iter().peekable();
             while let Some(primitive) = primitives.next() {
                 let mut line = sub_sub_f.line()?;
-                write!(line, "@{var}#{path} = t.{path}", var = var_guard.name(), path = primitive.path)?;
+                if !is_table {
+                    write!(line, "@{var}#{path} = ", var = var_guard.name(), path = primitive.path)?;
+                }
+                write!(line, "t.{path}", path = primitive.path)?;
                 if primitives.peek().is_some() {
                     line.write_char(',')?;
                 }
@@ -684,7 +703,7 @@ impl Statement {
                     }
                     line.write_str(")")?;
 
-                    select_wrapper.write_str(" FROM (")?;
+                    select_wrapper.write_str(" FROM")?;
                     select_wrapper
                 };
 
@@ -697,12 +716,13 @@ impl Statement {
                             let mut line = sub_f.line()?;
                             expr.fmt(&mut line, context)?;
                         }
-                        source_f.write_line(") as t;")
+                        source_f.write_line("AS t;")
                     }
                     StatementSource::Selection(query) => {
+                        source_f.write_line("(")?;
                         if query.result_data_type == *target_data_type {
                             query.fmt(source_f.sub_block(), context)?;
-                            source_f.write_line(";")
+                            source_f.write_line(");")
                         } else {
                             source_f.write_line(select_wrapper)?;
                             query.fmt(source_f.sub_block(), context)?;

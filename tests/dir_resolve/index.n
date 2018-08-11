@@ -100,3 +100,11 @@ fn delete_user(id: unsigned integer) {
 fn get_user(id: unsigned integer): {user: Users::entity}[] {
     return select * from Users user where user.id = id;
 }
+
+fn get_user_pair(id0: unsigned integer, id1: unsigned integer): {user: Users::entity}[] {
+    let result := get_user(id0);
+    let u1 := get_user(id1);
+    insert into result r (r.user)
+        select u1.user from u1;
+    return result;
+}
