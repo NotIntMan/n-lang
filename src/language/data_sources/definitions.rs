@@ -218,7 +218,7 @@ impl DataSource {
             DataSource::Variable { var } => {
                 let var_guard = var.read();
                 if aliases {
-                    f.write_line(format_args!("@{name} AS {name}", name = var_guard.name()))
+                    f.write_line(format_args!("@{name} AS [{name}]", name = var_guard.name()))
                 } else {
                     f.write_line(format_args!("@{name}", name = var_guard.name()))
                 }
@@ -227,7 +227,7 @@ impl DataSource {
                 let item_guard = item.read();
                 if aliases {
                     let var_guard = var.read();
-                    f.write_line(format_args!("[{}] AS {}", item_guard.get_path(), var_guard.name()))
+                    f.write_line(format_args!("[{}] AS [{}]", item_guard.get_path(), var_guard.name()))
                 } else {
                     let mut var_guard = var.write();
                     var_guard.set_name("".to_string());
@@ -253,7 +253,7 @@ impl DataSource {
             DataSource::Selection { query, alias, var: _ } => {
                 query.fmt(f.clone(), context)?;
                 if aliases {
-                    f.sub_block().write_line(format_args!("AS {}", alias))?;
+                    f.sub_block().write_line(format_args!("AS [{}]", alias))?;
                 }
                 Ok(())
             }

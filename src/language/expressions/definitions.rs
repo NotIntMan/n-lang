@@ -1001,7 +1001,7 @@ impl Expression {
             return Ok(());
         }
         if var.is_automatic() {
-            f.write_str(name)?;
+            write!(f, "[{}]", name)?;
             if access {
                 f.write_char('.')?;
             }
@@ -1022,7 +1022,7 @@ impl Expression {
     ) -> Result<bool, fmt::Error> {
         if data_type.as_primitive().is_some() {
             if var_is_automatic {
-                write!(f, "{}", var_name)?;
+                write!(f, "[{}]", var_name)?;
             } else {
                 write!(f, "@{}", var_name)?;
             }
@@ -1038,7 +1038,7 @@ impl Expression {
         let mut primitives = primitives.into_iter().peekable();
         while let Some(primitive) = primitives.next() {
             if var_is_automatic {
-                write!(f, "{}.", var_name)?;
+                write!(f, "[{}].", var_name)?;
             } else {
                 write!(f, "@{}#", var_name)?;
             }
@@ -1058,7 +1058,7 @@ impl Expression {
 
         if data_type.as_primitive().is_some() {
             if var.is_automatic() {
-                write!(f, "{}", var.name())?;
+                write!(f, "[{}]", var.name())?;
             } else {
                 write!(f, "@{}", var.name())?;
             }
@@ -1119,14 +1119,14 @@ impl Expression {
         }
 
         if property_data_type.as_primitive().is_some() {
-            write!(f, "( SELECT t.{}", path_buf.data)?;
+            write!(f, "( SELECT t.[{}]", path_buf.data)?;
         } else {
             f.write_str("( SELECT ")?;
             let mut primitives = property_data_type.primitives(PathBuf::new("#"))
                 .into_iter()
                 .peekable();
             while let Some(primitive) = primitives.next() {
-                write!(f, "t.{prop}#{name} as {name}", prop = path, name = primitive.path)?;
+                write!(f, "t.[{prop}#{name}] as [{name}]", prop = path, name = primitive.path)?;
                 if primitives.peek().is_some() {
                     f.write_str(", ")?;
                 }

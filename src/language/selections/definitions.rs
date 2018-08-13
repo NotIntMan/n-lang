@@ -452,7 +452,7 @@ impl Selection {
                 if let Some(sub_expr) = result_item.expr.get_property_or_wrap(primitive.path.as_path()) {
                     sub_expr.fmt(&mut line, context)?;
                 } else {
-                    write!(line, "( SELECT t.{} FROM (", new_path)?;
+                    write!(line, "( SELECT t.[{}] FROM (", new_path)?;
                     result_item.expr.fmt(&mut line, context)?;
                     write!(line, ") as t )")?;
                 }

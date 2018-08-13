@@ -492,7 +492,7 @@ impl InsertingSource {
                         .peekable();
                     while let Some(primitive) = primitives.next() {
                         let mut line = sub_f.line()?;
-                        write!(line, "t.{path} as {path}", path = primitive.path)?;
+                        write!(line, "t.[{path}] as [{path}]", path = primitive.path)?;
                         if primitives.peek().is_some() || properties_iter.peek().is_some() {
                             line.write_char(',')?;
                         }

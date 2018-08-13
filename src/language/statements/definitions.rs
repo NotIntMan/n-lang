@@ -549,7 +549,7 @@ impl Statement {
                 if !is_table {
                     write!(line, "@{var}#{path} = ", var = var_guard.name(), path = primitive.path)?;
                 }
-                write!(line, "t.{path}", path = primitive.path)?;
+                write!(line, "t.[{path}]", path = primitive.path)?;
                 if primitives.peek().is_some() {
                     line.write_char(',')?;
                 }
@@ -693,9 +693,8 @@ impl Statement {
 
                     let mut primitives = primitives.into_iter().peekable();
                     while let Some(primitive) = primitives.next() {
-                        line.write_str(primitive.path.data.as_str())?;
-                        select_wrapper.write_str("t.")?;
-                        select_wrapper.write_str(primitive.path.data.as_str())?;
+                        write!(line, "[{}]", primitive.path)?;
+                        write!(select_wrapper, "t.[{}]", primitive.path)?;
                         if primitives.peek().is_some() {
                             line.write_str(", ")?;
                             select_wrapper.write_str(", ")?;
@@ -759,7 +758,7 @@ impl Statement {
 
                 while let Some(primitive) = primitives.next() {
                     let mut line = sub_sub_f.line()?;
-                    write!(line, "@{var}#{path} = t.{path}", var = target_path, path = primitive.path)?;
+                    write!(line, "@{var}#{path} = t.[{path}]", var = target_path, path = primitive.path)?;
                     if primitives.peek().is_some() {
                         line.write_char(',')?;
                     }

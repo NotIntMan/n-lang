@@ -125,7 +125,7 @@ impl TableDefinition {
         let mut columns = columns.into_iter().peekable();
         while let Some(primitive) = columns.next() {
             let mut line = f.line()?;
-            line.write(format_args!("{} {}", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
+            line.write(format_args!("[{}] {}", primitive.path, TSQL(&primitive.field_type, parameters.clone())))?;
             if let Some(postfix) = &postfix {
                 line.write(format_args!(" {}", postfix))?;
             }
@@ -173,7 +173,7 @@ impl<'a> Generate<TSQLParameters<'a>> for TableDefinition {
 
             let mut primitives = Extractor::new(&mut primitives);
             if let Some(primitive) = primitives.next() {
-                primary_key.write(format_args!("{}", primitive.path.data))?;
+                primary_key.write(format_args!("[{}]", primitive.path.data))?;
             }
             for primitive in primitives {
                 primary_key.write(format_args!(", {}", primitive.path.data))?;

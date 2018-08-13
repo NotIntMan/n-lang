@@ -179,9 +179,11 @@ impl FunctionDefinition {
         while let Some(primitive) = arguments.next() {
             let mut line = f.line()?;
             if !is_automatic {
-                line.write_char('@')?;
+                write!(line, "@{}", primitive.path)?;
+            } else {
+                write!(line, "[{}]", primitive.path)?;
             }
-            line.write(format_args!("{} {}", primitive.path.data, TSQL(&primitive.field_type, context.parameters.clone())))?;
+            write!(line, " {}", TSQL(&primitive.field_type, context.parameters.clone()))?;
             if is_output {
                 line.write(" OUTPUT")?;
             }
@@ -396,7 +398,7 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
             pre_calc_calls: Vec::new(),
         }
     }
-    pub fn make_function_name<'x>(&'x mut self) -> Path<'x> {
+    pub fn make_function_name(&mut self) -> Path {
         if self.function_name.is_none() {
             let mut path = self.parameters.module_path.into_buf();
             path.push(self.function.name.as_str());
