@@ -94,23 +94,37 @@ impl RPCModule {
             sub_modules: Map::new(),
         }
     }
-    pub fn fmt(&self, f: &mut SimpleFormatter) -> fmt::Result {
+    pub fn fmt(&self, f: &mut SimpleFormatter, path: Path) -> fmt::Result {
         for (module_name, module) in self.sub_modules.iter() {
             writeln!(f, "export module {} {{", module_name)?;
-            module.fmt(&mut f.sub_block())?;
+            module.fmt(
+                &mut f.sub_block(),
+                PathBuf::from_paths(
+                    path,
+                    Path::new(module_name.as_str(), "::"),
+                ).as_path(),
+            )?;
             writeln!(f, "}}")?;
         }
         for (name, data_type) in self.data_types.iter() {
             data_type.fmt_export(f, &name)?;
         }
-        for (name, _function) in self.functions.iter() {
-            writeln!(f, "export function {} ();", name)?;
+        for (_name, function) in self.functions.iter() {
+            function.fmt_export(f, path)?;
         }
         Ok(())
     }
     pub fn generate_string(&self) -> Result<String, fmt::Error> {
         let mut result = String::new();
-        self.fmt(&mut SimpleFormatter::new(&mut result, 4))?;
+        {
+            let mut formatter = SimpleFormatter::new(&mut result, 4);
+
+            // Imports
+            writeln!(formatter, "import * as _mssql from 'mssql'")?;
+            writeln!(formatter, "")?;
+
+            self.fmt(&mut formatter, Path::new("", "::"))?;
+        }
         Ok(result)
     }
 }

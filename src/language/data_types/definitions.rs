@@ -68,6 +68,18 @@ pub fn int_class(size: u32) -> &'static str {
     }
 }
 
+#[inline]
+pub fn int_class_ts_mssql(size: u32) -> &'static str {
+    match size {
+        0..=1 => "Bit",
+        2..=8 => "TinyInt",
+        9..=16 => "SmallInt",
+        17..=32 => "Int",
+        33..=64 => "BigInt",
+        _ => panic!("{} is too big size for integer in ms-sql", size),
+    }
+}
+
 impl NumberType {
     pub fn can_cast(&self, target: &NumberType) -> bool {
         match self {
@@ -422,6 +434,57 @@ impl PrimitiveDataType {
         match self {
             PrimitiveDataType::Number(x) => x.check(),
             _ => Ok(()),
+        }
+    }
+    pub fn fmt_ts_mssql(&self, f: &mut impl Write) -> fmt::Result {
+        match self {
+            PrimitiveDataType::Null => f.write_str("Bit"),
+            PrimitiveDataType::Number(NumberType::Bit { size }) => {
+                f.write_str(int_class_ts_mssql(size.unwrap_or(1)))
+            }
+            PrimitiveDataType::Number(NumberType::Boolean) => f.write_str("Bit"),
+            PrimitiveDataType::Number(NumberType::Integer { size, .. }) => {
+                f.write_str(int_class_ts_mssql((*size).into()))
+            }
+            PrimitiveDataType::Number(NumberType::Decimal { size, .. }) => {
+                match size {
+                    Some((precision, Some(scale))) => write!(f, "Decimal({}, {})", precision, scale),
+                    Some((precision, None)) => write!(f, "Decimal({})", precision),
+                    None => write!(f, "Decimal"),
+                }
+            }
+            PrimitiveDataType::Number(NumberType::Float { size, double }) => {
+                match size {
+                    Some((precision, scale)) => write!(f, "Float({}, {})", precision, scale),
+                    None => if *double {
+                        write!(f, "Float(24)")
+                    } else {
+                        write!(f, "Float(53)")
+                    }
+                }
+            }
+            PrimitiveDataType::DateTime(date_time_type) => {
+                let (class, precision) = match date_time_type {
+                    DateTimeType::Date => ("Date", &None),
+                    DateTimeType::Time { precision } => ("Time", precision),
+                    DateTimeType::Datetime { precision } => ("DateTime", precision),
+                    DateTimeType::Timestamp { precision } => ("DateTime2", precision),
+                };
+                if let Some(precision) = precision {
+                    write!(f, "{}({})", class, precision)
+                } else {
+                    write!(f, "{}", class)
+                }
+            },
+            PrimitiveDataType::Year(_) => f.write_str("SmallInt"),
+            PrimitiveDataType::String(StringType::Varchar { size, .. }) => {
+                if let Some(size) = size {
+                    write!(f, "NVarChar({})", size)
+                } else {
+                    f.write_str("NVarChar")
+                }
+            }
+            PrimitiveDataType::String(StringType::Text { .. }) => f.write_str("NText"),
         }
     }
 }
@@ -1090,6 +1153,70 @@ impl DataType {
                 self.fmt(f)?;
                 writeln!(f, "")
             }
+        }
+    }
+    pub fn fmt_result_bind(
+        &self,
+        f: &mut SimpleFormatter,
+        variable: &str,
+        prefix: Path,
+    ) -> fmt::Result {
+        match self {
+            DataType::Array(_) => panic!("Array-type cannot be bind"),
+            DataType::Compound(CompoundDataType::Tuple(fields)) => {
+                writeln!(f, "[")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for (i, field) in fields.iter().enumerate() {
+                        let mut field_prefix = prefix.into_buf();
+                        field_prefix.push_fmt(format_args!("component{}", i))?;
+                        field.field_type.fmt_result_bind(
+                            &mut sub_f,
+                            variable,
+                            field_prefix.as_path(),
+                        )?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                writeln!(f, "]")
+            }
+            DataType::Compound(CompoundDataType::Structure(fields)) => {
+                writeln!(f, "{{")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for (name, field) in fields.iter() {
+                        let mut field_prefix = prefix.into_buf();
+                        field_prefix.push(&*name);
+                        write!(sub_f, "{}: ", name)?;
+                        field.field_type.fmt_result_bind(
+                            &mut sub_f,
+                            variable,
+                            field_prefix.as_path(),
+                        )?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                writeln!(f, "}}")
+            }
+            DataType::Primitive(_) => {
+                write!(
+                    f,
+                    "{var}['{path}']",
+                    var = variable,
+                    path = prefix,
+                )
+            }
+            DataType::Reference(item) => {
+                item.read()
+                    .get_data_type()
+                    .expect("Wrong references are not allowed at generate-time")
+                    .body.fmt_result_bind(
+                        f,
+                        variable,
+                        prefix
+                    )
+            }
+            DataType::Void => f.write_str("void 0"),
         }
     }
 }

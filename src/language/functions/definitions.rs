@@ -7,6 +7,7 @@ use helpers::{
     Path,
     PathBuf,
     Resolve,
+    SimpleFormatter,
     SyncRef,
     TSQL,
     TSQLParameters,
@@ -138,6 +139,21 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
             }
         };
 
+        if let Some(sub_type) = result.as_array() {
+            if !is_lite_weight {
+                return SemanticError::not_allowed_inside(result_pos, "array type", "function with side effects")
+                    .into_err_vec();
+            }
+            if sub_type.as_array().is_some() {
+                // Unreachable but mean
+                return SemanticError::not_allowed_inside(result_pos, "array type", "array type")
+                    .into_err_vec();
+            }
+            if sub_type.as_primitive().is_some() {
+                return SemanticError::not_allowed_inside(result_pos, "primitive type", "array type")
+                    .into_err_vec();
+            }
+        }
         if !is_lite_weight && result.as_array().is_some() {
             return SemanticError::not_allowed_inside(result_pos, "array type", "function with side effects")
                 .into_err_vec();
@@ -362,6 +378,178 @@ impl FunctionDefinition {
         }
 
         f.write_line("END")
+    }
+    pub fn fmt_export(
+        &self,
+        f: &mut SimpleFormatter,
+        module_path: Path,
+    ) -> fmt::Result {
+        writeln!(f, "export function {}(", self.name)?;
+
+        // Arguments
+        {
+            let mut args_f = f.sub_block();
+            writeln!(args_f, "_pool: _mssql.ConnectionPool,")?;
+            for (argument_name, argument) in &self.arguments {
+                write!(args_f, "{}: ", argument_name)?;
+                let argument_guard = argument.read();
+                let argument_data_type = argument_guard.data_type()
+                    .expect("Variable's data-type should not be unknown at generate-time");
+                argument_data_type.fmt(&mut args_f.sub_block())?;
+                writeln!(args_f, ",")?;
+            }
+        }
+
+        // Return type
+        write!(f, "): Promise<")?;
+        self.result.fmt(&mut f.sub_block())?;
+        writeln!(f, "> {{")?;
+
+        // Body
+        {
+            let mut body_f = f.sub_block();
+
+            // Binding arguments into the query
+            writeln!(body_f, "const _req = new _mssql.Request(_pool)")?;
+            for (argument_name, argument) in &self.arguments {
+                let argument_guard = argument.read();
+                let argument_data_type = argument_guard.data_type()
+                    .expect("Variable's data-type should not be unknown at generate-time");
+                let mut prefix = PathBuf::new("#");
+                prefix.push(&*argument_name);
+                for primitive in argument_data_type.primitives(prefix) {
+                    let data_path = primitive.path.as_path().into_new_buf(".");
+                    write!(body_f, "_req.input('{target}', _mssql.", target = primitive.path)?;
+                    primitive.field_type.fmt_ts_mssql(&mut body_f)?;
+                    writeln!(body_f, ", {source})", source = data_path)?;
+                }
+            }
+
+
+            if self.is_lite_weight {
+                // Arguments of function for call expression
+                let arguments = {
+                    let mut buffer = String::new();
+                    let mut arguments = self.arguments.iter()
+                        .peekable();
+                    while let Some((argument_name, argument)) = arguments.next() {
+                        let argument_guard = argument.read();
+                        let argument_data_type = argument_guard.data_type()
+                            .expect("Variable's data-type should not be unknown at generate-time");
+
+                        let mut prefix = PathBuf::new("#");
+                        prefix.push(&*argument_name);
+                        let mut primitives = argument_data_type.primitives(prefix)
+                            .into_iter()
+                            .peekable();
+                        while let Some(primitive) = primitives.next() {
+                            buffer.push('@');
+                            buffer.push_str(primitive.path.data.as_str());
+                            if primitives.peek().is_some() || arguments.peek().is_some() {
+                                buffer.push_str(", ");
+                            }
+                        }
+                    }
+                    buffer
+                };
+
+                // For primitive results
+                if self.result.as_primitive().is_some() {
+                    write!(
+                        body_f,
+                        "return _req.query('SELECT dbo.[{module}::{name}]({args}) as result')",
+                        module = module_path,
+                        name = self.name,
+                        args = arguments,
+                    )?;
+                    let mut then_f = body_f.sub_block();
+                    writeln!(then_f, ".then(_result => {{")?;
+                    {
+                        let mut closure_f = then_f.sub_block();
+                        writeln!(closure_f, "return _result.recordset[0].result")?;
+                    }
+                    writeln!(then_f, "}})")?;
+                } else {
+                    write!(
+                        body_f,
+                        "return _req.query('SELECT * FROM dbo.[{module}::{name}]({args})')",
+                        module = module_path,
+                        name = self.name,
+                        args = arguments,
+                    )?;
+
+                    // Extracting result
+                    let mut then_f = body_f.sub_block();
+                    writeln!(then_f, ".then(_result => {{")?;
+                    {
+                        let mut closure_f = then_f.sub_block();
+                        let (is_array, result) = self.result.as_array()
+                            .map(|t| (true, &**t))
+                            .unwrap_or_else(|| (false, &self.result));
+                        writeln!(closure_f, "return _result.recordset.map(record => {{")?;
+                        {
+                            // Binding results
+                            let mut sub_closure_f = closure_f.sub_block();
+                            sub_closure_f.write_str("return ")?;
+                            result.fmt_result_bind(
+                                &mut sub_closure_f,
+                                "record",
+                                Path::new("", "#"),
+                            )?;
+                            writeln!(sub_closure_f, "")?;
+                        }
+
+                        // Recordset is always an array
+                        // but if needs a one item, not an array
+                        // then we extract the first item and return it
+                        writeln!(closure_f, "}}){}", if is_array {
+                            ""
+                        } else {
+                            "[0]"
+                        })?;
+                    }
+                    writeln!(then_f, "}}")?;
+                }
+            } else {
+                // Binding result of procedure
+                let mut prefix = PathBuf::new("#");
+                prefix.push("_return_value");
+                for primitive in self.result.primitives(prefix) {
+                    write!(body_f, "_req.output('{}', _mssql.", primitive.path)?;
+                    primitive.field_type.fmt_ts_mssql(&mut body_f)?;
+                    writeln!(body_f, ")")?;
+                }
+
+                // Calling procedure
+                writeln!(
+                    body_f,
+                    "return _req.execute('dbo.[{module}::{name}]')",
+                    module = module_path,
+                    name = self.name,
+                )?;
+
+                // Awaiting result
+                let mut then_f = body_f.sub_block();
+                writeln!(then_f, ".then(_result => {{")?;
+
+                {
+                    // Binding result
+                    let mut closure_f = then_f.sub_block();
+                    write!(closure_f, "return ")?;
+                    self.result.fmt_result_bind(
+                        &mut closure_f,
+                        "_result.output",
+                        Path::new("_return_value", "#"),
+                    )?;
+                    writeln!(closure_f, "")?;
+                }
+
+                writeln!(then_f, "}})")?;
+            }
+        }
+
+        /// End of function
+        writeln!(f, "}}")
     }
 }
 
