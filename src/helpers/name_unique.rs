@@ -1,5 +1,8 @@
 use std::{
-    collections::HashSet,
+    collections::{
+        HashSet,
+        HashMap,
+    },
     fmt::Write,
 };
 
@@ -60,6 +63,36 @@ impl NameUniquer {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct AliasNameUniquer<'a> {
+    uniquer: &'a mut NameUniquer,
+    aliases: HashMap<String, String>,
+}
+
+impl<'a> AliasNameUniquer<'a> {
+    #[inline]
+    pub fn new(uniquer: &'a mut NameUniquer) -> Self {
+        Self {
+            uniquer,
+            aliases: HashMap::new(),
+        }
+    }
+    pub fn make_alias(&mut self, name: &str) -> &str {
+        if !self.aliases.contains_key(name) {
+            let result = self.uniquer.add_name(name.to_string());
+            self.aliases.insert(name.to_string(), result);
+        }
+        match self.aliases.get(name) {
+            Some(refer) => refer,
+            None => unreachable!(),
+        }
+    }
+    pub fn get_alias(&self, name: &str) -> Option<&str> {
+        self.aliases.get(name)
+            .map(|a| a.as_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,5 +104,17 @@ mod tests {
         assert_eq!(name, n.add_name(name.clone()));
         assert_eq!(format!("{}_0", name), n.add_name(name.clone()));
         assert_eq!(format!("{}_1", name), n.add_name(name.clone()));
+        {
+            let mut a = AliasNameUniquer::new(&mut n);
+            assert_eq!(
+                a.make_alias(&name).to_string(),
+                a.make_alias(&name).to_string()
+            );
+            let other_name = "input";
+            assert_eq!(
+                a.make_alias(other_name).to_string(),
+                a.make_alias(other_name).to_string()
+            );
+        }
     }
 }
