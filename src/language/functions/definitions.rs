@@ -455,7 +455,7 @@ impl FunctionDefinition {
 
                 // For primitive results
                 if self.result.as_primitive().is_some() {
-                    write!(
+                    writeln!(
                         body_f,
                         "return _req.query('SELECT dbo.[{module}::{name}]({args}) as result')",
                         module = module_path,
@@ -470,7 +470,7 @@ impl FunctionDefinition {
                     }
                     writeln!(then_f, "}})")?;
                 } else {
-                    write!(
+                    writeln!(
                         body_f,
                         "return _req.query('SELECT * FROM dbo.[{module}::{name}]({args})')",
                         module = module_path,
@@ -508,7 +508,7 @@ impl FunctionDefinition {
                             "[0]"
                         })?;
                     }
-                    writeln!(then_f, "}}")?;
+                    writeln!(then_f, "}})")?;
                 }
             } else {
                 // Binding result of procedure
