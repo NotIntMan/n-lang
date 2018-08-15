@@ -55,6 +55,7 @@ impl RPCModule {
 
         for (item_name, item) in source_guard.items() {
             let item_guard = item.value.read();
+            if !item_guard.is_belongs_to(source) { continue; }
             if let Some(data_type) = item_guard.get_data_type() {
                 data_types.insert(item_name.as_str(), data_type.body.clone());
             } else if let Some(function) = item_guard.get_function() {
