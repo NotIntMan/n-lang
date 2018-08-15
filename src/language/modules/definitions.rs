@@ -248,7 +248,7 @@ impl<'source> ModuleDefinitionValueAST<'source> {
             }
             ModuleDefinitionValueAST::Function(def) => def.name.text(),
             ModuleDefinitionValueAST::Table(def) => def.name.text(),
-            _ => unimplemented!(),
+            ModuleDefinitionValueAST::Module(def) => def.name.text(),
         }
     }
 }

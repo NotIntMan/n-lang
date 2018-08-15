@@ -36,7 +36,7 @@ pub trait TextSource {
     fn get_text(&self, path: Path) -> Option<Arc<Text>>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HashMapSource {
     map: HashMap<PathBuf, Arc<Text>>,
 }

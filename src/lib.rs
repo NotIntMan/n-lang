@@ -2,7 +2,6 @@
 #![feature(ptr_internals)]
 #![feature(box_syntax)]
 
-extern crate anymap;
 extern crate indexmap;
 #[cfg(feature = "parser_trace")]
 #[macro_use]
