@@ -1178,7 +1178,7 @@ impl DataType {
                         writeln!(sub_f, ",")?;
                     }
                 }
-                writeln!(f, "]")
+                write!(f, "]")
             }
             DataType::Compound(CompoundDataType::Structure(fields)) => {
                 writeln!(f, "{{")?;
@@ -1196,7 +1196,7 @@ impl DataType {
                         writeln!(sub_f, ",")?;
                     }
                 }
-                writeln!(f, "}}")
+                write!(f, "}}")
             }
             DataType::Primitive(_) => {
                 write!(
