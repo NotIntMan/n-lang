@@ -885,10 +885,11 @@ impl Statement {
                             }
                         }
                     } else {
-                        let result_name = context.make_result_variable_name().to_string();
+                        let result_var_name = context.function.result_var_name.as_ref()
+                            .expect("Result-variable name should be known when result is not void");
                         Statement::fmt_assignment(
                             f.clone(),
-                            &result_name,
+                            result_var_name,
                             &context.function.result,
                             context.function.is_lite_weight,
                             value,

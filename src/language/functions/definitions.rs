@@ -3,6 +3,7 @@ use helpers::{
     CodeFormatter,
     Extractor,
     Generate,
+    generate_name,
     NameUniquer,
     Path,
     PathBuf,
@@ -159,10 +160,20 @@ impl<'source> Resolve<(SyncRef<Module>, Vec<AttributeAST<'source>>)> for Functio
                 .into_err_vec();
         }
 
+        let result_var_name = if is_lite_weight && result.as_primitive().is_some() {
+            None
+        } else {
+            Some(generate_name(
+                |new_name| !arguments.contains_key(new_name),
+                "return_value".to_string(),
+            ))
+        };
+
         Ok(FunctionDefinition {
             name: self.name.to_string(),
             arguments,
             result,
+            result_var_name,
             body,
             context,
             is_lite_weight,
@@ -176,6 +187,7 @@ pub struct FunctionDefinition {
     pub name: String,
     pub arguments: IndexMap<String, SyncRef<FunctionVariable>>,
     pub result: DataType,
+    pub result_var_name: Option<String>,
     pub body: FunctionBody,
     pub context: SyncRef<FunctionContext>,
     pub is_lite_weight: bool,
@@ -255,14 +267,16 @@ impl FunctionDefinition {
                     true,
                 )?;
             } else {
-                let mut line = sub_f.line()?;
-                line.write(format_args!("@{} ", context.make_result_variable_name()))?;
-                if let Some(result) = context.function.result.as_primitive() {
-                    line.write(TSQL(&result, context.parameters.clone()))?;
-                } else {
-                    line.write("bit")?;
+                if let Some(result_variable_name) = &context.function.result_var_name {
+                    let mut line = sub_f.line()?;
+                    line.write(format_args!("@{} ", result_variable_name))?;
+                    if let Some(result) = context.function.result.as_primitive() {
+                        line.write(TSQL(&result, context.parameters.clone()))?;
+                    } else {
+                        line.write("bit")?;
+                    }
+                    line.write(" OUTPUT")?;
                 }
-                line.write(" OUTPUT")?;
             }
         } else {
             let table = if context.function.result.can_be_table() {
@@ -271,7 +285,9 @@ impl FunctionDefinition {
                 None
             };
             if let Some(primitives) = table {
-                f.write_line(format_args!(") RETURNS @{} TABLE (", context.make_result_variable_name()))?;
+                let result_variable_name = context.function.result_var_name.as_ref()
+                    .expect("Table-valued functions should know their return-value name.");
+                f.write_line(format_args!(") RETURNS @{} TABLE (", result_variable_name))?;
                 FunctionDefinition::fmt_primitives_as_args(
                     sub_f,
                     primitives,
@@ -365,7 +381,7 @@ impl FunctionDefinition {
         }
 
         if context.function.result == DataType::Void {
-            if let Some(var_name) = &context.result_variable_name {
+            if let Some(var_name) = &context.function.result_var_name {
                 sub_f.write_line(format_args!("SET @{} = 0;", var_name))?;
             }
         }
@@ -513,7 +529,9 @@ impl FunctionDefinition {
             } else {
                 // Binding result of procedure
                 let mut prefix = PathBuf::new("#");
-                prefix.push("_return_value");
+                let result_variable_name = self.result_var_name.as_ref()
+                    .expect("Procedures should know their return-value name.");
+                prefix.push(result_variable_name);
                 for primitive in self.result.primitives(prefix) {
                     write!(body_f, "_req.output('{}', _mssql.", primitive.path)?;
                     primitive.field_type.fmt_ts_mssql(&mut body_f)?;
@@ -539,7 +557,7 @@ impl FunctionDefinition {
                     self.result.fmt_result_bind(
                         &mut closure_f,
                         "_result.output",
-                        Path::new("_return_value", "#"),
+                        Path::new(result_variable_name, "#"),
                     )?;
                     writeln!(closure_f, "")?;
                 }
@@ -567,7 +585,6 @@ pub struct TSQLFunctionContext<'a, 'b> {
     pub parameters: TSQLParameters<'b>,
     pub names: NameUniquer,
     pub function_name: Option<PathBuf>,
-    pub result_variable_name: Option<String>,
     // TODO Учесть пре-вызовы перед каждой вставкой выражения
     pub temp_vars_scope: SyncRef<FunctionVariableScope>,
     pub pre_calc_calls: Vec<String>,
@@ -576,12 +593,18 @@ pub struct TSQLFunctionContext<'a, 'b> {
 impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
     pub fn new(function: &'a FunctionDefinition, parameters: TSQLParameters<'b>) -> Self {
         let temp_vars_scope = function.context.root().child();
+        let mut names = NameUniquer::new();
+        for (name, _) in &function.arguments {
+            names.add_name(name.clone());
+        }
+        if let Some(name) = &function.result_var_name {
+            names.add_name(name.clone());
+        }
         Self {
             function,
             parameters,
-            names: NameUniquer::new(),
+            names,
             function_name: None,
-            result_variable_name: None,
             temp_vars_scope,
             pre_calc_calls: Vec::new(),
         }
@@ -597,18 +620,11 @@ impl<'a, 'b> TSQLFunctionContext<'a, 'b> {
             None => unreachable!()
         }
     }
-    pub fn make_result_variable_name(&mut self) -> &str {
-        if self.result_variable_name.is_none() {
-            self.result_variable_name = Some(self.names.add_name("return_value".into()));
-        }
-        match &self.result_variable_name {
-            Some(result_variable_name) => result_variable_name.as_str(),
-            None => unreachable!(),
-        }
-    }
     pub fn make_result_variable_prefix(&mut self) -> PathBuf {
         let mut prefix = PathBuf::new("#");
-        prefix.push(self.make_result_variable_name());
+        if let Some(result_var_name) = &self.function.result_var_name {
+            prefix.push(&*result_var_name);
+        }
         prefix
     }
     pub fn add_pre_calc_call(&mut self, function: &SyncRef<Item>, arguments: &[Expression]) -> Result<SyncRef<FunctionVariable>, fmt::Error> {
