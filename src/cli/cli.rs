@@ -22,7 +22,7 @@ pub fn build_cli_app<'a, 'b>() -> App<'a, 'b> {
     App::new("N-lang compiler")
         .version("0.1.0")
         .author("Dmitry Demin <shepardiwe@gmail.com>")
-        .about("Compiles N-lang projects.")
+        .about("Compiler for N-lang projects. For now supports T-SQL and TypeScript only.")
         .arg(
             Arg::with_name(PROJECT_DIR)
                 .help("Project's directory location")
