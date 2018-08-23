@@ -1,14 +1,16 @@
-use std::sync::Arc;
-use std::fmt;
-use std::hash;
 use helpers::{
-    ReEntrantRWLock,
     ReEntrantReadGuard,
+    ReEntrantRWLock,
     ReEntrantWriteGuard,
+};
+use std::{
+    fmt,
+    hash,
+    sync::Arc,
 };
 
 #[derive(PartialEq, Eq)]
-pub struct SyncRef<T: ? Sized> {
+pub struct SyncRef<T: ?Sized> {
     res: Arc<ReEntrantRWLock<T>>,
 }
 
@@ -21,7 +23,7 @@ impl<T> SyncRef<T> {
     }
 }
 
-impl<T: ? Sized> SyncRef<T> {
+impl<T: ?Sized> SyncRef<T> {
     pub fn get_mut(&mut self) -> Option<&mut T> {
         let unique_lock = Arc::get_mut(&mut self.res)?;
         Some(unique_lock.get_mut())
@@ -41,7 +43,7 @@ impl<T: ? Sized> SyncRef<T> {
     }
 }
 
-impl<'a, T: ? Sized> SyncRef<T>
+impl<'a, T: ?Sized> SyncRef<T>
     where ReEntrantRWLock<T>: 'a {
     #[inline]
     pub fn try_read(&'a self) -> Option<ReEntrantReadGuard<'a, T>> {
@@ -69,7 +71,7 @@ impl<T> Clone for SyncRef<T> {
     }
 }
 
-impl<T: fmt::Debug + ? Sized> fmt::Debug for SyncRef<T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for SyncRef<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let data = self.read();
         if f.alternate() {
@@ -80,7 +82,7 @@ impl<T: fmt::Debug + ? Sized> fmt::Debug for SyncRef<T> {
     }
 }
 
-impl<T: fmt::Display + ? Sized> fmt::Display for SyncRef<T> {
+impl<T: fmt::Display + ?Sized> fmt::Display for SyncRef<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let data = self.read();
         write!(f, "SyncRef of {}", &*data)

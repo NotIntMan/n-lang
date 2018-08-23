@@ -1,14 +1,14 @@
 use lexeme_scanner::{
     ItemPosition,
-    Token,
     SymbolPosition,
+    Token,
 };
 use parser_basics::{
     keyword,
     Parser,
     ParserResult,
-    symbols,
     symbol_position,
+    symbols,
 };
 use super::super::*;
 

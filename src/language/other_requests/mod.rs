@@ -54,8 +54,9 @@
     Правила `selection`, `select_condition` и `select_sorting` определены в модуле `language::selections`.
 */
 
+pub use self::definitions::*;
+pub use self::rules::*;
+
 pub mod definitions;
 pub mod rules;
 
-pub use self::definitions::*;
-pub use self::rules::*;

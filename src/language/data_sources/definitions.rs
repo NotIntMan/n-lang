@@ -1,10 +1,9 @@
 use helpers::{
+    BlockFormatter,
     Path,
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
-use parser_basics::Identifier;
 use language::{
     AssignmentTarget,
     DataType,
@@ -13,7 +12,10 @@ use language::{
     ItemPath,
     Selection,
     SelectionAST,
+    TSQLFunctionContext,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
     FunctionVariable,
     FunctionVariableScope,
@@ -21,42 +23,16 @@ use project_analysis::{
     SemanticError,
     SemanticItemType,
 };
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum JoinConditionAST<'source> {
-    Expression(ExpressionAST<'source>),
-    Using(Vec<ItemPath>),
-    Natural,
-}
-
-impl<'source> Resolve<SyncRef<FunctionVariableScope>> for JoinConditionAST<'source> {
-    type Result = JoinCondition;
-    type Error = SemanticError;
-    fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
-        let result = match self {
-            JoinConditionAST::Expression(expr) => JoinCondition::Expression(expr.resolve(scope)?),
-            JoinConditionAST::Using(paths) => JoinCondition::Using(paths.clone()),
-            JoinConditionAST::Natural => JoinCondition::Natural,
-        };
-        Ok(result)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum JoinCondition {
-    Expression(Expression),
-    // TODO Специальная проверка синтаксиса JOIN ... USING (...)
-    Using(Vec<ItemPath>),
-    // TODO Специальная проверка синтаксиса JOIN ... NATURAL
-    Natural,
-}
+use std::fmt::{
+    self,
+    Write,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinType {
     Cross,
     Left,
     Right,
-    Full,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -67,7 +43,7 @@ pub enum DataSourceAST<'source> {
     },
     Join {
         join_type: JoinType,
-        condition: Option<JoinConditionAST<'source>>,
+        condition: Option<ExpressionAST<'source>>,
         left: Box<DataSourceAST<'source>>,
         right: Box<DataSourceAST<'source>>,
     },
@@ -99,16 +75,17 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                         if var.is_read_only() {
                             new_var.make_read_only();
                         }
+                        new_var.mark_as_automatic();
                         return Ok(DataSource::Variable { var });
                     }
                 }
                 match scope.module().get_item(name.path.as_path(), &mut Vec::new()) {
                     Some(item) => {
                         let var = {
-                            let mut item = item.write();
+                            let mut item = item.read();
                             let item_type = item.get_type();
-                            let entity_type = match item.get_table_mut() {
-                                Some(table) => table.make_entity_type(),
+                            let entity_type = match item.get_table() {
+                                Some(table) => &table.entity,
                                 None => return SemanticError::expected_item_of_another_type(
                                     name.pos,
                                     SemanticItemType::Table,
@@ -122,7 +99,12 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DataSourceAST<'source>
                                     .pop_right()
                                     .expect("Item's path should not be null"),
                             };
-                            scope.new_variable(pos, new_var_name.to_string(), Some(entity_type))?
+                            let var = scope.new_variable(pos, new_var_name.to_string(), Some(entity_type.clone()))?;
+                            {
+                                let mut var_guard = var.write();
+                                var_guard.mark_as_automatic();
+                            }
+                            var
                         };
                         Ok(DataSource::Table { item, var })
                     }
@@ -161,7 +143,7 @@ pub enum DataSource {
     },
     Join {
         join_type: JoinType,
-        condition: Option<JoinCondition>,
+        condition: Option<Expression>,
         left: Box<DataSource>,
         right: Box<DataSource>,
     },
@@ -189,10 +171,10 @@ impl DataSource {
             DataSource::Selection { query: _, alias: _, var: _ } => false,
         }
     }
-    pub fn get_datatype_for_insert(&self, pos: ItemPosition) -> Result<DataType, SemanticError> {
+    pub fn get_target_for_insert(&self, pos: ItemPosition) -> Result<SyncRef<FunctionVariable>, SemanticError> {
         match self {
-            DataSource::Variable { var } => var.data_type(pos),
-            DataSource::Table { item: _, var } => var.data_type(pos),
+            DataSource::Variable { var } => Ok(var.clone()),
+            DataSource::Table { item: _, var } => Ok(var.clone()),
             DataSource::Join { join_type: _, condition: _, left: _, right: _ } =>
                 return Err(SemanticError::not_allowed_inside(pos, "insertion", "JOIN of data sources")),
             DataSource::Selection { query: _, alias: _, var: _ } =>
@@ -224,6 +206,57 @@ impl DataSource {
             DataSource::Join { join_type: _, condition: _, left, right } =>
                 left.is_local() && right.is_local(),
             DataSource::Selection { query, alias: _, var: _ } => query.source.is_local(),
+        }
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        aliases: bool,
+    ) -> fmt::Result {
+        match self {
+            DataSource::Variable { var } => {
+                let var_guard = var.read();
+                if aliases {
+                    f.write_line(format_args!("@{name} AS [{name}]", name = var_guard.name()))
+                } else {
+                    f.write_line(format_args!("@{name}", name = var_guard.name()))
+                }
+            }
+            DataSource::Table { item, var } => {
+                let item_guard = item.read();
+                if aliases {
+                    let var_guard = var.read();
+                    f.write_line(format_args!("[{}] AS [{}]", item_guard.get_path(), var_guard.name()))
+                } else {
+                    let mut var_guard = var.write();
+                    var_guard.set_name("".to_string());
+                    f.write_line(format_args!("[{}]", item_guard.get_path()))
+                }
+            }
+            DataSource::Join { join_type, condition, left, right } => {
+                left.fmt(f.clone(), context, aliases)?;
+                {
+                    let mut line = f.line()?;
+                    line.write_str(match join_type {
+                        JoinType::Cross => "CROSS JOIN",
+                        JoinType::Left => "LEFT JOIN",
+                        JoinType::Right => "RIGHT JOIN",
+                    })?;
+                    if let Some(condition) = condition {
+                        line.write_str(" ON ")?;
+                        condition.fmt(&mut line, context)?;
+                    }
+                }
+                right.fmt(f, context, aliases)
+            }
+            DataSource::Selection { query, alias, var: _ } => {
+                query.fmt(f.clone(), context)?;
+                if aliases {
+                    f.sub_block().write_line(format_args!("AS [{}]", alias))?;
+                }
+                Ok(())
+            }
         }
     }
 }

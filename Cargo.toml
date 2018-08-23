@@ -1,11 +1,15 @@
 [package]
 name = "n_lang"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["Dmitry Demin"]
 
 [lib]
 name = "n_lang"
 path = "src/lib.rs"
+
+[[bin]]
+name = "n_lang"
+path = "src/cli/main.rs"
 
 [features]
 parser_trace = []
@@ -15,11 +19,10 @@ nom = "3.2.1"
 log = "0.4.1"
 env_logger = "0.5.3"
 indexmap = "0.4.1"
-anymap = "0.12.1"
+clap = "2.32.0"
 
 [dev-dependencies]
 pretty_assertions = "0.5.0"
 
 [profile.dev]
 debug = true
-opt-level = 0

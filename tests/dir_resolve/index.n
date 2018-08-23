@@ -1,5 +1,10 @@
+pub struct PersonSex {
+    is_male: boolean,
+}
+
 pub struct PersonInfo {
     age: unsigned tiny integer,
+    sex: PersonSex,
 }
 
 table Users {
@@ -18,8 +23,9 @@ fn get_max_user_age(): small integer {
     return t.component0;
 }
 
-fn add_user(person_info: PersonInfo) {
+fn add_user(person_info: PersonInfo): PersonInfo {
     insert into Users u (u.person_info) values (person_info);
+    return person_info;
 }
 
 fn new_person_info(age: unsigned tiny integer): PersonInfo {
@@ -32,6 +38,73 @@ fn old_all_users(increment: unsigned tiny integer) {
     update Users u set u.person_info.age = user_age(u) + 1;
 }
 
+fn user_info(user: Users::entity): PersonInfo {
+    return user.person_info;
+}
+
+fn max_of_ages(a: Users::entity, b: Users::entity): unsigned tiny integer {
+    let info_a := user_info(a);
+    if info_a.age > user_info(b).age {
+        return user_age(a);
+    } else {
+        return user_age(b);
+    }
+}
+
+fn sum(a: small integer, b: small integer): small integer {
+    return a + b;
+}
+
+fn fibo(n: small integer): small integer {
+    let a: small integer := 1;
+    let b: small integer := 1;
+    let i: small integer := 1;
+    while n > i {
+        i := i + 1;
+        let t := a;
+        a := b;
+        b := b + t;
+    };
+    do {
+        i := i + 1;
+        let t := a;
+        a := b;
+        b := b + t;
+    } while n > i;
+    loop {
+        i := i + 1;
+    };
+    return a;
+}
+
 fn wrong() {
-    let a := select u from Users u;
+    let a := select * from Users u;
+    let b := select * from a join Users us;
+    let c := 2 + 2 + 2;
+    let d := select max(a.u.person_info.age) from a;
+    let e := d.component0;
+    let f := sum(5, 10);
+    {
+        let info: PersonInfo;
+        info.age := 18;
+        info.sex.is_male := true;
+        let g := add_user(info);
+    }
+}
+
+fn delete_user(id: unsigned integer) {
+    wrong();
+    delete from Users u where u.id = id;
+}
+
+fn get_user(id: unsigned integer): {user: Users::entity}[] {
+    return select * from Users user where user.id = id;
+}
+
+fn get_user_pair(id0: unsigned integer, id1: unsigned integer): {user: Users::entity}[] {
+    let result := get_user(id0);
+    let u1 := get_user(id1);
+    insert into result r (r.user)
+        select u1.user from u1;
+    return result;
 }

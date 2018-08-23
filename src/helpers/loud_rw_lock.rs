@@ -1,11 +1,13 @@
-use std::sync::{
-    RwLock,
-    RwLockReadGuard,
-    RwLockWriteGuard,
-    TryLockError,
+use std::{
+    cmp,
+    fmt,
+    sync::{
+        RwLock,
+        RwLockReadGuard,
+        RwLockWriteGuard,
+        TryLockError,
+    },
 };
-use std::fmt;
-use std::cmp;
 
 pub struct LoudRwLock<T: ?Sized> {
     error_msg: &'static str,
@@ -102,7 +104,7 @@ impl<T: fmt::Debug + ?Sized> fmt::Debug for LoudRwLock<T> {
     }
 }
 
-impl<T: ? Sized, R: ? Sized> cmp::PartialEq<LoudRwLock<R>> for LoudRwLock<T>
+impl<T: ?Sized, R: ?Sized> cmp::PartialEq<LoudRwLock<R>> for LoudRwLock<T>
     where T: cmp::PartialEq<R> {
     fn eq(&self, other: &LoudRwLock<R>) -> bool {
         let left = self.read();
@@ -117,4 +119,4 @@ impl<T: ? Sized, R: ? Sized> cmp::PartialEq<LoudRwLock<R>> for LoudRwLock<T>
     }
 }
 
-impl<T: ? Sized> cmp::Eq for LoudRwLock<T> where T: cmp::Eq {}
+impl<T: ?Sized> cmp::Eq for LoudRwLock<T> where T: cmp::Eq {}

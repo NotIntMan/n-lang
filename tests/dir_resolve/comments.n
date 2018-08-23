@@ -1,4 +1,5 @@
 use posts::Posts;
+use posts::new_post;
 
 table Comments {
     #[primary_key]

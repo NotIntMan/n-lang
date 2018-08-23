@@ -1,10 +1,8 @@
-use nom::{
-    IResult,
-    ErrorKind,
-};
-
 use lexeme_scanner::Token;
-
+use nom::{
+    ErrorKind,
+    IResult,
+};
 use super::{
     new_error,
     new_error_without_pos,

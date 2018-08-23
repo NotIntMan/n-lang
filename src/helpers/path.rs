@@ -1,6 +1,11 @@
-use std::fmt;
-use std::cmp;
-use std::mem::replace;
+use std::{
+    cmp,
+    fmt::{
+        self,
+        Write,
+    },
+    mem::replace,
+};
 
 #[derive(Clone, Eq, Hash)]
 pub struct PathBuf {
@@ -33,7 +38,7 @@ impl PathBuf {
         buf
     }
     #[inline]
-    pub fn as_path<'a>(&'a self) -> Path<'a> {
+    pub fn as_path(&self) -> Path {
         Path {
             data: &self.data,
             delimiter: &self.delimiter,
@@ -51,6 +56,28 @@ impl PathBuf {
             self.data.push_str(&self.delimiter);
         }
         self.data.push_str(component);
+    }
+    pub fn push_fmt(&mut self, component: impl fmt::Display) -> fmt::Result {
+        self.data.reserve_exact(16 + self.delimiter.len());
+        if !self.data.is_empty() {
+            self.data.push_str(&self.delimiter);
+        }
+        self.data.write_fmt(format_args!("{}", component))
+    }
+    pub fn push_front(&mut self, component: impl ToString) {
+        self.data.reserve_exact(16 + self.delimiter.len());
+        if !self.data.is_empty() {
+            self.data.replace_range(0..0, &self.delimiter);
+        }
+        self.data.replace_range(0..0, &component.to_string());
+    }
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.as_path().is_empty()
+    }
+    #[inline]
+    pub fn the_only(&self) -> Option<&str> {
+        self.as_path().the_only()
     }
 }
 
@@ -93,10 +120,20 @@ impl<'a> cmp::PartialEq<PathBuf> for Path<'a> {
     }
 }
 
-impl<'a> From<Path<'a>> for PathBuf {
-    #[inline]
-    fn from(path: Path<'a>) -> PathBuf {
-        PathBuf::from_path(path)
+impl cmp::PartialOrd for PathBuf {
+    fn partial_cmp(&self, other: &PathBuf) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl cmp::Ord for PathBuf {
+    fn cmp(&self, other: &PathBuf) -> cmp::Ordering {
+        match self.data.cmp(&other.data) {
+            cmp::Ordering::Equal => {
+                self.delimiter.cmp(&other.delimiter)
+            }
+            o => o,
+        }
     }
 }
 
@@ -179,6 +216,18 @@ impl<'a> Path<'a> {
             None
         }
     }
+    #[inline]
+    pub fn into_buf(self) -> PathBuf {
+        PathBuf::from_path(self)
+    }
+    #[inline]
+    pub fn into_new_buf(self, delimiter: &str) -> PathBuf {
+        let mut result = PathBuf::new(delimiter);
+        for item in self {
+            result.push(item);
+        }
+        result
+    }
 }
 
 impl<'a> fmt::Debug for Path<'a> {
@@ -219,6 +268,29 @@ impl<'a> cmp::PartialEq<[&'a str]> for Path<'a> {
     }
 }
 
+impl<'a> Into<PathBuf> for Path<'a> {
+    fn into(self) -> PathBuf {
+        self.into_buf()
+    }
+}
+
+impl<'a> cmp::PartialOrd for Path<'a> {
+    fn partial_cmp(&self, other: &Path<'a>) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> cmp::Ord for Path<'a> {
+    fn cmp(&self, other: &Path<'a>) -> cmp::Ordering {
+        match self.data.cmp(&other.data) {
+            cmp::Ordering::Equal => {
+                self.delimiter.cmp(&other.delimiter)
+            }
+            o => o,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PathComponents<'a> {
     data: &'a str,
@@ -234,7 +306,7 @@ impl<'a> PathComponents<'a> {
 
 impl<'a> Iterator for PathComponents<'a> {
     type Item = &'a str;
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<&'a str> {
         let data_length = self.data.len();
         if data_length == 0 {
             return None;

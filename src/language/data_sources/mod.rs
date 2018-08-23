@@ -38,8 +38,9 @@
     Правило `selection` определено в модуле `language::selections`.
 */
 
+pub use self::definitions::*;
+pub use self::rules::*;
+
 pub mod definitions;
 pub mod rules;
 
-pub use self::definitions::*;
-pub use self::rules::*;

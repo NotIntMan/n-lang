@@ -1,13 +1,3 @@
-use lexeme_scanner::Token;
-use parser_basics::{
-    identifier,
-    item_position,
-    keyword,
-    list,
-    symbols,
-    symbol_position,
-    ParserResult,
-};
 use language::{
     data_type,
     deleting,
@@ -16,6 +6,16 @@ use language::{
     property_path,
     selection,
     updating,
+};
+use lexeme_scanner::Token;
+use parser_basics::{
+    identifier,
+    item_position,
+    keyword,
+    list,
+    ParserResult,
+    symbol_position,
+    symbols,
 };
 use super::*;
 

@@ -1,9 +1,9 @@
 //! Набор структур для отображения элемента лексического разбора
 
-use std::fmt;
 use helpers::Assertion;
-use super::*;
 use parser_basics::Identifier;
+use std::fmt;
+use super::*;
 
 /// Тип токена
 #[derive(Debug, Clone, Copy, PartialEq)]

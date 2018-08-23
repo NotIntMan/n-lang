@@ -1,25 +1,37 @@
 #![allow(unused_imports)]
 
-use std::mem::replace;
-use std::fmt;
-use std::sync::Arc;
-use indexmap::IndexMap;
-use helpers::Assertion;
 use helpers::{
     as_unique_identifier,
-    Path,
+    Assertion,
+    BlockFormatter,
+    Format,
+    Generate,
     parse_index,
+    Path,
+    PathBuf,
     Resolve,
+    SimpleFormatter,
     SyncRef,
+    TSQLParameters,
 };
+use indexmap::IndexMap;
+use language::ItemPath;
 use lexeme_scanner::ItemPosition;
 use parser_basics::Identifier;
-use language::ItemPath;
 use project_analysis::{
     Item,
-    SemanticItemType,
-    SemanticError,
     Module,
+    SemanticError,
+    SemanticErrorKind,
+    SemanticItemType,
+};
+use std::{
+    fmt::{
+        self,
+        Write,
+    },
+    mem::replace,
+    sync::Arc,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +54,30 @@ pub enum NumberType {
         size: Option<(u32, u32)>,
         double: bool,
     },
+}
+
+#[inline]
+pub fn int_class(size: u32) -> &'static str {
+    match size {
+        0..=1 => "bit",
+        2..=8 => "tinyint",
+        9..=16 => "smallint",
+        17..=32 => "int",
+        33..=64 => "bigint",
+        _ => panic!("{} is too big size for integer in ms-sql", size),
+    }
+}
+
+#[inline]
+pub fn int_class_ts_mssql(size: u32) -> &'static str {
+    match size {
+        0..=1 => "Bit",
+        2..=8 => "TinyInt",
+        9..=16 => "SmallInt",
+        17..=32 => "Int",
+        33..=64 => "BigInt",
+        _ => panic!("{} is too big size for integer in ms-sql", size),
+    }
 }
 
 impl NumberType {
@@ -91,6 +127,26 @@ impl NumberType {
         }
         false
     }
+    pub fn check(&self) -> Result<(), SemanticErrorKind> {
+        match self {
+            NumberType::Bit { size } => {
+                if size.unwrap_or(1) > 64 {
+                    return Err(SemanticErrorKind::NotSupportedYet {
+                        feature: "long bit sets",
+                    });
+                }
+            }
+            NumberType::Integer { size, .. } => {
+                if *size > 64 {
+                    return Err(SemanticErrorKind::NotSupportedYet {
+                        feature: "big numbers",
+                    });
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for NumberType {
@@ -132,6 +188,27 @@ impl fmt::Display for NumberType {
                     write!(f, "({}, {})", size_a, size_b)?;
                 }
                 Ok(())
+            }
+        }
+    }
+}
+
+impl<'a> Format<TSQLParameters<'a>> for NumberType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
+        match self {
+            NumberType::Bit { size } => {
+                f.write_str(int_class(size.unwrap_or(1)))
+            }
+            NumberType::Boolean => f.write_str("bit"),
+            NumberType::Integer { size, .. } => f.write_str(int_class((*size).into())),
+            NumberType::Decimal { size, .. } => match size {
+                None => f.write_str("decimal"),
+                Some((p, None)) => write!(f, "decimal({})", p),
+                Some((p, Some(s))) => write!(f, "decimal({}, {})", p, s),
+            }
+            NumberType::Float { double, .. } => {
+                let class = if *double { "double" } else { "float" };
+                f.write_str(class)
             }
         }
     }
@@ -180,6 +257,23 @@ impl fmt::Display for DateTimeType {
     }
 }
 
+impl<'a> Format<TSQLParameters<'a>> for DateTimeType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
+        let (class, precision) = match self {
+            DateTimeType::Date => ("date", &None),
+            DateTimeType::Time { precision } => ("time", precision),
+            DateTimeType::Datetime { precision } => ("datetime", precision),
+            DateTimeType::Timestamp { precision } => ("timestamp", precision),
+        };
+        f.write_str(class)?;
+        if let Some(p) = precision {
+            write!(f, "({})", p)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum YearType {
     Year2,
@@ -203,6 +297,12 @@ impl fmt::Display for YearType {
             &YearType::Year2 => write!(f, "year(2)"),
             &YearType::Year4 => write!(f, "year(4)"),
         }
+    }
+}
+
+impl<'a> Format<TSQLParameters<'a>> for YearType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
+        f.write_str("smallint")
     }
 }
 
@@ -281,6 +381,22 @@ impl fmt::Display for StringType {
     }
 }
 
+impl<'a> Format<TSQLParameters<'a>> for StringType {
+    fn fmt(&self, f: &mut impl fmt::Write, _parameters: TSQLParameters<'a>) -> fmt::Result {
+        match self {
+            StringType::Varchar { size, .. } => {
+                f.write_str("nvarchar")?;
+                if let Some(size) = size {
+                    write!(f, "({})", size)
+                } else {
+                    Ok(())
+                }
+            }
+            StringType::Text { .. } => f.write_str("ntext"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PrimitiveDataType {
     Null,
@@ -313,8 +429,67 @@ impl PrimitiveDataType {
         }
         false
     }
+    #[inline]
+    pub fn check(&self) -> Result<(), SemanticErrorKind> {
+        match self {
+            PrimitiveDataType::Number(x) => x.check(),
+            _ => Ok(()),
+        }
+    }
+    pub fn fmt_ts_mssql(&self, f: &mut impl Write) -> fmt::Result {
+        match self {
+            PrimitiveDataType::Null => f.write_str("Bit"),
+            PrimitiveDataType::Number(NumberType::Bit { size }) => {
+                f.write_str(int_class_ts_mssql(size.unwrap_or(1)))
+            }
+            PrimitiveDataType::Number(NumberType::Boolean) => f.write_str("Bit"),
+            PrimitiveDataType::Number(NumberType::Integer { size, .. }) => {
+                f.write_str(int_class_ts_mssql((*size).into()))
+            }
+            PrimitiveDataType::Number(NumberType::Decimal { size, .. }) => {
+                match size {
+                    Some((precision, Some(scale))) => write!(f, "Decimal({}, {})", precision, scale),
+                    Some((precision, None)) => write!(f, "Decimal({})", precision),
+                    None => write!(f, "Decimal"),
+                }
+            }
+            PrimitiveDataType::Number(NumberType::Float { size, double }) => {
+                match size {
+                    Some((precision, scale)) => write!(f, "Float({}, {})", precision, scale),
+                    None => if *double {
+                        write!(f, "Float(24)")
+                    } else {
+                        write!(f, "Float(53)")
+                    }
+                }
+            }
+            PrimitiveDataType::DateTime(date_time_type) => {
+                let (class, precision) = match date_time_type {
+                    DateTimeType::Date => ("Date", &None),
+                    DateTimeType::Time { precision } => ("Time", precision),
+                    DateTimeType::Datetime { precision } => ("DateTime", precision),
+                    DateTimeType::Timestamp { precision } => ("DateTime2", precision),
+                };
+                if let Some(precision) = precision {
+                    write!(f, "{}({})", class, precision)
+                } else {
+                    write!(f, "{}", class)
+                }
+            },
+            PrimitiveDataType::Year(_) => f.write_str("SmallInt"),
+            PrimitiveDataType::String(StringType::Varchar { size, .. }) => {
+                if let Some(size) = size {
+                    write!(f, "NVarChar({})", size)
+                } else {
+                    f.write_str("NVarChar")
+                }
+            }
+            PrimitiveDataType::String(StringType::Text { .. }) => f.write_str("NText"),
+        }
+    }
 }
 
+// TODO Удалить impl fmt::Display у всех сущностей, которым это не нужно. В частности, у типов данных.
 impl fmt::Display for PrimitiveDataType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -323,6 +498,18 @@ impl fmt::Display for PrimitiveDataType {
             PrimitiveDataType::DateTime(primitive) => write!(f, "{}", primitive),
             PrimitiveDataType::Year(primitive) => write!(f, "{}", primitive),
             PrimitiveDataType::String(primitive) => write!(f, "{}", primitive),
+        }
+    }
+}
+
+impl<'a> Format<TSQLParameters<'a>> for PrimitiveDataType {
+    fn fmt(&self, f: &mut impl fmt::Write, parameters: TSQLParameters<'a>) -> fmt::Result {
+        match self {
+            PrimitiveDataType::Null => f.write_str("null"),
+            PrimitiveDataType::Number(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
+            PrimitiveDataType::DateTime(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
+            PrimitiveDataType::Year(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
+            PrimitiveDataType::String(x) => Format::<TSQLParameters>::fmt(x, f, parameters),
         }
     }
 }
@@ -537,26 +724,44 @@ impl<'source> Resolve<SyncRef<Module>> for Vec<(Identifier<'source>, FieldAST<'s
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataTypeAST<'source> {
+pub struct DataTypeAST<'source> {
+    pub pos: ItemPosition,
+    pub body: DataTypeASTBody<'source>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataTypeASTBody<'source> {
+    Array(Box<DataTypeAST<'source>>),
     Compound(CompoundDataTypeAST<'source>),
     Primitive(PrimitiveDataType),
     Reference(ItemPath),
 }
 
+impl<'source> DataTypeAST<'source> {
+    pub fn array(self) -> Self {
+        let pos = self.pos;
+        Self {
+            pos,
+            body: DataTypeASTBody::Array(box self),
+        }
+    }
+}
+
 impl<'source> Assertion for DataTypeAST<'source> {
     fn assert(&self, other_data_type: &DataTypeAST) {
-        match self {
-            DataTypeAST::Compound(compound_type) => {
-                match_it!(other_data_type, DataTypeAST::Compound(other_compound_type) => {
+        let other_body = &other_data_type.body;
+        match &self.body {
+            DataTypeASTBody::Compound(compound_type) => {
+                match_it!(other_body, DataTypeASTBody::Compound(other_compound_type) => {
                     compound_type.assert(other_compound_type);
                 });
             }
-            DataTypeAST::Reference(path) => {
-                match_it!(other_data_type, DataTypeAST::Reference(other_path) => {
+            DataTypeASTBody::Reference(path) => {
+                match_it!(other_body, DataTypeASTBody::Reference(other_path) => {
                     assert_eq!(path.path, other_path.path);
                 });
             }
-            other => assert_eq!(other, other_data_type),
+            other => assert_eq!(other, other_body),
         }
     }
 }
@@ -583,10 +788,18 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
     type Result = DataType;
     type Error = SemanticError;
     fn resolve(&self, ctx: &SyncRef<Module>) -> Result<Self::Result, Vec<Self::Error>> {
-        match self {
-            DataTypeAST::Compound(value) => Ok(DataType::Compound(value.resolve(ctx)?)),
-            DataTypeAST::Primitive(value) => Ok(DataType::Primitive(value.clone())),
-            DataTypeAST::Reference(path) => {
+        match &self.body {
+            DataTypeASTBody::Array(sub_type) => Ok(DataType::Array(
+                Arc::new((**sub_type).resolve(ctx)?)
+            )),
+            DataTypeASTBody::Compound(value) => Ok(DataType::Compound(value.resolve(ctx)?)),
+            DataTypeASTBody::Primitive(value) => {
+                if let Err(kind) = value.check() {
+                    return Err(vec![SemanticError::new(self.pos, kind)]);
+                }
+                Ok(DataType::Primitive(value.clone()))
+            }
+            DataTypeASTBody::Reference(path) => {
                 let item = match ctx.get_item(path.path.as_path(), &mut vec![]) {
                     Some(item) => item,
                     None => return SemanticError::unresolved_item(path.pos, path.path.clone()).into_err_vec(),
@@ -606,7 +819,7 @@ impl<'source> Resolve<SyncRef<Module>> for DataTypeAST<'source> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum DataType {
     Array(Arc<DataType>),
     Compound(CompoundDataType),
@@ -726,6 +939,286 @@ impl DataType {
             }
         }
     }
+    pub fn make_primitives(&self, prefix: PathBuf, target: &mut Vec<FieldPrimitive>) {
+        match self {
+            DataType::Array(sub_type) => {
+                let mut sub_prefix = prefix;
+                sub_prefix.push("[]");
+                sub_type.make_primitives(sub_prefix, target);
+            }
+            DataType::Primitive(primitive) => {
+                target.push(FieldPrimitive {
+                    path: prefix,
+                    field_type: primitive.clone(),
+                });
+            }
+            DataType::Void => {
+                target.push(FieldPrimitive {
+                    path: prefix,
+                    field_type: PrimitiveDataType::Number(NumberType::Bit {
+                        size: Some(0),
+                    }),
+                });
+            }
+            DataType::Compound(CompoundDataType::Tuple(fields)) => {
+                for (i, field) in fields.iter().enumerate() {
+                    let mut path = prefix.clone();
+                    if path.push_fmt(format_args!("component{}", i)).is_ok() {
+                        field.field_type.make_primitives(path, target);
+                    }
+                }
+            }
+            DataType::Compound(CompoundDataType::Structure(fields)) => {
+                for (field_name, field) in fields.iter() {
+                    let mut path = prefix.clone();
+                    path.push(field_name.as_str());
+                    field.field_type.make_primitives(path, target);
+                }
+            }
+            DataType::Reference(item) => {
+                let item = item.read();
+                if let Some(data_type) = item.get_data_type() {
+                    data_type.body.make_primitives(prefix, target);
+                };
+            }
+        }
+    }
+    pub fn primitives(&self, prefix: PathBuf) -> Vec<FieldPrimitive> {
+        let mut result = Vec::new();
+        self.make_primitives(prefix, &mut result);
+        result
+    }
+    pub fn can_be_table(&self) -> bool {
+        match self {
+            DataType::Array(_) |
+            DataType::Compound(_) => true,
+            DataType::Reference(item) => {
+                let item = item.read();
+                if let Some(data_type) = item.get_data_type() {
+                    data_type.body.can_be_table()
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    pub fn make_table_type(&self, prefix: PathBuf, consumer: &mut Vec<FieldPrimitive>) -> bool {
+        match self {
+            DataType::Array(sub_type) => {
+                sub_type.make_primitives(prefix, consumer);
+                true
+            }
+            DataType::Compound(_) => {
+                self.make_primitives(prefix, consumer);
+                true
+            }
+            DataType::Reference(item) => {
+                let item = item.read();
+                if let Some(data_type) = item.get_data_type() {
+                    data_type.body.make_table_type(prefix, consumer)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    #[inline]
+    pub fn as_table_type(&self, prefix: PathBuf) -> Option<Vec<FieldPrimitive>> {
+        let mut result = Vec::new();
+        if self.make_table_type(prefix, &mut result) {
+            Some(result)
+        } else {
+            None
+        }
+    }
+    #[inline]
+    pub fn as_primitive(&self) -> Option<PrimitiveDataType> {
+        match self {
+            DataType::Primitive(x) => Some(x.clone()),
+            DataType::Reference(item) => {
+                let item_guard = item.read();
+                let references_data_type = item_guard.get_data_type()?;
+                references_data_type.body.as_primitive()
+            }
+            DataType::Void => {
+                Some(PrimitiveDataType::Number(NumberType::Bit {
+                    size: Some(0),
+                }))
+            }
+            _ => None,
+        }
+    }
+    #[inline]
+    pub fn as_array(&self) -> Option<&Arc<DataType>> {
+        match self {
+            DataType::Array(sub_type) => Some(sub_type),
+            _ => None,
+        }
+    }
+    pub fn fmt(
+        &self,
+        f: &mut SimpleFormatter,
+    ) -> fmt::Result {
+        match self {
+            DataType::Array(sub_type) => {
+                sub_type.fmt(f)?;
+                f.write_str("[]")
+            }
+            DataType::Compound(CompoundDataType::Structure(fields)) => {
+                if fields.is_empty() {
+                    return f.write_str("{}");
+                }
+                writeln!(f, "{{")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for (field_name, field) in fields.iter() {
+                        write!(sub_f, "{}: ", field_name)?;
+                        field.field_type.fmt(&mut sub_f)?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            DataType::Compound(CompoundDataType::Tuple(fields)) => {
+                if fields.is_empty() {
+                    return f.write_str("[]");
+                }
+                writeln!(f, "[")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for field in fields.iter() {
+                        field.field_type.fmt(&mut sub_f)?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            DataType::Primitive(PrimitiveDataType::Null) => {
+                f.write_str("null")
+            }
+            DataType::Primitive(PrimitiveDataType::Number(NumberType::Bit { size })) => {
+                f.write_str(match size {
+                    Some(0) => "void",
+                    Some(1) => "boolean",
+                    _ => "number",
+                })
+            }
+            DataType::Primitive(PrimitiveDataType::Number(NumberType::Boolean)) => {
+                f.write_str("boolean")
+            }
+            DataType::Primitive(PrimitiveDataType::Number(_)) => {
+                f.write_str("number")
+            }
+            DataType::Primitive(PrimitiveDataType::DateTime(_)) => {
+                f.write_str("Date")
+            }
+            DataType::Primitive(PrimitiveDataType::Year(_)) => {
+                f.write_str("number")
+            }
+            DataType::Primitive(PrimitiveDataType::String(_)) => {
+                f.write_str("string")
+            }
+            DataType::Reference(reference) => {
+                let guard = reference.read();
+                f.write_str(
+                    guard.get_path()
+                        .as_path()
+                        .into_new_buf(".")
+                        .data.as_str()
+                )
+            }
+            DataType::Void => {
+                f.write_str("void")
+            }
+        }
+    }
+    pub fn fmt_export(
+        &self,
+        f: &mut SimpleFormatter,
+        name: &str,
+    ) -> fmt::Result {
+        match self {
+            DataType::Array(_) |
+            DataType::Primitive(_) |
+            DataType::Reference(_) |
+            DataType::Void => {
+                write!(f, "export type {} = ", name)?;
+                self.fmt(f)?;
+                writeln!(f, ";")
+            }
+            DataType::Compound(_) => {
+                write!(f, "export interface {} ", name)?;
+                self.fmt(f)?;
+                writeln!(f, "")
+            }
+        }
+    }
+    pub fn fmt_result_bind(
+        &self,
+        f: &mut SimpleFormatter,
+        variable: &str,
+        prefix: Path,
+    ) -> fmt::Result {
+        match self {
+            DataType::Array(_) => panic!("Array-type cannot be bind"),
+            DataType::Compound(CompoundDataType::Tuple(fields)) => {
+                writeln!(f, "[")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for (i, field) in fields.iter().enumerate() {
+                        let mut field_prefix = prefix.into_buf();
+                        field_prefix.push_fmt(format_args!("component{}", i))?;
+                        field.field_type.fmt_result_bind(
+                            &mut sub_f,
+                            variable,
+                            field_prefix.as_path(),
+                        )?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            DataType::Compound(CompoundDataType::Structure(fields)) => {
+                writeln!(f, "{{")?;
+                {
+                    let mut sub_f = f.sub_block();
+                    for (name, field) in fields.iter() {
+                        let mut field_prefix = prefix.into_buf();
+                        field_prefix.push(&*name);
+                        write!(sub_f, "{}: ", name)?;
+                        field.field_type.fmt_result_bind(
+                            &mut sub_f,
+                            variable,
+                            field_prefix.as_path(),
+                        )?;
+                        writeln!(sub_f, ",")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            DataType::Primitive(_) => {
+                write!(
+                    f,
+                    "{var}['{path}']",
+                    var = variable,
+                    path = prefix,
+                )
+            }
+            DataType::Reference(item) => {
+                item.read()
+                    .get_data_type()
+                    .expect("Wrong references are not allowed at generate-time")
+                    .body.fmt_result_bind(
+                        f,
+                        variable,
+                        prefix
+                    )
+            }
+            DataType::Void => f.write_str("void 0"),
+        }
+    }
 }
 
 impl fmt::Display for DataType {
@@ -765,4 +1258,43 @@ impl fmt::Display for DataType {
             DataType::Void => write!(f, "!"),
         }
     }
+}
+
+impl PartialEq for DataType {
+    fn eq(&self, rhs: &DataType) -> bool {
+        if let DataType::Reference(item) = rhs {
+            let item_guard = item.read();
+            return match item_guard.get_data_type() {
+                Some(rhs) => *self == rhs.body,
+                None => false,
+            };
+        }
+        match self {
+            DataType::Array(lhs_sub_type) => if let DataType::Array(rhs_sub_type) = rhs {
+                *lhs_sub_type == *rhs_sub_type
+            } else { false }
+            DataType::Compound(lhs_compound) => if let DataType::Compound(rhs_compound) = rhs {
+                *lhs_compound == *rhs_compound
+            } else { false }
+            DataType::Primitive(lhs_primitive) => if let DataType::Primitive(rhs_primitive) = rhs {
+                *lhs_primitive == *rhs_primitive
+            } else { false }
+            DataType::Reference(item) => {
+                let item_guard = item.read();
+                match item_guard.get_data_type() {
+                    Some(lhs) => lhs.body == *rhs,
+                    None => false,
+                }
+            }
+            DataType::Void => if let DataType::Void = rhs { true } else { false }
+        }
+    }
+}
+
+impl Eq for DataType {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FieldPrimitive {
+    pub path: PathBuf,
+    pub field_type: PrimitiveDataType,
 }

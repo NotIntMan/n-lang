@@ -2,10 +2,9 @@
 
 use std::fmt::{
     Display,
-    Result,
     Formatter,
+    Result,
 };
-
 use super::*;
 
 /**
@@ -95,7 +94,7 @@ impl Display for ScannerErrorKind {
                     write!(f, ", expected: {}", c)?;
                 }
                 Ok(())
-            },
+            }
             ScannerErrorKind::NotInRadix(c, r) => write!(f, "digit {:?} is not in {}-based radix", c, r),
             ScannerErrorKind::UnexpectedInput(c) => write!(f, "unexpected input {:?}", c),
         }
