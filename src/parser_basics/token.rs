@@ -4,12 +4,11 @@ use lexeme_scanner::{
     Token,
     TokenKindLess,
 };
-
 use super::{
-    ParserInput,
-    ParserResult,
     ParserErrorKind,
     ParserErrorTokenInfo,
+    ParserInput,
+    ParserResult,
 };
 
 /**

@@ -1,7 +1,7 @@
 //! Группа элементов
 
-use std::mem::replace;
 use helpers::IntoStatic;
+use std::mem::replace;
 use super::extract::extract;
 
 /**

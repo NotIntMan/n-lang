@@ -1,12 +1,12 @@
 use std::fmt::{
-    Write,
-    Result,
     Display,
+    Result,
+    Write,
 };
 use std::ops::{
     DivAssign,
-    SubAssign,
     Rem,
+    SubAssign,
 };
 
 pub fn write_pad_left<W: Write, D: Display>(w: &mut W, value: D, length: usize) -> Result {

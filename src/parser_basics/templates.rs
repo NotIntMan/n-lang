@@ -2,10 +2,8 @@
 
 // TODO Попробовать запилить шаблоны, которые сочетаются с nom
 
-use nom::IResult;
-
 use lexeme_scanner::Token;
-
+use nom::IResult;
 use super::{
     ParserInput,
     ParserResult,
@@ -60,7 +58,7 @@ pub fn list<
     DelimiterOutput,
     Delimiter: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, DelimiterOutput>,
 >(
-    mut input: &'token [Token<'source>], element: Element, delimiter: Delimiter
+    mut input: &'token [Token<'source>], element: Element, delimiter: Delimiter,
 )
     -> ParserResult<'token, 'source, Vec<ElementOutput>>
     where Token<'source>: 'token
@@ -71,14 +69,14 @@ pub fn list<
             IResult::Done(new_input, element_result) => {
                 input = new_input;
                 result.push(element_result);
-            },
-            _ => { break 'parse_cycle },
+            }
+            _ => { break 'parse_cycle; }
         }
         match delimiter(input) {
             IResult::Done(new_input, _) => {
                 input = new_input;
-            },
-            _ => { break 'parse_cycle },
+            }
+            _ => { break 'parse_cycle; }
         }
     }
     input.ok(result)
@@ -97,7 +95,7 @@ pub fn comma_list<
     ElementOutput,
     Element: Fn(&'token [Token<'source>]) -> ParserResult<'token, 'source, ElementOutput>,
 >(
-    input: &'token [Token<'source>], element: Element
+    input: &'token [Token<'source>], element: Element,
 )
     -> ParserResult<'token, 'source, Vec<ElementOutput>>
     where Token<'source>: 'token

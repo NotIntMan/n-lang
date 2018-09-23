@@ -1,7 +1,7 @@
 use std::fmt::{
     Display,
-    Result as FResult,
     Formatter,
+    Result as FResult,
 };
 
 /// Функция-помощник, которая форматирует список значений, разделяя их запятой

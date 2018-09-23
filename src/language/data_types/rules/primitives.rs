@@ -1,15 +1,5 @@
 //! Парсеры, распознающие грамматику примитивных типов данных
 
-use lexeme_scanner::Token;
-
-use parser_basics::{
-    keyword,
-    none,
-    ParserResult,
-    round_wrap,
-    symbols,
-    u32_literal,
-};
 use language::{
     CharacterSet,
     DateTimeType,
@@ -17,6 +7,15 @@ use language::{
     PrimitiveDataType,
     StringType,
     YearType,
+};
+use lexeme_scanner::Token;
+use parser_basics::{
+    keyword,
+    none,
+    ParserResult,
+    round_wrap,
+    symbols,
+    u32_literal,
 };
 
 /// [(u32)]

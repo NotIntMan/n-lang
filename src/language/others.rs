@@ -1,4 +1,3 @@
-use std::fmt;
 use helpers::{
     Path,
     PathBuf,
@@ -15,6 +14,7 @@ use parser_basics::{
     symbol_position,
     symbols,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, Eq, Hash)]
 pub struct ItemPath {
@@ -27,7 +27,7 @@ impl ItemPath {
     pub fn for_root(delimiter: &str) -> Self {
         ItemPath {
             pos: Default::default(),
-            path: PathBuf::from(Path::new("", delimiter)),
+            path: PathBuf::from_path(Path::new("", delimiter)),
         }
     }
     pub fn new(pos: ItemPosition, idents: Vec<Identifier>, delimiter: &str) -> Self {

@@ -1,19 +1,21 @@
-use std::fmt;
 use helpers::{
+    generate_name,
     ID,
     IDPull,
     Path,
 };
 use helpers::SyncRef;
+use language::DataType;
 use lexeme_scanner::ItemPosition;
-use language::{
-    DataType,
-};
 use project_analysis::{
     Module,
     ProjectContext,
     SemanticError,
     SemanticItemType,
+};
+use std::{
+    fmt,
+    mem::replace,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,16 +24,20 @@ pub struct FunctionVariable {
     pos: ItemPosition,
     data_type: Option<DataType>,
     is_read_only: bool,
+    is_argument: bool,
+    is_automatic: bool,
 }
 
 impl FunctionVariable {
     #[inline]
-    fn new(pos: ItemPosition, name: String, data_type: Option<DataType>, is_read_only: bool) -> SyncRef<Self> {
+    fn new(pos: ItemPosition, name: String, data_type: Option<DataType>) -> SyncRef<Self> {
         SyncRef::new(FunctionVariable {
             name,
             pos,
             data_type,
-            is_read_only,
+            is_read_only: false,
+            is_argument: false,
+            is_automatic: false,
         })
     }
     #[inline]
@@ -39,11 +45,39 @@ impl FunctionVariable {
         self.name.as_str()
     }
     #[inline]
+    pub fn set_name(&mut self, new_name: String) -> String {
+        replace(&mut self.name, new_name)
+    }
+    #[inline]
     pub fn data_type(&self) -> Option<&DataType> {
         match &self.data_type {
             Some(data_type) => Some(data_type),
             None => None,
         }
+    }
+    #[inline]
+    pub fn is_read_only(&self) -> bool {
+        self.is_read_only
+    }
+    #[inline]
+    pub fn make_read_only(&mut self) {
+        self.is_read_only = true
+    }
+    #[inline]
+    pub fn is_argument(&self) -> bool {
+        self.is_argument
+    }
+    #[inline]
+    pub fn mark_as_argument(&mut self) {
+        self.is_argument = true
+    }
+    #[inline]
+    pub fn is_automatic(&self) -> bool {
+        self.is_automatic
+    }
+    #[inline]
+    pub fn mark_as_automatic(&mut self) {
+        self.is_automatic = true
     }
 }
 
@@ -66,11 +100,27 @@ impl SyncRef<FunctionVariable> {
     }
     #[inline]
     pub fn is_read_only(&self) -> bool {
-        self.read().is_read_only
+        self.read().is_read_only()
     }
     #[inline]
     pub fn make_read_only(&self) {
-        self.write().is_read_only = true
+        self.write().make_read_only()
+    }
+    #[inline]
+    pub fn is_argument(&self) -> bool {
+        self.read().is_argument()
+    }
+    #[inline]
+    pub fn mark_as_argument(&self) {
+        self.write().mark_as_argument()
+    }
+    #[inline]
+    pub fn is_automatic(&self) -> bool {
+        self.read().is_automatic()
+    }
+    #[inline]
+    pub fn mark_as_automatic(&self) {
+        self.write().mark_as_automatic()
     }
 }
 
@@ -150,9 +200,19 @@ impl SyncRef<FunctionVariableScope> {
         if self.read().find_variable(name.as_str()).is_some() {
             return Err(SemanticError::duplicate_definition(pos, name, SemanticItemType::Variable));
         }
-        let var = FunctionVariable::new(pos, name, data_type, false);
+        let var = FunctionVariable::new(pos, name, data_type);
         self.write().variables.push(var.clone());
         Ok(var)
+    }
+    pub fn new_temp_variable(&self, pos: ItemPosition, data_type: DataType) -> SyncRef<FunctionVariable> {
+        let guard = self.read();
+        let name = generate_name(
+            |name| guard.find_variable(name).is_none(),
+            "t".to_string(),
+        );
+        let var = FunctionVariable::new(pos, name, Some(data_type));
+        self.write().variables.push(var.clone());
+        var
     }
     #[inline]
     pub fn context(&self) -> SyncRef<FunctionContext> {
@@ -245,6 +305,19 @@ impl SyncRef<FunctionContext> {
     }
     #[inline]
     pub fn project(&self) -> SyncRef<ProjectContext> { self.module().project() }
+    pub fn get_all_variables(&self) -> Vec<SyncRef<FunctionVariable>> {
+        let mut result = Vec::new();
+        let self_guard = self.read();
+        for scope in self_guard.scopes.iter() {
+            let scope_guard = scope.read();
+            result.extend(
+                scope_guard.variables()
+                    .into_iter()
+                    .cloned(),
+            );
+        }
+        result
+    }
 }
 
 impl fmt::Debug for FunctionContext {

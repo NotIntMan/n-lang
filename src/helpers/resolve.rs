@@ -1,6 +1,8 @@
-use std::hash::Hash;
-use std::mem::swap;
 use indexmap::IndexMap;
+use std::{
+    hash::Hash,
+    mem::swap,
+};
 
 pub trait Resolve<Context = ()>: Sized {
     type Result;

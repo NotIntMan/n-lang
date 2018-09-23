@@ -1,23 +1,23 @@
-use std::thread::{
-    current,
-    ThreadId,
-    panicking,
-    yield_now,
-};
-use std::sync::{
-    Mutex,
-    MutexGuard,
-};
-use std::ops::{
-    Deref,
-    DerefMut,
-};
+use helpers::find_index;
 use std::cmp::{
     Eq,
     PartialEq,
 };
 use std::fmt;
-use helpers::find_index;
+use std::ops::{
+    Deref,
+    DerefMut,
+};
+use std::sync::{
+    Mutex,
+    MutexGuard,
+};
+use std::thread::{
+    current,
+    panicking,
+    ThreadId,
+    yield_now,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ThreadEntityCount {
@@ -147,7 +147,7 @@ impl ReEntrantRWHead {
     }
 }
 
-pub struct ReEntrantRWLock<T: ? Sized> {
+pub struct ReEntrantRWLock<T: ?Sized> {
     head: Mutex<ReEntrantRWHead>,
     data: T,
 }
@@ -165,7 +165,7 @@ impl<T> ReEntrantRWLock<T> {
     }
 }
 
-impl<T: ? Sized> ReEntrantRWLock<T> {
+impl<T: ?Sized> ReEntrantRWLock<T> {
     fn head(&self) -> MutexGuard<ReEntrantRWHead> {
         self.head.lock()
             .expect("Head of ReEntrantRWLock was poisoned!")
@@ -176,7 +176,7 @@ impl<T: ? Sized> ReEntrantRWLock<T> {
     }
 }
 
-impl<'a, T: ? Sized> ReEntrantRWLock<T>
+impl<'a, T: ?Sized> ReEntrantRWLock<T>
     where ReEntrantRWLock<T>: 'a {
     pub fn try_read(&'a self) -> Option<ReEntrantReadGuard<'a, T>> {
         let mut head = self.head();
@@ -216,7 +216,7 @@ impl<'a, T: ? Sized> ReEntrantRWLock<T>
     }
 }
 
-impl<T: PartialEq + ? Sized> PartialEq for ReEntrantRWLock<T> {
+impl<T: PartialEq + ?Sized> PartialEq for ReEntrantRWLock<T> {
     fn eq(&self, other: &ReEntrantRWLock<T>) -> bool {
         let a = self.read();
         let b = other.read();
@@ -230,7 +230,7 @@ impl<T: PartialEq + ? Sized> PartialEq for ReEntrantRWLock<T> {
     }
 }
 
-impl<T: PartialEq + ? Sized> Eq for ReEntrantRWLock<T> {}
+impl<T: PartialEq + ?Sized> Eq for ReEntrantRWLock<T> {}
 
 impl<T: Clone> Clone for ReEntrantRWLock<T> {
     fn clone(&self) -> Self {
@@ -239,7 +239,7 @@ impl<T: Clone> Clone for ReEntrantRWLock<T> {
     }
 }
 
-impl<T: fmt::Debug + ? Sized> fmt::Debug for ReEntrantRWLock<T> {
+impl<T: fmt::Debug + ?Sized> fmt::Debug for ReEntrantRWLock<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let data = self.read();
         if f.alternate() {
@@ -250,12 +250,12 @@ impl<T: fmt::Debug + ? Sized> fmt::Debug for ReEntrantRWLock<T> {
     }
 }
 
-pub struct ReEntrantReadGuard<'a, T: ? Sized>
+pub struct ReEntrantReadGuard<'a, T: ?Sized>
     where ReEntrantRWLock<T>: 'a {
     source: &'a ReEntrantRWLock<T>,
 }
 
-impl<'a, T: ? Sized> Deref for ReEntrantReadGuard<'a, T>
+impl<'a, T: ?Sized> Deref for ReEntrantReadGuard<'a, T>
     where ReEntrantRWLock<T>: 'a {
     type Target = T;
     fn deref(&self) -> &T {
@@ -263,19 +263,19 @@ impl<'a, T: ? Sized> Deref for ReEntrantReadGuard<'a, T>
     }
 }
 
-impl<'a, T: ? Sized> Drop for ReEntrantReadGuard<'a, T> {
+impl<'a, T: ?Sized> Drop for ReEntrantReadGuard<'a, T> {
     fn drop(&mut self) {
         self.source.head().try_release_read();
     }
 }
 
 #[derive(Debug)]
-pub struct ReEntrantWriteGuard<'a, T: ? Sized>
+pub struct ReEntrantWriteGuard<'a, T: ?Sized>
     where ReEntrantRWLock<T>: 'a {
     source: &'a ReEntrantRWLock<T>,
 }
 
-impl<'a, T: ? Sized> Deref for ReEntrantWriteGuard<'a, T>
+impl<'a, T: ?Sized> Deref for ReEntrantWriteGuard<'a, T>
     where ReEntrantRWLock<T>: 'a {
     type Target = T;
     fn deref(&self) -> &T {
@@ -283,7 +283,7 @@ impl<'a, T: ? Sized> Deref for ReEntrantWriteGuard<'a, T>
     }
 }
 
-impl<'a, T: ? Sized> DerefMut for ReEntrantWriteGuard<'a, T>
+impl<'a, T: ?Sized> DerefMut for ReEntrantWriteGuard<'a, T>
     where ReEntrantRWLock<T>: 'a {
     fn deref_mut(&mut self) -> &mut T {
         unsafe {
@@ -292,7 +292,7 @@ impl<'a, T: ? Sized> DerefMut for ReEntrantWriteGuard<'a, T>
     }
 }
 
-impl<'a, T: ? Sized> Drop for ReEntrantWriteGuard<'a, T> {
+impl<'a, T: ?Sized> Drop for ReEntrantWriteGuard<'a, T> {
     fn drop(&mut self) {
         let mut head = self.source.head();
         head.try_release_write();

@@ -1,11 +1,12 @@
 use helpers::{
     accumulative_result_collect,
     Assertion,
+    BlockFormatter,
     deep_result_collect,
+    PathBuf,
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
 use language::{
     AssignmentTarget,
     DataSource,
@@ -18,11 +19,18 @@ use language::{
     SelectionAST,
     SelectionSortingItem,
     SelectionSortingItemAST,
+    SelectionSortingOrder,
+    TSQLFunctionContext,
 };
+use lexeme_scanner::ItemPosition;
 use project_analysis::{
     FunctionVariableScope,
     InsertSourceContext,
     SemanticError,
+};
+use std::fmt::{
+    self,
+    Write,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -75,6 +83,59 @@ pub struct UpdatingAssignment {
     pub value: Expression,
 }
 
+impl UpdatingAssignment {
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        last_comma: bool,
+    ) -> fmt::Result {
+        let var_guard = self.target.var.read();
+        let var_data_type = var_guard.data_type()
+            .expect("Variable cannot have unknown data-type at generate time.")
+            .property_type(self.target.pos, self.target.property.as_path())
+            .expect("Property existing should be already checked at generate time.");
+
+        if var_data_type.as_primitive().is_some() {
+            let mut line = f.line()?;
+            let access = !self.target.property.is_empty();
+            Expression::fmt_variable(&mut line, &*var_guard, access)?;
+            if access {
+                write!(line, "{}", self.target.property.as_path().into_new_buf("#"))?;
+            }
+            line.write_str(" = ")?;
+            self.value.fmt(&mut line, context)?;
+            if last_comma {
+                line.write_char(',')?;
+            }
+        } else {
+            let mut primitives = var_data_type.primitives(PathBuf::new("#"))
+                .into_iter()
+                .peekable();
+
+            while let Some(primitive) = primitives.next() {
+                let mut line = f.line()?;
+                Expression::fmt_variable(&mut line, &*var_guard, true)?;
+
+                let mut target_path = self.target.property.as_path().into_new_buf("#");
+                target_path.append(primitive.path.as_path());
+
+                write!(line, "{} = ", target_path)?;
+                Expression::fmt_property_access(
+                    &mut line,
+                    &self.value,
+                    primitive.path.as_path(),
+                    context,
+                )?;
+                if last_comma || primitives.peek().is_some() {
+                    line.write_char(',')?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignmentAST<'source> {
     fn assert(&self, other: &(&str, Option<&str>)) {
         let other_property_tokens = ::lexeme_scanner::Scanner::scan(other.0)
@@ -95,8 +156,6 @@ impl<'a, 'b, 'source> Assertion<(&'a str, Option<&'b str>)> for UpdatingAssignme
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UpdatingAST<'source> {
-    pub low_priority: bool,
-    pub ignore: bool,
     pub source: DataSourceAST<'source>,
     pub assignments: Vec<UpdatingAssignmentAST<'source>>,
     pub where_clause: Option<ExpressionAST<'source>>,
@@ -134,8 +193,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAST<'source> {
         };
 
         Ok(Updating {
-            low_priority: self.low_priority,
-            ignore: self.ignore,
             source,
             assignments,
             where_clause,
@@ -147,8 +204,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for UpdatingAST<'source> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Updating {
-    pub low_priority: bool,
-    pub ignore: bool,
     pub source: DataSource,
     pub assignments: Vec<UpdatingAssignment>,
     pub where_clause: Option<Expression>,
@@ -161,14 +216,52 @@ impl Updating {
     pub fn is_lite_weight(&self) -> bool {
         self.source.is_local()
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InsertingPriority {
-    Usual,
-    Low,
-    Delayed,
-    High,
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        f.write_line("UPDATE")?;
+        let mut sub_f = f.sub_block();
+        let sub_sub_f = sub_f.sub_block();
+        if let Some(limit) = &self.limit_clause {
+            sub_f.write_line(format_args!("TOP({})", limit))?;
+        }
+        self.source.fmt(sub_sub_f.clone(), context, false)?;
+        sub_f.write_line("SET")?;
+        {
+            let mut assignments = self.assignments.iter()
+                .peekable();
+            while let Some(assignment) = assignments.next() {
+                assignment.fmt(
+                    sub_sub_f.clone(),
+                    context,
+                    assignments.peek().is_some(),
+                )?;
+            }
+        }
+        if let Some(where_clause) = &self.where_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("WHERE ")?;
+            where_clause.fmt(&mut line, context)?;
+        }
+        if let Some(order_by_clause) = &self.order_by_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("ORDER BY ")?;
+            let mut items = order_by_clause.iter().peekable();
+            while let Some(expr) = items.next() {
+                expr.expr.fmt(&mut line, context)?;
+                line.write_str(match &expr.order {
+                    SelectionSortingOrder::Asc => " ASC",
+                    SelectionSortingOrder::Desc => " DESC",
+                })?;
+                if items.peek().is_some() {
+                    line.write_str(", ")?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -182,9 +275,6 @@ pub enum InsertingSourceASTBody<'source> {
     ValueLists {
         properties: Option<Vec<ItemPath>>,
         lists: Vec<ValueList<'source>>,
-    },
-    AssignmentList {
-        assignments: Vec<UpdatingAssignmentAST<'source>>,
     },
     Selection {
         properties: Option<Vec<ItemPath>>,
@@ -246,17 +336,6 @@ impl<'source, 'a> Resolve<InsertSourceContext<'a>> for InsertingSourceAST<'sourc
                     lists,
                 })
             }
-            InsertingSourceASTBody::AssignmentList { assignments } => {
-                let assignments = accumulative_result_collect(assignments.iter().map(|assignment_ast| {
-                    let assignment = assignment_ast.resolve(ctx.scope)?;
-                    if !ctx.target.is_target_belongs_to_source(&assignment.target) {
-                        return SemanticError::not_allowed_inside(assignment_ast.pos, "assignment not belonging to the target data source", "INSERT query")
-                            .into_err_vec();
-                    }
-                    Ok(assignment)
-                }))?;
-                Ok(InsertingSource::AssignmentList { assignments })
-            }
             InsertingSourceASTBody::Selection { properties, query } => {
                 let query = query.resolve(ctx.scope)?;
                 let properties = {
@@ -283,12 +362,24 @@ impl<'source, 'a> Resolve<InsertSourceContext<'a>> for InsertingSourceAST<'sourc
                                         Ok(assignment)
                                     })
                             )?;
-                            Some(assignments)
-                        },
+                            assignments
+                        }
                         None => {
-                            query_result_type.should_cast_to(query.pos, &ctx.target.get_datatype_for_insert(query.pos)?)?;
-                            None
-                        },
+                            let var = ctx.target.get_target_for_insert(query.pos)?;
+                            let target_data_type = var.data_type(query.pos)?;
+                            query_result_type.should_cast_to(query.pos, &target_data_type)?;
+                            let mut primitives_prefix = PathBuf::new(".");
+                            primitives_prefix.push(var.read().name());
+                            let properties: Result<_, _> = target_data_type.primitives(primitives_prefix)
+                                .into_iter()
+                                .map(|primitive| AssignmentTarget::new_in_scope(
+                                    ctx.scope,
+                                    query.pos,
+                                    primitive.path.as_path(),
+                                ))
+                                .collect();
+                            properties?
+                        }
                     }
                 };
                 Ok(InsertingSource::Selection { properties, query })
@@ -303,22 +394,122 @@ pub enum InsertingSource {
         properties: Vec<AssignmentTarget>,
         lists: Vec<Vec<Expression>>,
     },
-    AssignmentList {
-        assignments: Vec<UpdatingAssignment>,
-    },
     Selection {
-        properties: Option<Vec<AssignmentTarget>>,
+        properties: Vec<AssignmentTarget>,
         query: Selection,
     },
 }
 
+impl InsertingSource {
+    pub fn fmt_target_list(
+        target: &[AssignmentTarget],
+        line: &mut impl fmt::Write,
+    ) -> fmt::Result {
+        line.write_char('(')?;
+
+        let mut properties = target.iter()
+            .peekable();
+        while let Some(property) = properties.next() {
+            let var_guard = property.var.read();
+            let mut primitives = var_guard.data_type()
+                .expect("Variable data-type should be known at generate time")
+                .property_type(ItemPosition::default(), property.property.as_path())
+                .expect("Property existing should be already checked at generate time.")
+                .primitives(property.property.as_path().into_new_buf("#"))
+                .into_iter()
+                .peekable();
+            while let Some(primitive) = primitives.next() {
+                Expression::fmt_variable(line, &*var_guard, true)?;
+                write!(line, "{}", primitive.path)?;
+                if primitives.peek().is_some() || properties.peek().is_some() {
+                    line.write_str(", ")?;
+                }
+            }
+        }
+
+        line.write_char(')')
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let mut sub_f = f.sub_block();
+        match self {
+            InsertingSource::ValueLists { properties, lists } => {
+                InsertingSource::fmt_target_list(&properties, &mut f.line()?)?;
+                f.write_line("VALUES")?;
+                let mut lists_iter = lists.iter()
+                    .peekable();
+                while let Some(list) = lists_iter.next() {
+                    f.write_line("(")?;
+                    let mut expressions = list.iter()
+                        .enumerate()
+                        .peekable();
+                    while let Some((i, expression)) = expressions.next() {
+                        let property = &properties[i];
+                        let var_guard = property.var.read();
+                        let mut primitives = var_guard.data_type()
+                            .expect("Variable data-type should be known at generate time")
+                            .property_type(ItemPosition::default(), property.property.as_path())
+                            .expect("Property existing should be already checked at generate time.")
+                            .primitives(PathBuf::new("#"))
+                            .into_iter()
+                            .peekable();
+                        while let Some(primitive) = primitives.next() {
+                            let mut line = sub_f.line()?;
+                            Expression::fmt_property_access(
+                                &mut line,
+                                expression,
+                                primitive.path.as_path(),
+                                context,
+                            )?;
+                            if primitives.peek().is_some() || expressions.peek().is_some() {
+                                line.write_char(',')?;
+                            }
+                        }
+                    }
+                    if lists_iter.peek().is_some() {
+                        f.write_line("),")?;
+                    } else {
+                        f.write_line(")")?;
+                    }
+                }
+                Ok(())
+            }
+            InsertingSource::Selection { properties, query } => {
+                f.write_line("SELECT")?;
+                let mut properties_iter = properties.iter()
+                    .peekable();
+                while let Some(property) = properties_iter.next() {
+                    let var_guard = property.var.read();
+                    let mut primitives = var_guard.data_type()
+                        .expect("Variable data-type should be known at generate time")
+                        .property_type(ItemPosition::default(), property.property.as_path())
+                        .expect("Property existing should be already checked at generate time.")
+                        .primitives(property.property.as_path().into_new_buf("#"))
+                        .into_iter()
+                        .peekable();
+                    while let Some(primitive) = primitives.next() {
+                        let mut line = sub_f.line()?;
+                        write!(line, "t.[{path}] as [{path}]", path = primitive.path)?;
+                        if primitives.peek().is_some() || properties_iter.peek().is_some() {
+                            line.write_char(',')?;
+                        }
+                    }
+                }
+                f.write_line("FROM (")?;
+                query.fmt(sub_f, context)?;
+                f.write_line(") as t")
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct InsertingAST<'source> {
-    pub priority: InsertingPriority,
-    pub ignore: bool,
     pub target: DataSourceAST<'source>,
     pub source: InsertingSourceAST<'source>,
-    pub on_duplicate_key_update: Option<Vec<UpdatingAssignmentAST<'source>>>,
 }
 
 impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> {
@@ -326,43 +517,26 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for InsertingAST<'source> 
     type Error = SemanticError;
     fn resolve(&self, scope: &SyncRef<FunctionVariableScope>) -> Result<Self::Result, Vec<Self::Error>> {
         let target = self.target.resolve(scope)?;
-        let mut errors = Vec::new();
 
         let source = {
             let ctx = InsertSourceContext {
                 scope,
                 target: &target,
             };
-            self.source.accumulative_resolve(&ctx, &mut errors)
-        };
-        let on_duplicate_key_update = self.on_duplicate_key_update.accumulative_resolve(scope, &mut errors);
-
-        let source = match source {
-            Some(x) => x,
-            None => return Err(errors)
-        };
-        let on_duplicate_key_update = match on_duplicate_key_update {
-            Some(x) => x,
-            None => return Err(errors)
+            self.source.resolve(&ctx)?
         };
 
         Ok(Inserting {
-            priority: self.priority,
-            ignore: self.ignore,
             target,
             source,
-            on_duplicate_key_update,
         })
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Inserting {
-    pub priority: InsertingPriority,
-    pub ignore: bool,
     pub target: DataSource,
     pub source: InsertingSource,
-    pub on_duplicate_key_update: Option<Vec<UpdatingAssignment>>,
 }
 
 impl Inserting {
@@ -370,13 +544,21 @@ impl Inserting {
     pub fn is_lite_weight(&self) -> bool {
         self.target.is_local()
     }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        f.write_line("INSERT INTO")?;
+        let sub_f = f.sub_block();
+        self.target.fmt(sub_f.clone(), context, false)?;
+        self.source.fmt(sub_f, context)?;
+        f.write_line(";")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeletingAST<'source> {
-    pub low_priority: bool,
-    pub quick: bool,
-    pub ignore: bool,
     pub source: DataSourceAST<'source>,
     pub where_clause: Option<ExpressionAST<'source>>,
     pub order_by_clause: Option<Vec<SelectionSortingItemAST<'source>>>,
@@ -403,9 +585,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DeletingAST<'source> {
         };
 
         Ok(Deleting {
-            low_priority: self.low_priority,
-            quick: self.quick,
-            ignore: self.ignore,
             source,
             where_clause,
             order_by_clause,
@@ -416,9 +595,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for DeletingAST<'source> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Deleting {
-    pub low_priority: bool,
-    pub quick: bool,
-    pub ignore: bool,
     pub source: DataSource,
     pub where_clause: Option<Expression>,
     pub order_by_clause: Option<Vec<SelectionSortingItem>>,
@@ -429,5 +605,23 @@ impl Deleting {
     #[inline]
     pub fn is_lite_weight(&self) -> bool {
         self.source.is_local()
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        match &self.limit_clause {
+            Some(limit) => f.write_line(format_args!("DELETE TOP({}) FROM", limit))?,
+            None => f.write_line("DELETE FROM")?,
+        }
+        let mut sub_f = f.sub_block();
+        self.source.fmt(sub_f.sub_block(), context, false)?;
+        if let Some(where_clause) = &self.where_clause {
+            let mut line = sub_f.line()?;
+            line.write_str("WHERE ")?;
+            where_clause.fmt(&mut line, context)?;
+        }
+        sub_f.write_line(';')
     }
 }

@@ -1,9 +1,9 @@
 use lexeme_scanner::{
-    TokenKind,
     ScannerErrorKind,
+    TokenKind,
 };
-use lexeme_scanner::rules::number::is_number_begin;
 use lexeme_scanner::rules::basics::*;
+use lexeme_scanner::rules::number::is_number_begin;
 
 /// Совершает попытку разбора числового литерала.
 /// Полностью соответствует спецификации числовых литералов языка.

@@ -1,6 +1,6 @@
-use std::hash::Hash;
 use indexmap::IndexMap;
 use parser_basics::Identifier;
+use std::hash::Hash;
 
 pub fn as_unique<K: Eq + Hash + Clone, V>(vec: Vec<(K, V)>) -> Result<IndexMap<K, V>, K> {
     let mut result = IndexMap::new();

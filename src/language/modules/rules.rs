@@ -1,21 +1,21 @@
-use nom::IResult;
-use lexeme_scanner::Token;
-use parser_basics::{
-    end_of_input,
-    identifier,
-    item_position,
-    keyword,
-    none,
-    symbols,
-    symbol_position,
-    ParserResult,
-};
 use language::{
     attributes,
     compound_type,
     function_definition,
     module_path,
     struct_body,
+};
+use lexeme_scanner::Token;
+use nom::IResult;
+use parser_basics::{
+    end_of_input,
+    identifier,
+    item_position,
+    keyword,
+    none,
+    ParserResult,
+    symbol_position,
+    symbols,
 };
 use super::*;
 

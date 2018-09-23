@@ -1,13 +1,13 @@
+use language::{
+    module_path,
+    property_path,
+};
 use lexeme_scanner::ItemPosition;
 use parser_basics::{
     comma_list,
     Parser,
     ParserResult,
     symbols,
-};
-use language::{
-    property_path,
-    module_path,
 };
 use super::*;
 

@@ -1,6 +1,3 @@
-use std::mem::replace;
-use std::sync::Arc;
-use indexmap::IndexMap;
 use helpers::{
     Path,
     PathBuf,
@@ -9,24 +6,29 @@ use helpers::{
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
+use indexmap::IndexMap;
 use language::{
     BinaryOperator,
     DataType,
     PostfixUnaryOperator,
     PrefixUnaryOperator,
 };
+use lexeme_scanner::ItemPosition;
 use project_analysis::{
     Item,
     Module,
-    TextSource,
     SemanticError,
     StdLib,
     StdLibBinaryOperation,
     StdLibFunction,
     StdLibPostfixUnaryOperation,
     StdLibPrefixUnaryOperation,
+    TextSource,
     UnresolvedModule,
+};
+use std::{
+    mem::replace,
+    sync::Arc,
 };
 
 #[derive(Debug)]
@@ -57,15 +59,12 @@ impl ProjectContext {
         })
     }
     pub fn get_module(&self, path: Path) -> Option<&ResolutionModuleState> {
-        println!("Getting module {:?} from project's context required", path);
         for (item_path, item) in self.modules.iter() {
             let item_path = item_path.read();
             if item_path.as_path() == path {
-                println!("Found {:?}", item);
                 return Some(item);
             }
         }
-        println!("Nothing was found");
         None
     }
 }
@@ -111,15 +110,12 @@ impl SyncRef<ProjectContext> {
             let new_state = match module {
                 ResolutionModuleState::Unresolved(module) => {
                     let mut project_context = (module_path.clone(), self.clone());
-                    println!("Resolving module {:?}", *module_path.read());
                     match module.resolve(&mut project_context) {
                         Ok(module) => {
                             new_module_resolved = true;
-                            println!("Resolved");
                             ResolutionModuleState::Resolved(module)
                         }
                         Err(mut errors) => {
-                            println!("Failed with: {:#?}", errors);
                             result.append(&mut errors);
                             continue;
                         }
@@ -157,7 +153,7 @@ impl SyncRef<ProjectContext> {
         let mut module_path = path;
         let module = loop {
             if let Some(module) = self.get_module(module_path) {
-                break module
+                break module;
             }
             if module_path.is_empty() {
                 return None;
@@ -204,11 +200,9 @@ impl<S: TextSource> Resolve<S> for SyncRef<ProjectContext> {
                     ||
                     self.need_more_resolution_steps()
             ) {
-                println!("Breaking resolution cycle");
                 break;
             }
             errors = self.resolution_step();
-            println!("Continuing resolution cycle");
         }
         {
             let mut project = self.write();
@@ -224,7 +218,6 @@ impl<S: TextSource> Resolve<S> for SyncRef<ProjectContext> {
         let project = self.read();
         if errors.is_empty() {
             let mut result = IndexMap::new();
-//            println!("Preparing Result::Ok of {:#?}", project.modules);
             for (path, module) in project.modules.iter() {
                 match module {
                     ResolutionModuleState::Resolved(module) => {

@@ -1,77 +1,63 @@
 //! Модуль, содержащий в себе набор простых структур, функций и макросов-помощников, используемых несколькими модулями.
 
-#[macro_use]
-pub mod array_macro;
-
-pub mod assertion;
-pub use self::assertion::*;
-
-#[macro_use]
-pub mod convert_macro;
-
-#[macro_use]
-pub mod count_expression_macro;
-
-pub mod extract;
-pub use self::extract::*;
-
-pub mod group;
-pub use self::group::*;
-
-pub mod display_list;
-pub use self::display_list::*;
-
-#[macro_use]
-pub mod match_it_macro;
-
-pub mod into_static;
-pub use self::into_static::*;
-
-pub mod find_index;
-pub use self::find_index::*;
-
-pub mod loud_rw_lock;
-pub use self::loud_rw_lock::*;
-
-pub mod write_pad;
-pub use self::write_pad::*;
-
-pub mod extractor;
-pub use self::extractor::*;
-
-pub mod re_entrant_rw_lock;
-pub use self::re_entrant_rw_lock::*;
-
-pub mod lazy;
-pub use self::lazy::*;
-
-pub mod id_pull;
-pub use self::id_pull::*;
-
-pub mod sync_ref;
-pub use self::sync_ref::*;
-
-pub mod resolve;
-pub use self::resolve::*;
+pub use self::{
+    as_unique::*,
+    assertion::*,
+    code_formatter::*,
+    display_list::*,
+    extract::*,
+    extractor::*,
+    find_index::*,
+    format::*,
+    group::*,
+    id_pull::*,
+    into_static::*,
+    is_f32_enough::*,
+    lazy::*,
+    loud_rw_lock::*,
+    map::*,
+    name_unique::*,
+    parse_component::*,
+    parse_number_literal::*,
+    path::*,
+    re_entrant_rw_lock::*,
+    resolve::*,
+    result_collect::*,
+    sync_ref::*,
+    write_pad::*,
+};
 
 pub mod as_unique;
-pub use self::as_unique::*;
-
-pub mod path;
-pub use self::path::*;
-
-pub mod parse_component;
-pub use self::parse_component::*;
-
-pub mod parse_number_literal;
-pub use self::parse_number_literal::*;
-
+#[macro_use]
+pub mod array_macro;
+pub mod assertion;
+pub mod code_formatter;
+#[macro_use]
+pub mod convert_macro;
+#[macro_use]
+pub mod count_expression_macro;
+pub mod display_list;
+pub mod extract;
+pub mod extractor;
+pub mod find_index;
+pub mod format;
+pub mod group;
+pub mod id_pull;
+pub mod into_static;
 pub mod is_f32_enough;
-pub use self::is_f32_enough::*;
-
+pub mod lazy;
+pub mod loud_rw_lock;
+#[macro_use]
+pub mod match_it_macro;
+pub mod map;
+pub mod name_unique;
+pub mod parse_component;
+pub mod parse_number_literal;
+pub mod path;
+pub mod re_entrant_rw_lock;
+pub mod resolve;
+pub mod result_collect;
+pub mod sync_ref;
+pub mod write_pad;
 #[macro_use]
 pub mod universal_assert_macro;
-
-pub mod result_collect;
-
-pub use self::result_collect::*;

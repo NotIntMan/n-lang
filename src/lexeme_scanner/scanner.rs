@@ -1,7 +1,6 @@
 //! Сканер. Получает строку на ввод и реализует итерируемый механизм сканирования лексем в полученонй строке.
 
 use std::iter::FromIterator;
-
 use super::*;
 use super::rules::scan;
 
@@ -32,7 +31,7 @@ impl<'a> Iterator for Scanner<'a>
                 Err(kind) => {
                     self.finished = true;
                     return Some(Err(ScannerError { kind, pos: self.position.clone() }));
-                },
+                }
             };
             self.source = &self.source[len..];
             if kind.is_end() {

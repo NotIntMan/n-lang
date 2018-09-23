@@ -1,11 +1,10 @@
-use std::sync::Arc;
-use indexmap::IndexMap;
 use helpers::{
+    BlockFormatter,
+    PathBuf,
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
-use parser_basics::Identifier;
+use indexmap::IndexMap;
 use language::{
     BOOLEAN_TYPE,
     CompoundDataType,
@@ -15,10 +14,20 @@ use language::{
     Expression,
     ExpressionAST,
     Field,
+    TSQLFunctionContext,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
     FunctionVariableScope,
     SemanticError,
+};
+use std::{
+    fmt::{
+        self,
+        Write,
+    },
+    sync::Arc,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,7 +134,22 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionResultAST<'so
                 let scope_guard = scope.read();
                 let mut results = Vec::new();
                 let mut errors = Vec::new();
-                for var in scope_guard.variables() {
+                let parent;
+                let parent_guard;
+                let variables = {
+                    let parent_variables = match scope.parent() {
+                        Some(parent_ref) => {
+                            parent = parent_ref;
+                            parent_guard = parent.read();
+                            parent_guard.variables()
+                        }
+                        None => &[][..],
+                    };
+                    scope_guard.variables()
+                        .iter()
+                        .chain(parent_variables.iter())
+                };
+                for var in variables {
                     match var.data_type(*pos) {
                         Ok(data_type) => {
                             if errors.is_empty() {
@@ -216,10 +240,6 @@ pub struct SelectionLimit {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionAST<'source> {
     pub distinct: bool,
-    pub high_priority: bool,
-    pub straight_join: bool,
-    pub result_size: SelectionResultSize,
-    pub cache: bool,
     pub result: SelectionResultAST<'source>,
     pub source: DataSourceAST<'source>,
     pub where_clause: Option<ExpressionAST<'source>>,
@@ -330,29 +350,32 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
             }
         }
 
-        let one_row_result = {
-            let limit_one_row = match self.limit_clause {
-                Some(limit_clause) => limit_clause.count == 1,
-                None => false,
-            };
-
-            limit_one_row || (is_aggregate_query && group_by_clause.is_none())
-        };
-
         let result_data_type = SelectionExpression::type_of_expression_set(result.as_slice());
-        let result_data_type = if one_row_result {
+        let result_data_type = if is_aggregate_query && group_by_clause.is_none() {
             result_data_type
         } else {
             DataType::Array(Arc::new(result_data_type))
         };
 
+        if let Some(limit_clause) = &self.limit_clause {
+            if limit_clause.offset.is_some() {
+                let is_order_by_clause_empty = match &order_by_clause {
+                    Some(clause) => clause.is_empty(),
+                    None => true,
+                };
+                if is_order_by_clause_empty {
+                    errors.push(SemanticError::not_allowed_inside(
+                        self.pos,
+                        "LIMIT clause with offset",
+                        "query without sorting",
+                    ));
+                }
+            }
+        }
+
         if errors.is_empty() {
             Ok(Selection {
                 distinct: self.distinct,
-                high_priority: self.high_priority,
-                straight_join: self.straight_join,
-                result_size: self.result_size,
-                cache: self.cache,
                 result,
                 source,
                 where_clause,
@@ -372,10 +395,6 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for SelectionAST<'source> 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Selection {
     pub distinct: bool,
-    pub high_priority: bool,
-    pub straight_join: bool,
-    pub result_size: SelectionResultSize,
-    pub cache: bool,
     pub result: Vec<SelectionExpression>,
     pub source: DataSource,
     pub where_clause: Option<Expression>,
@@ -385,4 +404,152 @@ pub struct Selection {
     pub limit_clause: Option<SelectionLimit>,
     pub result_data_type: DataType,
     pub pos: ItemPosition,
+}
+
+impl Selection {
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let mut offset_fetch_clause = None;
+        {
+            let mut line = f.line()?;
+            line.write_str("SELECT")?;
+            if self.distinct {
+                line.write_str(" DISTINCT")?;
+            }
+            if let Some(limit_clause) = &self.limit_clause {
+                match &limit_clause.offset {
+                    Some(offset) => {
+                        offset_fetch_clause = Some((limit_clause.count, *offset));
+                    }
+                    None => {
+                        write!(line, " TOP({})", limit_clause.count)?;
+                    }
+                }
+            }
+        }
+
+        let mut sub_f = f.sub_block();
+
+        let mut result_items = self.result.iter()
+            .enumerate()
+            .peekable();
+        while let Some((i, result_item)) = result_items.next() {
+            let mut primitives = {
+                result_item.expr.data_type.primitives(PathBuf::new("."))
+                    .into_iter()
+                    .peekable()
+            };
+
+            while let Some(primitive) = primitives.next() {
+                let mut line = sub_f.line()?;
+
+                let new_path = primitive.path.as_path()
+                    .into_new_buf("#");
+
+                if let Some(sub_expr) = result_item.expr.get_property_or_wrap(primitive.path.as_path()) {
+                    sub_expr.fmt(&mut line, context)?;
+                } else {
+                    write!(line, "( SELECT t.[{}] FROM (", new_path)?;
+                    result_item.expr.fmt(&mut line, context)?;
+                    write!(line, ") as t )")?;
+                }
+
+                let mut new_path = new_path;
+                if let Some(alias) = result_item.can_be_named() {
+                    new_path.push_front(alias);
+                } else {
+                    new_path.push_front(format_args!("component{}", i));
+                }
+
+                write!(line, " AS {}", new_path)?;
+
+                if primitives.peek().is_some() || result_items.peek().is_some() {
+                    write!(line, ",")?;
+                }
+            }
+        }
+
+        f.write_line("FROM")?;
+        self.source.fmt(sub_f.clone(), context, true)?;
+
+//        while let Some((var, function, arguments)) = context.extract_pre_calc_calls() {
+//            let mut line = sub_f.line()?;
+//            line.write_str("OUTER APPLY ")?;
+//            Expression::fmt_function_call(
+//                &mut line,
+//                &function,
+//                &arguments,
+//                context,
+//            )?;
+//            var.mark_as_automatic();
+//            write!(line, " AS {}", var.read().name())?;
+//        }
+
+        if let Some(where_clause) = &self.where_clause {
+            let mut line = f.line()?;
+            line.write_str("WHERE ")?;
+            where_clause.fmt(&mut line, context)?;
+        }
+
+        if let Some(group_by_clause) = &self.group_by_clause {
+            let mut line = f.line()?;
+            line.write_str("GROUP BY ")?;
+            let mut items = group_by_clause.sorting.iter().peekable();
+            while let Some(expr) = items.next() {
+                expr.expr.fmt(&mut line, context)?;
+                line.write_str(match &expr.order {
+                    SelectionSortingOrder::Asc => " ASC",
+                    SelectionSortingOrder::Desc => " DESC",
+                })?;
+                if items.peek().is_some() {
+                    line.write_str(", ")?;
+                }
+            }
+            if group_by_clause.with_rollup {
+                line.write_str(" WITH ROLLUP")?;
+            }
+        }
+
+        if let Some(having_clause) = &self.having_clause {
+            let mut line = f.line()?;
+            line.write_str("HAVING ")?;
+            having_clause.fmt(&mut line, context)?;
+        }
+
+        {
+            let order_by_clause = match &self.order_by_clause {
+                Some(expressions) => &expressions[..],
+                None => &[][..],
+            };
+            if !order_by_clause.is_empty() || offset_fetch_clause.is_some() {
+                {
+                    let mut line = f.line()?;
+                    line.write_str("ORDER BY ")?;
+                    if order_by_clause.is_empty() {
+                        // TODO Проброс ошибок из генератора
+                        unreachable!("LIMIT clause doesn't make sense without ORDER BY clause");
+                    }
+                    let mut items = order_by_clause.iter().peekable();
+                    while let Some(expr) = items.next() {
+                        expr.expr.fmt(&mut line, context)?;
+                        line.write_str(match &expr.order {
+                            SelectionSortingOrder::Asc => " ASC",
+                            SelectionSortingOrder::Desc => " DESC",
+                        })?;
+                        if items.peek().is_some() {
+                            line.write_str(", ")?;
+                        }
+                    }
+                }
+                if let Some((count, offset)) = offset_fetch_clause {
+                    f.write_line(format_args!("OFFSET {} ROWS FETCH NEXT {} ROWS ONLY", offset, count))?;
+                }
+            }
+        }
+
+        Ok(())
+    }
 }

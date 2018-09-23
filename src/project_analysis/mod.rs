@@ -15,29 +15,31 @@
 
 */
 
-pub mod project;
-pub use self::project::*;
-
-pub mod error;
 pub use self::error::*;
-
-pub mod source;
-pub use self::source::*;
-
-pub mod module;
-pub use self::module::*;
-
-pub mod item;
+pub use self::function::*;
+pub use self::insert_source::*;
 pub use self::item::*;
-
-pub mod stdlib;
+pub use self::module::*;
+pub use self::project::*;
+pub use self::source::*;
+pub use self::statement::*;
 pub use self::stdlib::*;
 
+pub mod project;
+
+pub mod error;
+
+pub mod source;
+
+pub mod module;
+
+pub mod item;
+
+pub mod stdlib;
+
 pub mod function;
-pub use self::function::*;
 
 pub mod statement;
-pub use self::statement::*;
 
 pub mod insert_source;
-pub use self::insert_source::*;
+

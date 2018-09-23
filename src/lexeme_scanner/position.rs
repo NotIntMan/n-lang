@@ -1,19 +1,19 @@
 //! Набор структур для отображения позиции элемента в тексте
 
-use std::fmt::{
-    Debug,
-    Display,
-    Result,
-    Formatter,
-};
-use std::ops::{
-    Range,
-    Index,
-    IndexMut,
-};
 use std::cmp::{
     Ordering,
     PartialOrd,
+};
+use std::fmt::{
+    Debug,
+    Display,
+    Formatter,
+    Result,
+};
+use std::ops::{
+    Index,
+    IndexMut,
+    Range,
 };
 
 /// Позиция символа

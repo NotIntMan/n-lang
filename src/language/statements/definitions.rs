@@ -1,33 +1,41 @@
 use helpers::{
+    BlockFormatter,
+    CodeFormatter,
     Path,
     PathBuf,
     Resolve,
     SyncRef,
 };
-use lexeme_scanner::ItemPosition;
-use parser_basics::Identifier;
 use language::{
     BOOLEAN_TYPE,
-    Expression,
-    ExpressionAST,
     DataType,
     DataTypeAST,
     Deleting,
     DeletingAST,
+    Expression,
+    ExpressionAST,
     Inserting,
     InsertingAST,
     ItemPath,
     Selection,
     SelectionAST,
+    TSQLFunctionContext,
     Updating,
     UpdatingAST,
 };
+use lexeme_scanner::ItemPosition;
+use parser_basics::Identifier;
 use project_analysis::{
     FunctionVariable,
     FunctionVariableScope,
+    Item,
     SemanticError,
     StatementFlowControlJumping,
     StatementFlowControlPosition,
+};
+use std::fmt::{
+    self,
+    Write,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -257,8 +265,14 @@ impl<'source> Resolve<SyncRef<FunctionVariableScope>> for StatementAST<'source> 
             }
             StatementASTBody::Expression { expression } => {
                 let expression = expression.resolve(ctx)?;
-                StatementBody::Expression {
-                    expression,
+                let var = ctx.new_temp_variable(self.pos, expression.data_type.clone());
+                StatementBody::VariableAssignment {
+                    target: AssignmentTarget {
+                        var,
+                        property: PathBuf::empty(),
+                        pos: self.pos,
+                    },
+                    source: StatementSource::Expression(expression),
                 }
             }
             StatementASTBody::DeletingRequest { request } => {
@@ -345,9 +359,9 @@ pub enum StatementBody {
     Block {
         statements: Vec<Statement>,
     },
-    Expression {
-        expression: Expression,
-    },
+    //    Expression {
+//        expression: Expression,
+//    },
     DeletingRequest {
         request: Deleting,
     },
@@ -396,7 +410,7 @@ impl Statement {
             },
             StatementBody::Block { statements } => statements.iter()
                 .all(|stmt| stmt.is_lite_weight()),
-            StatementBody::Expression { expression } => expression.is_lite_weight(),
+//            StatementBody::Expression { expression } => expression.is_lite_weight(),
             StatementBody::DeletingRequest { request } => request.is_lite_weight(),
             StatementBody::InsertingRequest { request } => request.is_lite_weight(),
             StatementBody::UpdatingRequest { request } => request.is_lite_weight(),
@@ -473,11 +487,441 @@ impl Statement {
                     Err(errors)
                 }
             }
-            StatementBody::Expression { expression: _ } |
+//            StatementBody::Expression { expression: _ } |
             StatementBody::DeletingRequest { request: _ } |
             StatementBody::InsertingRequest { request: _ } |
             StatementBody::UpdatingRequest { request: _ } |
             StatementBody::Nothing => Ok(StatementFlowControlJumping::Nothing),
+        }
+    }
+    #[inline]
+    pub fn as_block(&self) -> Option<&[Statement]> {
+        match &self.body {
+            StatementBody::Block { statements } => Some(&statements[..]),
+            _ => None,
+        }
+    }
+    pub fn fmt_pre_call(
+        mut f: BlockFormatter<impl fmt::Write>,
+        target: Option<&SyncRef<FunctionVariable>>,
+        function: &SyncRef<Item>,
+        arguments: &[Expression],
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let function_guard = function.read();
+        let function_def = function_guard.get_function()
+            .expect("item argument of Statement::fmt_pre_call is not a function!");
+        let mut sub_f = f.sub_block();
+        let mut sub_sub_f = sub_f.sub_block();
+        if function_def.is_lite_weight {
+            let var_guard = if let Some(target) = target {
+                target.read()
+            } else {
+                let mut line = sub_sub_f.line()?;
+                Expression::fmt_function_call(&mut line, function, arguments, context)?;
+                return line.write_char(';');
+            };
+            let var_data_type = var_guard.data_type()
+                .expect("Variables cannot have unknown data-type at generate-time");
+            let (is_table, primitives) = if let Some(sub_type) = var_data_type.as_array() {
+                (true, sub_type.primitives(PathBuf::new("#")))
+            } else {
+                (false, var_data_type.primitives(PathBuf::new("#")))
+            };
+            if is_table {
+                let mut line = f.line()?;
+                write!(line, "INSERT INTO @{} (", var_guard.name())?;
+
+                let mut primitives = primitives.iter().peekable();
+                while let Some(primitive) = primitives.next() {
+                    line.write_str(primitive.path.data.as_str())?;
+                    if primitives.peek().is_some() {
+                        line.write_str(", ")?;
+                    }
+                }
+                line.write_str(")")?;
+            }
+            f.write_line("SELECT")?;
+
+            let mut primitives = primitives.into_iter().peekable();
+            while let Some(primitive) = primitives.next() {
+                let mut line = sub_sub_f.line()?;
+                if !is_table {
+                    write!(line, "@{var}#{path} = ", var = var_guard.name(), path = primitive.path)?;
+                }
+                write!(line, "t.[{path}]", path = primitive.path)?;
+                if primitives.peek().is_some() {
+                    line.write_char(',')?;
+                }
+            }
+
+            sub_f.write_line("FROM")?;
+
+            Expression::fmt_function_call(&mut sub_sub_f.line()?, function, arguments, context)?;
+
+            sub_f.write_line("AS t;")?;
+        } else {
+            let var_guard = target.map(|var| var.read());
+
+            f.write_line(format_args!("EXECUTE dbo.[{}]", function_guard.get_path()))?;
+
+            let mut arguments = arguments.into_iter().enumerate().peekable();
+            while let Some((i, argument)) = arguments.next() {
+                let (_, argument_target) = function_def.arguments.get_index(i)
+                    .expect("Arguments should not have different count at generate-time.");
+                let argument_target_guard = argument_target.read();
+
+                let argument_target_data_type = argument_target_guard.data_type()
+                    .expect("Arguments cannot have unknown data-type at generate-time");
+
+                let mut primitives = argument_target_data_type.primitives(PathBuf::new("#"))
+                    .into_iter()
+                    .peekable();
+
+                while let Some(primitive) = primitives.next() {
+                    let mut line = sub_f.line()?;
+                    match argument.get_property_or_wrap(primitive.path.as_path()) {
+                        Some(sub_expr) => sub_expr.fmt(&mut line, context)?,
+                        None => argument.fmt(&mut line, context)?,
+                    }
+                    if var_guard.is_some() || arguments.peek().is_some() || primitives.peek().is_some() {
+                        line.write_char(',')?;
+                    } else {
+                        line.write_char(';')?;
+                    }
+                }
+            }
+
+            if let Some(var_guard) = var_guard {
+                let mut primitives = function_def.result.primitives(PathBuf::new("#"))
+                    .into_iter()
+                    .peekable();
+                while let Some(primitive) = primitives.next() {
+                    let mut line = sub_f.line()?;
+                    write!(line, "@{}#{} OUTPUT", var_guard.name(), primitive.path)?;
+                    if primitives.peek().is_some() {
+                        line.write_char(',')?;
+                    } else {
+                        line.write_char(';')?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn fmt_something_with_pre_calls(
+        mut f: BlockFormatter<impl fmt::Write>,
+        buffer: &mut String,
+        context: &mut TSQLFunctionContext,
+        action: impl Fn(BlockFormatter<String>, &mut TSQLFunctionContext) -> fmt::Result,
+    ) -> fmt::Result {
+        buffer.clear();
+        {
+            let buffer_f = {
+                let mut formatter = CodeFormatter::new(buffer);
+                formatter.indent_size = 4;
+                formatter.root_block()
+            };
+            action(buffer_f, context)?;
+        }
+        for pre_call in context.extract_pre_calc_calls() {
+            for line in pre_call.lines() {
+                f.write_line(line)?;
+            }
+        }
+        for line in buffer.lines() {
+            f.write_line(line)?;
+        }
+        buffer.clear();
+        Ok(())
+    }
+    pub fn fmt_block_without_parens(
+        f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        statements: &[Statement],
+    ) -> fmt::Result {
+        let mut buffer = String::new();
+        for statement in statements {
+            Statement::fmt_something_with_pre_calls(
+                f.clone(),
+                &mut buffer,
+                context,
+                |buffer_f, context| statement.fmt(buffer_f, context),
+            )?;
+        }
+        Ok(())
+    }
+    pub fn fmt_block(
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+        statements: &[Statement],
+    ) -> fmt::Result
+    {
+        f.write_line("BEGIN")?;
+        Statement::fmt_block_without_parens(
+            f.sub_block(),
+            context,
+            statements,
+        )?;
+        f.write_line("END")
+    }
+    pub fn fmt_assignment(
+        mut f: BlockFormatter<impl fmt::Write>,
+        target_path: &str,
+        target_data_type: &DataType,
+        is_can_be_table: bool,
+        source: &StatementSource,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        let target_data_type_as_complex = if is_can_be_table {
+            match target_data_type.as_table_type(PathBuf::new("#")) {
+                Some(primitives) => Ok(primitives),
+                None => Err(target_data_type.as_primitive()),
+            }
+        } else {
+            match target_data_type.as_array() {
+                Some(sub_type) => Ok(sub_type.primitives(PathBuf::new("#"))),
+                None => Err(target_data_type.as_primitive()),
+            }
+        };
+        match target_data_type_as_complex {
+            Ok(primitives) => {
+                let select_wrapper = {
+                    let mut line = f.line()?;
+                    write!(line, "INSERT INTO @{} (", target_path)?;
+                    let mut select_wrapper = String::from("SELECT ");
+
+                    let mut primitives = primitives.into_iter().peekable();
+                    while let Some(primitive) = primitives.next() {
+                        write!(line, "[{}]", primitive.path)?;
+                        write!(select_wrapper, "t.[{}]", primitive.path)?;
+                        if primitives.peek().is_some() {
+                            line.write_str(", ")?;
+                            select_wrapper.write_str(", ")?;
+                        }
+                    }
+                    line.write_str(")")?;
+
+                    select_wrapper.write_str(" FROM")?;
+                    select_wrapper
+                };
+
+                let mut source_f = f.sub_block();
+                match source {
+                    StatementSource::Expression(expr) => {
+                        source_f.write_line(select_wrapper)?;
+                        let mut sub_f = source_f.sub_block();
+                        {
+                            let mut line = sub_f.line()?;
+                            expr.fmt(&mut line, context)?;
+                        }
+                        source_f.write_line("AS t;")
+                    }
+                    StatementSource::Selection(query) => {
+                        source_f.write_line("(")?;
+                        if query.result_data_type == *target_data_type {
+                            query.fmt(source_f.sub_block(), context)?;
+                            source_f.write_line(");")
+                        } else {
+                            source_f.write_line(select_wrapper)?;
+                            query.fmt(source_f.sub_block(), context)?;
+                            source_f.write_line(") as t;")
+                        }
+                    }
+                }
+            }
+            Err(Some(_)) => {
+                match source {
+                    StatementSource::Expression(expr) => {
+                        let mut line = f.line()?;
+                        write!(line, "SET @{} = ", target_path)?;
+                        expr.fmt(&mut line, context)?;
+                        line.write_char(';')?;
+                    }
+                    StatementSource::Selection(query) => {
+                        f.write_line(format_args!("SET @{} = (", target_path))?;
+                        query.fmt(f.sub_block(), context)?;
+                        f.write_line(");")?;
+                    }
+                }
+                Ok(())
+            }
+            Err(None) => {
+                f.write_line("SELECT")?;
+
+                let mut primitives = target_data_type.primitives(PathBuf::new("#"))
+                    .into_iter()
+                    .peekable();
+
+                let mut sub_f = f.sub_block();
+                let mut sub_sub_f = sub_f.sub_block();
+
+                while let Some(primitive) = primitives.next() {
+                    let mut line = sub_sub_f.line()?;
+                    write!(line, "@{var}#{path} = t.[{path}]", var = target_path, path = primitive.path)?;
+                    if primitives.peek().is_some() {
+                        line.write_char(',')?;
+                    }
+                }
+
+                match source {
+                    StatementSource::Expression(expr) => {
+                        sub_f.write_line("FROM")?;
+                        expr.fmt(&mut sub_sub_f.line()?, context)?;
+                        sub_f.write_line(" as t;")
+                    }
+                    StatementSource::Selection(query) => {
+                        sub_f.write_line("FROM (")?;
+                        query.fmt(sub_sub_f, context)?;
+                        sub_f.write_line(") as t;")
+                    }
+                }
+            }
+        }
+    }
+    pub fn fmt(
+        &self,
+        mut f: BlockFormatter<impl fmt::Write>,
+        context: &mut TSQLFunctionContext,
+    ) -> fmt::Result {
+        match &self.body {
+            StatementBody::Nothing => Ok(()),
+            StatementBody::VariableAssignment { target, source } => {
+                let var_guard = target.var.read();
+                let data_type = var_guard.data_type()
+                    .expect("Variable cannot have undefined data-type at generate-time");
+                let data_type = data_type.property_type(self.pos, target.property.as_path())
+                    .expect("Property path should be checked at semantic-check-time");
+                let mut var_path = target.property.as_path().into_new_buf("#");
+                var_path.push_front(var_guard.name());
+                Statement::fmt_assignment(
+                    f,
+                    &var_path.data,
+                    &data_type,
+                    data_type.as_array().is_some(),
+                    source,
+                    context,
+                )
+            }
+            StatementBody::Condition { condition, then_body, else_body } => {
+                Statement::fmt_something_with_pre_calls(
+                    f.clone(),
+                    &mut String::new(),
+                    context,
+                    |mut f, context| {
+                        let mut cond_line = f.line()?;
+                        cond_line.write_str("IF ")?;
+                        condition.fmt(&mut cond_line, context)
+                    },
+                )?;
+                then_body.fmt(f.sub_block(), context)?;
+                if let Some(else_body) = else_body {
+                    f.write_line("ELSE")?;
+                    else_body.fmt(f.sub_block(), context)?;
+                }
+                Ok(())
+            }
+            StatementBody::Cycle { cycle_type: CycleType::Simple, body } => {
+                f.write_line("WHILE 1 = 1")?;
+                body.fmt(f.sub_block(), context)
+            }
+            StatementBody::Cycle { cycle_type: CycleType::PrePredicated(predicate), body } => {
+                f.write_line("WHILE 1 = 1 BEGIN")?;
+                let mut buffer = String::new();
+                let mut sub_f = f.sub_block();
+                Statement::fmt_something_with_pre_calls(
+                    sub_f.clone(),
+                    &mut buffer,
+                    context,
+                    |mut buffer_f, context| {
+                        let mut predicate_line = buffer_f.line()?;
+                        predicate_line.write_str("IF ")?;
+                        predicate.fmt(&mut predicate_line, context)
+                    },
+                )?;
+                body.fmt(sub_f.clone(), context)?;
+                sub_f.write_line("ELSE BREAK;")?;
+                f.write_line("END")
+            }
+            StatementBody::Cycle { cycle_type: CycleType::PostPredicated(predicate), body } => {
+                f.write_line("WHILE 1 = 1 BEGIN")?;
+                let mut sub_f = f.sub_block();
+                body.fmt(sub_f.clone(), context)?;
+                let mut buffer = String::new();
+                Statement::fmt_something_with_pre_calls(
+                    sub_f.clone(),
+                    &mut buffer,
+                    context,
+                    |mut buffer_f, context| {
+                        let mut predicate_line = buffer_f.line()?;
+                        predicate_line.write_str("IF NOT ")?;
+                        predicate.fmt(&mut predicate_line, context)?;
+                        predicate_line.write_str(" BREAK;")
+                    },
+                )?;
+                f.write_line("END")
+            }
+            StatementBody::CycleControl { operator } => {
+                f.write_line(match operator {
+                    CycleControlOperator::Break => "BREAK;",
+                    CycleControlOperator::Continue => "CONTINUE;",
+                })
+            }
+            StatementBody::Return { value } => {
+                if let Some(value) = value {
+                    if context.function.result.as_primitive().is_some() {
+                        match value {
+                            StatementSource::Expression(expr) => {
+                                let mut line = f.line()?;
+                                line.write_str("RETURN ")?;
+                                expr.fmt(&mut line, context)?;
+                                line.write_char(';')?;
+                            }
+                            StatementSource::Selection(selection) => {
+                                f.write_line("RETURN")?;
+                                let mut sub_f = f.sub_block();
+                                selection.fmt(sub_f.clone(), context)?;
+                                sub_f.write_line(";")?;
+                            }
+                        }
+                    } else {
+                        let result_var_name = context.function.result_var_name.as_ref()
+                            .expect("Result-variable name should be known when result is not void");
+                        Statement::fmt_assignment(
+                            f.clone(),
+                            result_var_name,
+                            &context.function.result,
+                            context.function.is_lite_weight,
+                            value,
+                            context,
+                        )?;
+                    }
+                } else {
+                    if context.function.is_lite_weight {
+                        f.write_line("RETURN 1;")?;
+                    } else {
+                        f.write_line("RETURN;")?;
+                    }
+                }
+                Ok(())
+            }
+            StatementBody::Block { statements } => {
+                Statement::fmt_block(f, context, statements)
+            }
+//            StatementBody::Expression { expression } => {
+//                let mut line = f.line()?;
+//                expression.fmt(&mut line, context)?;
+//                line.write_char(';')
+//            }
+            StatementBody::DeletingRequest { request } => {
+                request.fmt(f, context)
+            }
+            StatementBody::InsertingRequest { request } => {
+                request.fmt(f, context)
+            }
+            StatementBody::UpdatingRequest { request } => {
+                request.fmt(f, context)
+            }
         }
     }
 }

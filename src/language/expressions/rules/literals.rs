@@ -5,11 +5,11 @@ use lexeme_scanner::{
 };
 use parser_basics::{
     keyword,
-    token,
-    ParserInput,
     ParserErrorKind,
     ParserErrorTokenInfo,
+    ParserInput,
     ParserResult,
+    token,
 };
 use super::*;
 

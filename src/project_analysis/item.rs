@@ -1,6 +1,6 @@
-use std::fmt;
 use helpers::{
     Path,
+    PathBuf,
     SyncRef,
 };
 use language::{
@@ -9,9 +9,11 @@ use language::{
     TableDefinition,
 };
 use project_analysis::Module;
+use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone)]
 pub struct Item {
+    parent: SyncRef<Module>,
     body: ItemBody,
 }
 
@@ -20,14 +22,6 @@ pub enum ItemBody {
     DataType {
         def: DataTypeDefinition,
     },
-    //    ImportDefinition {
-//        def: ExternalItemImport<'static>
-//    },
-//    ImportItem {
-//        name: StaticIdentifier,
-//        original_name: StaticIdentifier,
-//        item: ItemRef,
-//    },
     ModuleReference {
         module: SyncRef<Module>,
     },
@@ -43,35 +37,45 @@ pub enum ItemBody {
 
 impl Item {
     #[inline]
-    pub fn data_type(def: DataTypeDefinition) -> Self {
-        Item { body: ItemBody::DataType { def } }
+    pub fn data_type(parent: SyncRef<Module>, def: DataTypeDefinition) -> Self {
+        Item {
+            parent,
+            body: ItemBody::DataType { def },
+        }
     }
     #[inline]
     pub fn module_ref(module: SyncRef<Module>) -> Self {
-        Item { body: ItemBody::ModuleReference { module } }
+        Item {
+            parent: module.clone(),
+            body: ItemBody::ModuleReference { module },
+        }
     }
     #[inline]
-    pub fn function(def: FunctionDefinition) -> Self {
-        Item { body: ItemBody::Function { def } }
+    pub fn function(parent: SyncRef<Module>, def: FunctionDefinition) -> Self {
+        Item {
+            parent,
+            body: ItemBody::Function { def },
+        }
     }
     #[inline]
-    pub fn table(mut def: TableDefinition) -> Self {
-        let entity = SyncRef::new(Item::data_type(DataTypeDefinition {
+    pub fn table(parent: SyncRef<Module>, def: TableDefinition) -> Self {
+        let entity = SyncRef::new(Item::data_type(parent.clone(), DataTypeDefinition {
             name: format!("{}::entity", def.name),
-            body: def.make_entity_type(),
+            body: def.entity.clone(),
         }));
-        let primary_key = SyncRef::new(Item::data_type(DataTypeDefinition {
+        let primary_key = SyncRef::new(Item::data_type(parent.clone(), DataTypeDefinition {
             name: format!("{}::primary_key", def.name),
-            body: def.make_primary_key_type(),
+            body: def.primary_key.clone(),
         }));
-        Item { body: ItemBody::Table { def, entity, primary_key } }
+        Item {
+            parent,
+            body: ItemBody::Table { def, entity, primary_key },
+        }
     }
     #[inline]
     pub fn get_type(&self) -> SemanticItemType {
         match &self.body {
             ItemBody::DataType { def: _ } => SemanticItemType::DataType,
-//            ItemBody::ImportDefinition { def: _ } => SemanticItemType::UnresolvedImport,
-//            ItemBody::ImportItem { name: _, original_name: _, item } => item.get_type(),
             ItemBody::ModuleReference { module: _ } => SemanticItemType::Module,
             ItemBody::Table { def: _, entity: _, primary_key: _ } => SemanticItemType::Table,
             ItemBody::Function { def: _ } => SemanticItemType::Function,
@@ -105,12 +109,34 @@ impl Item {
             _ => None,
         }
     }
+    pub fn get_path(&self) -> PathBuf {
+        let name = match &self.body {
+            ItemBody::DataType { def } => def.name.as_str(),
+            ItemBody::ModuleReference { module } => {
+                let module = module.read();
+                let path = module.path().read();
+                return path.clone();
+            }
+            ItemBody::Table { def, .. } => def.name.as_str(),
+            ItemBody::Function { def } => def.name.as_str(),
+        };
+        let parent = self.parent.read();
+        let path = parent.path().read();
+        let mut result = path.clone();
+        result.push(name);
+        result
+    }
     #[inline]
-    pub fn get_table_mut(&mut self) -> Option<&mut TableDefinition> {
-        match &mut self.body {
-            ItemBody::Table { def, entity: _, primary_key: _ } => Some(def),
-            _ => None,
-        }
+    pub fn body(&self) -> &ItemBody {
+        &self.body
+    }
+    #[inline]
+    pub fn parent(&self) -> &SyncRef<Module> {
+        &self.parent
+    }
+    #[inline]
+    pub fn is_belongs_to(&self, module: &SyncRef<Module>) -> bool {
+        self.parent.is_same_ref(module)
     }
 }
 
@@ -139,6 +165,24 @@ impl SyncRef<Item> {
     #[inline]
     pub fn get_type(&self) -> SemanticItemType {
         self.read().get_type()
+    }
+}
+
+impl PartialEq for Item {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.parent.is_same_ref(&rhs.parent)
+            &&
+            self.body == rhs.body
+    }
+}
+
+impl fmt::Debug for Item {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if f.alternate() {
+            write!(f, "Item::{:#?}", self.body)
+        } else {
+            write!(f, "Item::{:?}", self.body)
+        }
     }
 }
 
