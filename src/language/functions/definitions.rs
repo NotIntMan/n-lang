@@ -233,10 +233,8 @@ impl FunctionDefinition {
         {
             let mut arguments = context.function.arguments.iter().peekable();
             while let Some((argument_name, argument)) = arguments.next() {
-                let mut argument_guard = argument.write();
+                let argument_guard = argument.read();
                 let mut prefix = PathBuf::new("#");
-                let new_name = context.names.add_name(argument_guard.name().into());
-                argument_guard.set_name(new_name);
                 prefix.push(argument_name.as_str());
                 let primitives = argument_guard.data_type()
                     .expect("Function argument cannot have unknown data-type")

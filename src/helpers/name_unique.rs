@@ -49,11 +49,13 @@ impl NameUniquer {
             names: HashSet::new(),
         }
     }
-    pub fn add_name(&mut self, name: String) -> String {
-        let name = generate_name(
-            |name| !self.names.contains(name),
-            name,
-        );
+    pub fn add_name(&mut self, mut name: String) -> String {
+        if self.names.contains(&name) {
+            name = generate_name(
+                |name| !self.names.contains(name),
+                name,
+            );
+        }
         self.names.insert(name.clone());
         name
     }

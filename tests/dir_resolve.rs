@@ -149,19 +149,26 @@ fn dir_resolve() {
 
 #[test]
 fn item_order_should_always_be_the_same() {
-    let db_code = {
-        let (db, _rpc) = resolve_project();
+    let (db_code, rpc_code) = {
+        let (db, rpc) = resolve_project();
         let db_code = db.generate_string()
             .expect("Cannot generate output for database");
-        db_code
+        let rpc_code = rpc.generate_string()
+            .expect("Cannot generate output for RPC");
+        (db_code, rpc_code)
     };
 
     for _ in 0..100 {
-        let (db, _rpc) = resolve_project();
+        let (db, rpc) = resolve_project();
         assert_eq!(
             db_code,
             db.generate_string()
                 .expect("Cannot generate output for database")
+        );
+        assert_eq!(
+            rpc_code,
+            rpc.generate_string()
+                .expect("Cannot generate output for RPC")
         );
     }
 }
