@@ -1,4 +1,6 @@
 # Язык N
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FNotIntMan%2Fn-lang.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FNotIntMan%2Fn-lang?ref=badge_shield)
+
 
 Проект языка программирования хранимых процедур.
 
@@ -101,3 +103,7 @@
 [PrettyAssertion]: https://crates.io/crates/pretty_assertions
 [Clap]: https://crates.io/crates/clap
 [Дмитрий Демин]: https://github.com/NotIntMan
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FNotIntMan%2Fn-lang.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2FNotIntMan%2Fn-lang?ref=badge_large)
